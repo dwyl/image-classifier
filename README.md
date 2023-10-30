@@ -22,6 +22,7 @@ within `Phoenix`!
 - [How? 💻](#how-)
   - [Prerequisites](#prerequisites)
   - [0. Creating a fresh `Phoenix` project](#0-creating-a-fresh-phoenix-project)
+  - [1. Installing initial dependencies](#1-installing-initial-dependencies)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -117,8 +118,49 @@ you should be able to see the following page.
 We're ready to start implementing!
 
 
+## 1. Installing initial dependencies
 
+Now that we're ready to go, 
+let's start by adding some dependencies.
 
+Head over to `mix.exs` 
+and add the following dependencies
+to the `deps` section.
+
+```elixir
+{:bumblebee, "~> 0.4.2"},
+{:exla, "~> 0.6.1"}
+```
+
+- [**`bumblebee`**](https://github.com/elixir-nx/bumblebee),
+a framework that will allows us to integrate
+[`Transformer Models`](https://huggingface.co/docs/transformers/index) in `Phoenix`.
+`Transformers` (from [Hugging Face](https://huggingface.co/))
+are APIs that allow us to easily download and train pretrained models.
+`Bumblebee` aims to support all Transformer Models, 
+however some are lacking.
+You may check which ones are supported by visiting 
+`Bumblebee`'s repository
+or visiting https://jonatanklosko-bumblebee-tools.hf.space/apps/repository-inspector
+and checking if the model is currently supported.
+
+- [**`EXLA`**](https://hexdocs.pm/exla/EXLA.html),
+Elixir implementation of [Google's XLA](https://www.tensorflow.org/xla/),
+a compiler that provides faster linear algebra calculations
+with `TensorFlow` models.
+This backend compiler is needed for [`Nx`](https://github.com/elixir-nx/nx),
+a framework that allows support for tensors and numerical definitions
+in Elixir.
+We are installing `EXLA` because allows us to compile models
+*just-in-time* and run them on CPU and/or GPU.
+
+In `config/config.exs`,
+let's add our `:nx` configuration
+to use `EXLA`.
+
+```elixir
+config :nx, default_backend: EXLA.Backend
+```
 
 
 # _Please_ Star the repo! ⭐️
