@@ -23,6 +23,7 @@ within `Phoenix`!
   - [Prerequisites](#prerequisites)
   - [0. Creating a fresh `Phoenix` project](#0-creating-a-fresh-phoenix-project)
   - [1. Installing initial dependencies](#1-installing-initial-dependencies)
+  - [2. Adding `LiveView` capabilities to our project](#2-adding-liveview-capabilities-to-our-project)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -161,6 +162,122 @@ to use `EXLA`.
 ```elixir
 config :nx, default_backend: EXLA.Backend
 ```
+
+## 2. Adding `LiveView` capabilities to our project
+
+As it stands,
+our project is not using `LiveView`.
+Let's fix this.
+
+In `lib/app_web/router.ex`,
+change the `scope "/"` to the following.
+
+```elixir
+  scope "/", AppWeb do
+    pipe_through :browser
+
+    live "/", PageLive
+  end
+```
+
+Instead of using the `PageController`,
+we are going to be creating `ImgupLive`,
+a `LiveView` file.
+
+Let's create our `LiveView` files.
+Inside `lib/app_web`, 
+create a folder called `live`
+and create the following file 
+`page_live.ex`.
+
+```elixir
+defmodule AppWeb.PageLive do
+  use AppWeb, :live_view
+
+  @impl true
+  def mount(_params, _session, socket) do
+    {:ok, socket}
+  end
+end
+
+```
+
+This is a simple `LiveView` controller.
+
+In the same `live` folder,
+create a file called `page_live.html.heex`
+and use the following code.
+
+```html
+<.flash_group flash={@flash} />
+<div class="px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32">
+  <div class="mx-auto max-w-xl w-[50vw] lg:mx-0">
+    <form>
+      <div class="space-y-12">
+        <div>
+          <h2 class="text-base font-semibold leading-7 text-gray-900">Image Classifier</h2>
+          <p class="mt-1 text-sm leading-6 text-gray-600">Drag your images and we'll run an AI model to caption it!</p>
+
+          <div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+
+            <div class="col-span-full">
+              <div class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
+                <div class="text-center">
+                  <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" />
+                  </svg>
+                  <div class="mt-4 flex text-sm leading-6 text-gray-600">
+                    <label for="file-upload" class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500">
+                      <span>Upload a file</span>
+                      <input id="file-upload" name="file-upload" type="file" class="sr-only">
+                    </label>
+                    <p class="pl-1">or drag and drop</p>
+                  </div>
+                  <p class="text-xs leading-5 text-gray-600">PNG, JPG, GIF up to 10MB</p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+```
+
+This is a simple HTML form that uses 
+[`Tailwind CSS`](https://github.com/dwyl/learn-tailwind)
+to enhance the presentation of the upload form. 
+We'll also remove the unused header of the page layout,
+while we're at it.
+
+Locate the file `lib/app_web/components/layouts/app.html.heex`
+and remove the `<header>` class.
+The file should only have the following code:
+
+```html
+<main class="px-4 py-20 sm:px-6 lg:px-8">
+  <div class="mx-auto max-w-2xl">
+    <.flash_group flash={@flash} />
+    <%= @inner_content %>
+  </div>
+</main>
+```
+
+Now you can safely delete the `lib/app_web/controllers` folder,
+which is no longer used.
+
+If you run `mix phx.server`,
+you should see the following screen:
+
+<p align="center">
+  <img src="https://github.com/dwyl/imgup/assets/17494745/5a3438fe-fa45-47f9-8cb2-9d6d405f55a0">
+</p>
+
+This means we've successfully added `LiveView`
+and changed our view!
+
 
 
 # _Please_ Star the repo! ⭐️
