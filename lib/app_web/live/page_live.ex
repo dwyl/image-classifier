@@ -5,8 +5,8 @@ defmodule AppWeb.PageLive do
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(:uploaded_files, [])
-     |> allow_upload(:image_list,
+     |> assign(label: nil, running: false, task_ref: nil)
+     |> allow_upload(:image,
        accept: ~w(image/*),
        auto_upload: true,
        progress: &handle_progress/3,
@@ -16,21 +16,14 @@ defmodule AppWeb.PageLive do
   end
 
   @impl true
-  def handle_event("validate", _params, socket) do
+  def handle_event("noop", %{}, socket) do
+    dbg("what")
     {:noreply, socket}
   end
 
-  @impl true
-  def handle_event("remove-selected", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :image_list, ref)}
-  end
+  defp handle_progress(:image, entry, socket) do
+    dbg("bru")
 
-  @impl true
-  def handle_event("save", _params, socket) do
-    {:noreply, socket}
-  end
-
-  defp handle_progress(:image_list, entry, socket) do
     if entry.done? do
       uploaded_file =
         consume_uploaded_entry(socket, entry, fn %{} = meta ->
