@@ -43,7 +43,16 @@ defmodule App.MixProject do
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.2"},
-      {:plug_cowboy, "~> 2.5"}
+      {:plug_cowboy, "~> 2.5"},
+
+      # Bumblebee imports
+      {:bumblebee, "~> 0.4.2"},
+      {:exla, "~> 0.6.1"},
+      {:nx, "~> 0.6.2"},
+
+      # Image
+      {:mogrify, "~> 0.9.3"},
+      {:vix, "~> 0.23.1"}
     ]
   end
 
