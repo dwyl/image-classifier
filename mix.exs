@@ -51,7 +51,6 @@ defmodule App.MixProject do
       {:nx, "~> 0.6.2"},
 
       # Image
-      {:mogrify, "~> 0.9.3"},
       {:vix, "~> 0.23.1"}
     ]
   end

@@ -1,6 +1,6 @@
 defmodule AppWeb.PageLive do
   use AppWeb, :live_view
-  import Mogrify
+  alias Vix.Vips.Image, as: Vimage
 
   @impl true
   def mount(_params, _session, socket) do
@@ -12,109 +12,76 @@ defmodule AppWeb.PageLive do
        auto_upload: true,
        progress: &handle_progress/3,
        max_entries: 1,
-       chunk_size: 64_000
+       chunk_size: 2_000,
+       max_file_size: 8_000
      )}
   end
 
   @impl true
-  def handle_event("validate", _params, socket) do
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("remove-selected", %{"ref" => ref}, socket) do
-    {:noreply, cancel_upload(socket, :image_list, ref)}
-  end
-
-  @impl true
-  def handle_event("save", _params, socket) do
+  def handle_event("noop", _params, socket) do
     {:noreply, socket}
   end
 
   def handle_progress(:image_list, entry, socket) do
     if entry.done? do
-      socket
-      |> consume_uploaded_entry(entry, fn %{} = meta ->
-        # Resizes the image in-line
-        # open(meta.path) |> resize("224x224") |> save(in_place: true)
+
+      # Consume the entry and get the tensor to feed to classifier
+      tensor = consume_uploaded_entry(socket, entry, fn %{} = meta ->
         {:ok, vimage} = Vix.Vips.Image.new_from_file(meta.path)
-
-        {:ok, flattened} = flatten(vimage)
-        {:ok, srgb} = to_colorspace(flattened, :VIPS_INTERPRETATION_sRGB)
-        {:ok, tensor} = to_nx(srgb, shape: :hwc)
+        pre_process_image(vimage)
       end)
-      |> case do
-        tensor ->
-          task = Task.async(fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
 
-          {:noreply, assign(socket, running: true, task_ref: task.ref)}
+      # Create an async task to classify the image
+      task = Task.async(fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
 
-        _ ->
-          {:noreply, socket}
-      end
+      # Update socket assigns to show spinner whilst task is running
+      {:noreply, assign(socket, running: true, task_ref: task.ref)}
     else
       {:noreply, socket}
     end
   end
 
-  defp flatten(image) do
-    if Vix.Vips.Image.has_alpha?(image) do
-      Vix.Vips.Operation.flatten(image)
-    else
-      {:ok, image}
-    end
-  end
-
-  defp to_colorspace(image, colorspace) do
-    Vix.Vips.Operation.colourspace(image, colorspace)
-  end
-
-  def to_nx(image, options \\ []) do
-    {to_shape, options} = Keyword.pop(options, :shape, @default_shape)
-
-    with {:ok, tensor} <- Vix.Vips.Image.write_to_tensor(image),
-         {:ok, shape, names} <- maybe_reshape_tensor(tensor, to_shape) do
-      %Vix.Tensor{data: binary, type: type} = tensor
-
-      binary
-      |> Nx.from_binary(type, options)
-      |> Nx.reshape(shape, names: names)
-      |> wrap(:ok)
-    end
-  end
-
-  # write_to_tensor writes in height, widght, bands format. No reshape
-  # is required.
-  defp maybe_reshape_tensor(%Vix.Tensor{shape: shape}, :hwc),
-    do: {:ok, shape, [:height, :width, :bands]}
-
-  defp maybe_reshape_tensor(%Vix.Tensor{shape: shape}, :hwb),
-    do: {:ok, shape, [:height, :width, :bands]}
-
-  defp maybe_reshape_tensor(%Vix.Tensor{} = tensor, :whb),
-    do: maybe_reshape_tensor(tensor, :whc)
-
-  # We need to reshape the tensor since the default is
-  # :hwc
-  defp maybe_reshape_tensor(%Vix.Tensor{shape: {x, y, bands}}, :whc),
-    do: {:ok, {y, x, bands}, [:width, :height, :bands]}
-
-  defp maybe_reshape_tensor(_tensor, shape) do
-    {:error,
-     "Invalid shape. Allowable shapes are :whb, :whc, :hwc and :hwb. Found #{inspect(shape)}"}
-  end
-
-  defp wrap(item, atom) do
-    {atom, item}
-  end
-
-  defp decode_as_tensor(<<height::32-integer, width::32-integer, data::binary>>) do
-    data |> Nx.from_binary(:u8) |> Nx.reshape({height, width, 3})
-  end
-
+  @impl true
   def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket) do
+    # This is called everytime an Async Task is created.
+    # We flush it here.
     Process.demonitor(ref, [:flush])
+
+    # And then destructure the result from the classifier.
     %{predictions: [%{label: label}]} = result
+
+    # Update the socket assigns with result and stopping spinner.
     {:noreply, assign(socket, label: label, running: false)}
+  end
+
+  defp pre_process_image(%Vimage{} = image) do
+
+    # If the image has an alpha channel, we flatten the alpha out of the image --------
+    {:ok, flattened_image} = case Vix.Vips.Image.has_alpha?(image) do
+      true -> Vix.Vips.Operation.flatten(image)
+      false -> {:ok, image}
+    end
+
+    # Convert the image to sRGB colourspace ----------------
+    {:ok, srgb_image} = Vix.Vips.Operation.colourspace(flattened_image, :VIPS_INTERPRETATION_sRGB)
+
+    # Converting image to tensor ----------------
+
+    {:ok, tensor} = Vix.Vips.Image.write_to_tensor(image)
+
+    # We reshape the tensor given a specific format.
+    # In this case, we are using {height, width, channels/bands}.
+    # If you want to use {width, height, channels/bands},
+    # you need format = `[:width, :height, :bands]` and shape = `{y, x, bands}`.
+    %Vix.Tensor{data: binary, type: type, shape: {x, y, bands}} = tensor
+    format = [:height, :width, :bands]
+    shape = {x, y, bands}
+
+    final_tensor =
+      binary
+      |> Nx.from_binary(type)
+      |> Nx.reshape(shape, names: format)
+
+    {:ok, final_tensor}
   end
 end
