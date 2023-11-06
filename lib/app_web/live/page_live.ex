@@ -13,7 +13,7 @@ defmodule AppWeb.PageLive do
        progress: &handle_progress/3,
        max_entries: 1,
        chunk_size: 2_000,
-       max_file_size: 8_000
+       max_file_size: 10_000_000
      )}
   end
 
@@ -66,8 +66,7 @@ defmodule AppWeb.PageLive do
     {:ok, srgb_image} = Vix.Vips.Operation.colourspace(flattened_image, :VIPS_INTERPRETATION_sRGB)
 
     # Converting image to tensor ----------------
-
-    {:ok, tensor} = Vix.Vips.Image.write_to_tensor(image)
+    {:ok, tensor} = Vix.Vips.Image.write_to_tensor(srgb_image)
 
     # We reshape the tensor given a specific format.
     # In this case, we are using {height, width, channels/bands}.
@@ -84,4 +83,6 @@ defmodule AppWeb.PageLive do
 
     {:ok, final_tensor}
   end
+
+  def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 10MB."
 end
