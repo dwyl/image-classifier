@@ -12,8 +12,8 @@ defmodule AppWeb.PageLive do
        auto_upload: true,
        progress: &handle_progress/3,
        max_entries: 1,
-       chunk_size: 2_000,
-       max_file_size: 10_000_000
+       chunk_size: 64_000,
+       max_file_size: 5_000_000
      )}
   end
 
@@ -54,6 +54,8 @@ defmodule AppWeb.PageLive do
     {:noreply, assign(socket, label: label, running: false)}
   end
 
+  def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 10MB."
+
   defp pre_process_image(%Vimage{} = image) do
 
     # If the image has an alpha channel, we flatten the alpha out of the image --------
@@ -83,6 +85,4 @@ defmodule AppWeb.PageLive do
 
     {:ok, final_tensor}
   end
-
-  def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 10MB."
 end
