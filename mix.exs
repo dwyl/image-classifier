@@ -40,18 +40,18 @@ defmodule App.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:phoenix, "~> 1.7.0"},
-      {:phoenix_html, "~> 3.3"},
-      {:phoenix_live_reload, "~> 1.2", only: :dev},
-      {:phoenix_live_view, "~> 0.18.16"},
-      {:heroicons, "~> 0.5"},
-      {:floki, ">= 0.30.0", only: :test},
-      {:esbuild, "~> 0.5", runtime: Mix.env() == :dev},
-      {:tailwind, "~> 0.1.8", runtime: Mix.env() == :dev},
+      {:phoenix, "~> 1.7.10"},
+      {:phoenix_html, "~> 3.3.3"},
+      {:phoenix_live_reload, "~> 1.4.1", only: :dev},
+      {:phoenix_live_view, "~> 0.20.1"},
+      {:heroicons, "~> 0.5.3"},
+      {:floki, ">= 0.35.2", only: :test},
+      {:esbuild, "~> 0.8.1", runtime: Mix.env() == :dev},
+      {:tailwind, "~> 0.2.2", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},
-      {:jason, "~> 1.2"},
-      {:plug_cowboy, "~> 2.5"},
+      {:jason, "~> 1.4"},
+      {:plug_cowboy, "~> 2.6.1"},
 
       # Bumblebee imports
       {:bumblebee, "~> 0.4.2"},
