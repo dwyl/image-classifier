@@ -1,13 +1,13 @@
 <div align="center">
 
-# Image classifier in `Elixir`
+# Image Captioning in `Elixir`
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/dwyl/image-classifier/ci.yml?label=build&style=flat-square&branch=main)
 [![codecov.io](https://img.shields.io/codecov/c/github/dwyl/image-classifier/main.svg?style=flat-square)](https://codecov.io/github/dwyl/image-classifier?branch=main)
 [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat-square)](https://github.com/dwyl/image-classifier/issues)
 [![HitCount](https://hits.dwyl.com/dwyl/image-classifier.svg?style=flat-square&show=unique)](https://hits.dwyl.com/dwyl/image-classifier)
 
-Classify your images using 
+Caption your images using 
 machine learning models
 within `Phoenix`!
 
@@ -15,7 +15,7 @@ within `Phoenix`!
 
 <br />
 
-- [Image classifier in `Elixir`](#image-classifier-in-elixir)
+- [Image Captioning in `Elixir`](#image-captioning-in-elixir)
 - [Why? 🤷](#why-)
 - [What? 💭](#what-)
 - [Who? 👤](#who-)
@@ -48,7 +48,7 @@ Building our
 we consider `images` an _essential_ 
 medium of communication.
 
-By adding a way of classifying images,
+By adding a way of captioning images,
 we make it *easy* for people
 to suggest meta tags to describe images
 so they become **searchable**.
@@ -59,13 +59,13 @@ so they become **searchable**.
 This run-through will create a simple
 `Phoenix` web application
 that will allow you to choose/drag an image
-and classify the image.
+and caption the image.
 
 
 # Who? 👤
 
 This tutorial is aimed at `Phoenix` beginners 
-that want to grasp how to do image classifying
+that want to grasp how to do image captioning
 within a `Phoenix` application.
 
 If you are completely new to `Phoenix` and `LiveView`,
@@ -329,7 +329,7 @@ let's make some changes to
       <div class="border-gray-900/10 pb-12">
         <h2 class="text-base font-semibold leading-7 text-gray-900">Image Classification</h2>
         <p class="mt-1 text-sm leading-6 text-gray-600">
-            Do simple classification with this <a href="https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html" class="font-mono font-medium text-sky-500">LiveView</a>
+            Do simple captioning with this <a href="https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html" class="font-mono font-medium text-sky-500">LiveView</a>
             demo, powered by <a href="https://github.com/elixir-nx/bumblebee" class="font-mono font-medium text-sky-500">Bumblebee</a>.
         </p>
 
@@ -472,7 +472,7 @@ nothing will change.
 # 4. Integrating `Bumblebee`
 
 Now here comes the fun part!
-It's time to do some image classification! 🎉
+It's time to do some image captioning! 🎉
 
 
 ## 4.1 `Nx` configuration
