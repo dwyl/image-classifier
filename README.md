@@ -29,6 +29,7 @@ within `Phoenix`!
   - [4.1 `Nx` configuration](#41-nx-configuration)
   - [4.2 `Async` processing the image for classification](#42-async-processing-the-image-for-classification)
     - [4.2.1 Considerations regarding `async` processes](#421-considerations-regarding-async-processes)
+    - [4.2.2 Alternative for better testing](#422-alternative-for-better-testing)
   - [4.3 Image pre-processing](#43-image-pre-processing)
   - [4.4 Updating the view](#44-updating-the-view)
   - [4.5 Check it out!](#45-check-it-out)
@@ -689,6 +690,90 @@ and we **want to stop the task if `LiveView` is closed/crashes**.
 However, if you are building something 
 like a report that has to be generated even if the person closes the browser tab,
 this is not the right solution.
+
+
+### 4.2.2 Alternative for better testing
+
+We are spawning async tasks by calling `Task.async/1`.
+This is creating an ***unsupervised task**.
+Although it's plausible for this simple app,
+it's best for us to create a 
+[**`Supervisor`**](https://hexdocs.pm/elixir/1.15.7/Supervisor.html)
+that manages their child tasks.
+This way, we have more control over the execution and lifetime of the child classes.
+
+Additionally, it's better to have these tasks supervised
+because it makes it possible to create tests for our `LiveView`.
+For this, we need to make a couple of changes.
+
+First, head over to `lib/app/application.ex`
+and add a supervisor to the `start/2` function children array.
+
+```elixir
+  def start(_type, _args) do
+    children = [
+      AppWeb.Telemetry,
+      {Phoenix.PubSub, name: App.PubSub},
+      {Nx.Serving, serving: serving(), name: ImageClassifier},
+      {Task.Supervisor, name: App.TaskSupervisor},      # add this line
+      AppWeb.Endpoint
+    ]
+
+    opts = [strategy: :one_for_one, name: App.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+```
+
+We are creating a [`Task.Supervisor`](https://hexdocs.pm/elixir/1.15.7/Supervisor.html)
+with the name `App.TaskSupervisor`.
+
+Now, in `lib/app_web/live/page_live.ex`,
+we create the async task like so:
+
+```elixir
+  task = Task.Supervisor.async(App.TaskSupervisor, fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
+```
+
+We are now using [`Task.Supervisor.async`](https://hexdocs.pm/elixir/1.15.7/Task.Supervisor.html#async/3),
+passing the name of the supervisor we've defined earlier.
+
+And that's it!
+We are creating async tasks like before,
+the only difference is that they're now **supervised**.
+
+In tests, you can create a small module that waits for the tasks to be completed.
+
+```elixir
+defmodule AppWeb.SupervisorSupport do
+
+  @moduledoc """
+    This is a support module helper that is meant to wait for all the children of a supervisor to complete.
+    If you go to `lib/app/application.ex`, you'll see that we created a `TaskSupervisor`, where async tasks are spawned.
+    This module helps us to wait for all the children to finish during tests.
+  """
+
+  @doc """
+    Find all children spawned by this supervisor and wait until they finish.
+  """
+  def wait_for_completion() do
+    pids = Task.Supervisor.children(App.TaskSupervisor)
+    Enum.each(pids, &Process.monitor/1)
+    wait_for_pids(pids)
+  end
+
+  defp wait_for_pids([]), do: nil
+  defp wait_for_pids(pids) do
+    receive do
+      {:DOWN, _ref, :process, pid, _reason} -> wait_for_pids(List.delete(pids, pid))
+    end
+  end
+end
+```
+
+You can call `AppWeb.SupervisorSupport.wait_for_completion()` 
+in unit tests so they wait for the tasks to complete.
+In our case, 
+we do that until the *prediction is made*.
 
 
 ## 4.3 Image pre-processing
