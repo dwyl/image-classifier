@@ -33,11 +33,12 @@ within `Phoenix`!
   - [4.3 Image pre-processing](#43-image-pre-processing)
   - [4.4 Updating the view](#44-updating-the-view)
   - [4.5 Check it out!](#45-check-it-out)
-- [4.6 Considerations on user images](#46-considerations-on-user-images)
-  - [5. Final touches](#5-final-touches)
-    - [5.1 Setting max file size](#51-setting-max-file-size)
-    - [5.2 Show errors](#52-show-errors)
-    - [5.3 Show image preview](#53-show-image-preview)
+  - [4.6 Considerations on user images](#46-considerations-on-user-images)
+- [5. Final touches](#5-final-touches)
+  - [5.1 Setting max file size](#51-setting-max-file-size)
+  - [5.2 Show errors](#52-show-errors)
+  - [5.3 Show image preview](#53-show-image-preview)
+- [6. What about other models?](#6-what-about-other-models)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -972,7 +973,7 @@ You can and **should** try other models.
 You can see the supported models in https://github.com/elixir-nx/bumblebee#model-support.
 
 
-# 4.6 Considerations on user images
+## 4.6 Considerations on user images
 
 To maintain the app as simple as possible,
 we are receiving the image from the person as is.
@@ -998,13 +999,13 @@ in `Bumblebee`'s repository
 at https://github.com/elixir-nx/bumblebee/blob/main/examples/phoenix/image_classification.exs.
 
 
-## 5. Final touches
+# 5. Final touches
 
 Although our app is functional,
 we can make it **better**. 🎨
 
 
-### 5.1 Setting max file size
+## 5.1 Setting max file size
 
 In order to better control user input,
 we should add a limit to the size of the image that is being uploaded.
@@ -1037,7 +1038,7 @@ The number is in `bytes`,
 hence why we set it as `5_000_000`.
 
 
-### 5.2 Show errors
+## 5.2 Show errors
 
 In case a person uploads an image that is too large,
 we should show this feedback to the person!
@@ -1107,7 +1108,7 @@ Awesome! 🎉
 </p>
 
 
-### 5.3 Show image preview
+## 5.3 Show image preview
 
 As of now, even though our app predicts the given images,
 it is not showing a preview of the image the person submitted.
@@ -1215,6 +1216,138 @@ it is previewed and shown to the person!
 <p align="center">
   <img width=800 src="https://github.com/dwyl/image-classifier/assets/17494745/2835c24f-f4ba-48bc-aab0-6b39830156ce" />
 </p>
+
+
+# 6. What about other models?
+
+Maybe you weren't happy with the results from this model.
+
+That's fair. `ResNet-50` is a smaller, "older" model compared to other
+image captioning/classification models.
+
+What if you wanted to use others?
+Well, as we've mentioned before, 
+`Bumblebee` uses 
+[**Transformer models from `HuggingFace`**](https://huggingface.co/docs/transformers/index).
+To know if one is supported
+(as shown in [`Bumblebee`'s docs](https://github.com/elixir-nx/bumblebee#model-support)),
+we need to check the `config.json` file
+in the model repository 
+and copy the class name under `"architectures"`
+and search it on `Bumblebee`'s codebase.
+
+For example, 
+here's one of the more popular image captioning models -
+Salesforce's `BLIP` - 
+https://huggingface.co/Salesforce/blip-image-captioning-large/blob/main/config.json.
+
+<p align="center">
+  <img width="48%" src="https://github.com/elixir-nx/bumblebee/assets/17494745/33dc869f-37f7-4d18-b126-3a0bd0d578d3" />
+  <img width="48%" src="https://github.com/elixir-nx/bumblebee/assets/17494745/8f1d115c-171b-42bf-b974-08172c957a09" />
+</p>
+
+
+If you visit `Bumblebee`'s codebase
+and search for the class name,
+you'll find it is supported.
+
+<p align="center">
+  <img width="800" src="https://github.com/elixir-nx/bumblebee/assets/17494745/500eb97b-c20a-4c9a-846e-327cdcd1c37c" />
+</p>
+
+Awesome!
+Now we can use it!
+
+If you dig around `Bumblebee`'s docs as well
+(https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_to_text/5),
+you'll see that we've got to use `image_to_text/5` with this model.
+It needs a `tokenizer`, `featurizer` and a `generation-config`
+so we can use it.
+
+Let's do it!
+Head over to `lib/app/application.ex`,
+and change the `serving/0` function.
+
+```elixir
+  def serving do
+    {:ok, model_info} = Bumblebee.load_model({:hf, "Salesforce/blip-image-captioning-base"})
+    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "Salesforce/blip-image-captioning-base"})
+    {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "Salesforce/blip-image-captioning-base"})
+    {:ok, generation_config} = Bumblebee.load_generation_config({:hf, "Salesforce/blip-image-captioning-base"})
+
+    Bumblebee.Vision.image_to_text(model_info, featurizer, tokenizer, generation_config,
+      compile: [batch_size: 10],
+      defn_options: [compiler: EXLA]
+    )
+  end
+```
+
+As you can see, we're using the repository name of `BLIP`'s model
+from the HuggingFace website.
+
+If you run `mix phx.server`, 
+you'll see that it will download the new models,
+tokenizers, featurizer and configs to run the model.
+
+```sh
+|====================================================================================================| 100% (989.82 MB)
+[info] TfrtCpuClient created.
+|====================================================================================================| 100% (711.39 KB)
+[info] Running AppWeb.Endpoint with cowboy 2.10.0 at 127.0.0.1:4000 (http)
+[info] Access AppWeb.Endpoint at http://localhost:4000
+[watch] build finished, watching for changes...
+```
+
+You may think we're done here.
+But we are not! ✋
+
+The **destructuring of the output of the model may not be the same**.
+If you try to submit a photo,
+you'll get this error:
+
+```sh
+no match of right hand side value: %{results: [%{text: "a person holding a large blue ball on a beach"}]}
+```
+
+This means that we need to make some changes
+when parsing the output of the model 😀.
+
+Head over to `lib/app_web/live/page_live.ex`
+and change the `handle_info/3` function
+that is called after the async task is completed.
+
+```elixir
+  def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket) do
+    Process.demonitor(ref, [:flush])
+
+    %{results: [%{text: label}]} = result # change this line
+
+    {:noreply, assign(socket, label: label, running: false)}
+  end
+```
+
+As you can see, we are now correctly destructuring the result from the model.
+And that's it!
+
+If you run `mix phx.server`,
+you'll see that we got far more accurate results!
+
+<p align="center">
+  <img width="800" src="https://github.com/elixir-nx/bumblebee/assets/17494745/0cae2db0-5ca4-4434-9c63-76aadb7d578b" />
+</p>
+
+Awesome! 🎉
+
+> [!NOTE]
+>
+> Take note that `BLIP`, 
+> when compared to `ResNet-50` (for example),
+> is a larger model.
+> There are more accurate and even larger models out there
+> (for example, the [`blip-image-captioning-large`](https://huggingface.co/Salesforce/blip-image-captioning-large) model,
+> the larger version of the model we've just used).
+> This is a balancing act: the larger the model, the longer a prediction may take
+> and more resources your server will need to have to handle this heavier workload.
 
 
 # _Please_ Star the repo! ⭐️
