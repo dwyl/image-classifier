@@ -11,7 +11,7 @@ defmodule AppWeb.PageLiveTest do
     {:ok, _view, _html} = live(conn)
   end
 
-  test "uploading a file", %{conn: conn} do
+  test "uploading a file and getting prediction", %{conn: conn} do
     {:ok, lv, html} = live(conn, ~p"/")
     assert html =~ "Image Classification"
 
@@ -26,9 +26,10 @@ defmodule AppWeb.PageLiveTest do
     # Should show an uploaded local file
     assert render_upload(image, file.name)
 
-    # Waiting to get the prediction
-    lv |> render_async()
+    # Wait for the prediction to end
+    AppWeb.SupervisorSupport.wait_for_completion()
 
-    assert  html =~ "Waiting for image input."
+    # A prediction should have occurred and the label should be shown ("Waiting for image input." should not be shown)
+    refute render(lv) =~ "Waiting for image input."
   end
 end

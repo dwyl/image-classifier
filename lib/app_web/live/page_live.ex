@@ -32,7 +32,7 @@ defmodule AppWeb.PageLive do
       end)
 
       # Create an async task to classify the image
-      task = Task.async(fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
+      task = Task.Supervisor.async(App.TaskSupervisor, fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
 
       # Update socket assigns to show spinner whilst task is running
       {:noreply, assign(socket, running: true, task_ref: task.ref)}

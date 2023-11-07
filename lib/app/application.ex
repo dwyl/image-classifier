@@ -12,7 +12,10 @@ defmodule App.Application do
       AppWeb.Telemetry,
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
+      # Nx serving for image classifier
       {Nx.Serving, serving: serving(), name: ImageClassifier},
+      # Adding a supervisor
+      {Task.Supervisor, name: App.TaskSupervisor},
       # Start the Endpoint (http/https)
       AppWeb.Endpoint
       # Start a worker by calling: App.Worker.start_link(arg)
