@@ -6,7 +6,7 @@ defmodule AppWeb.PageLive do
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(label: nil, running: false, task_ref: nil)
+     |> assign(label: nil, running: false, task_ref: nil, image_preview_base64: nil)
      |> allow_upload(:image_list,
        accept: ~w(image/*),
        auto_upload: true,
@@ -26,16 +26,22 @@ defmodule AppWeb.PageLive do
     if entry.done? do
 
       # Consume the entry and get the tensor to feed to classifier
-      tensor = consume_uploaded_entry(socket, entry, fn %{} = meta ->
+      {:ok, tensor, file_binary} = consume_uploaded_entry(socket, entry, fn %{} = meta ->
+        file_binary = File.read!(meta.path)
+
         {:ok, vimage} = Vix.Vips.Image.new_from_file(meta.path)
-        pre_process_image(vimage)
+        {:ok, tensor} = pre_process_image(vimage)
+        {:ok, tensor, file_binary}
       end)
 
       # Create an async task to classify the image
       task = Task.Supervisor.async(App.TaskSupervisor, fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
 
+      # Encode the image to base64
+      base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
+
       # Update socket assigns to show spinner whilst task is running
-      {:noreply, assign(socket, running: true, task_ref: task.ref)}
+      {:noreply, assign(socket, running: true, task_ref: task.ref, image_preview_base64: base64)}
     else
       {:noreply, socket}
     end
