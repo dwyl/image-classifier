@@ -37,6 +37,7 @@ within `Phoenix`!
   - [5. Final touches](#5-final-touches)
     - [5.1 Setting max file size](#51-setting-max-file-size)
     - [5.2 Show errors](#52-show-errors)
+    - [5.3 Show image preview](#53-show-image-preview)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -1105,6 +1106,115 @@ Awesome! 🎉
   <img width=800 src="https://github.com/dwyl/aws-sdk-mock/assets/17494745/1bf903eb-31d5-48a4-9da9-1f5f64932b6e" />
 </p>
 
+
+### 5.3 Show image preview
+
+As of now, even though our app predicts the given images,
+it is not showing a preview of the image the person submitted.
+Let's fix this 🛠️.
+
+Let's add a new socket assign variable 
+pertaining to the [base64](https://en.wikipedia.org/wiki/Base64) representation 
+of the image in `lib/app_web/live_page/live.ex`
+
+```elixir
+     |> assign(label: nil, running: false, task_ref: nil, image_preview_base64: nil)
+```
+
+We've added `image_preview_base64`
+as a new socket assign,
+initializing it as `nil`.
+
+Next, we need to *read the file while consuming it*,
+and properly update the socket assign
+so we can show it to the person.
+
+In the same file,
+change the `handle_progress/3` function to the following.
+
+```elixir
+  def handle_progress(:image_list, entry, socket) do
+    if entry.done? do
+
+      # Consume the entry and get the tensor to feed to classifier
+      {:ok, tensor, file_binary} = consume_uploaded_entry(socket, entry, fn %{} = meta ->
+        file_binary = File.read!(meta.path)
+
+        {:ok, vimage} = Vix.Vips.Image.new_from_file(meta.path)
+        {:ok, tensor} = pre_process_image(vimage)
+        {:ok, tensor, file_binary}
+      end)
+
+      # Create an async task to classify the image
+      task = Task.Supervisor.async(App.TaskSupervisor, fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
+
+      # Encode the image to base64
+      base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
+
+      # Update socket assigns to show spinner whilst task is running
+      {:noreply, assign(socket, running: true, task_ref: task.ref, image_preview_base64: base64)}
+    else
+      {:noreply, socket}
+    end
+  end
+```
+
+We're using [`File.read!/1`](https://hexdocs.pm/elixir/1.13/File.html#read/1)
+to retrieve the binary representation of the image that was uploaded.
+We use [`Base.encode64/2`](https://hexdocs.pm/elixir/1.12/Base.html#encode64/2)
+to encode this file binary 
+and assign the newly created `image_preview_base64` socket assign
+with this base64 representation of the image.
+
+Now, all that's left to do
+is to *render the image on our view*.
+In `lib/app_web/live/page_live.html.heex`,
+locate the line:
+
+```html
+<div class="text-center">
+```
+
+We are going to update this `<div>`
+to show the image with the `image_preview_base64` socket assign.
+
+```html
+<div class="text-center">
+  <!-- Show image preview -->
+  <%= if @image_preview_base64 do %>
+    <img src={@image_preview_base64} />
+  <% else %>
+    <svg class="mx-auto h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" />
+    </svg>
+    <div class="mt-4 flex text-sm leading-6 text-gray-600">
+      <label for="file-upload" class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500">
+        <form id="upload-form" phx-change="noop" phx-submit="noop">
+          <label class="cursor-pointer">
+            <.live_file_input upload={@uploads.image_list} class="hidden" />
+            Upload
+          </label>
+        </form>
+      </label>
+      <p class="pl-1">or drag and drop</p>
+    </div>
+    <p class="text-xs leading-5 text-gray-600">PNG, JPG, GIF up to 5MB</p>
+  <% end %>
+</div>
+```
+
+As you can see, 
+we are checking if `@image_preview_base64` is defined.
+If so, we simply show the image with it as `src` 😊.
+
+Now, if you run the application, 
+you'll see that after dragging the image,
+it is previewed and shown to the person!
+
+
+<p align="center">
+  <img width=800 src="https://github.com/dwyl/image-classifier/assets/17494745/2835c24f-f4ba-48bc-aab0-6b39830156ce" />
+</p>
 
 
 # _Please_ Star the repo! ⭐️
