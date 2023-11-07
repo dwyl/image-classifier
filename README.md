@@ -1137,12 +1137,12 @@ change the `handle_progress/3` function to the following.
     if entry.done? do
 
       # Consume the entry and get the tensor to feed to classifier
-      {:ok, tensor, file_binary} = consume_uploaded_entry(socket, entry, fn %{} = meta ->
+      %{tensor: tensor, file_binary: file_binary} = consume_uploaded_entry(socket, entry, fn %{} = meta ->
         file_binary = File.read!(meta.path)
 
         {:ok, vimage} = Vix.Vips.Image.new_from_file(meta.path)
         {:ok, tensor} = pre_process_image(vimage)
-        {:ok, tensor, file_binary}
+        {:ok, %{tensor: tensor, file_binary: file_binary}}
       end)
 
       # Create an async task to classify the image
