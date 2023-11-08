@@ -29,8 +29,16 @@ defmodule AppWeb.PageLive do
       %{tensor: tensor, file_binary: file_binary} = consume_uploaded_entry(socket, entry, fn %{} = meta ->
         file_binary = File.read!(meta.path)
 
-        {:ok, vimage} = Vix.Vips.Image.new_from_file(meta.path)
-        {:ok, tensor} = pre_process_image(vimage)
+        # Get image and resize
+        # This is dependant on the resolution of the model's dataset.
+        # In our case, we want the width to be closer to 640, whilst maintaining aspect ratio.
+        width = 640
+        {:ok, thumbnail_vimage} = Vix.Vips.Operation.thumbnail(meta.path, width, size: :VIPS_SIZE_DOWN)
+
+        # Pre-process it
+        {:ok, tensor} = pre_process_image(thumbnail_vimage)
+
+        # Return it
         {:ok, %{tensor: tensor, file_binary: file_binary}}
       end)
 

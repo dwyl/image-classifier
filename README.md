@@ -998,6 +998,47 @@ You can see an example implementation of this technique
 in `Bumblebee`'s repository 
 at https://github.com/elixir-nx/bumblebee/blob/main/examples/phoenix/image_classification.exs.
 
+However, since we are not using `Javascript` for anything,
+we can (and *should*!) properly downsize our images
+so they better fit the training dataset of the model we use.
+This will allow the model to process faster, 
+since larger images carry over more data that is ultimately unnecessary
+for models to make predictions.
+
+For this,
+head over to `lib/app_web/live/page_live.ex`,
+locate the `handle_progress/3` function
+and change resize the image *before processing it*.
+
+```elixir
+    file_binary = File.read!(meta.path)
+
+    # Get image and resize
+    # This is dependant on the resolution of the model's dataset.
+    # In our case, we want the width to be closer to 640, whilst maintaining aspect ratio.
+    width = 640
+    {:ok, thumbnail_vimage} = Vix.Vips.Operation.thumbnail(meta.path, width, size: :VIPS_SIZE_DOWN)
+
+    # Pre-process it
+    {:ok, tensor} = pre_process_image(thumbnail_vimage)
+    
+    #...
+```
+
+We are using [`Vix.Vips.Operation.thumbnail/3`](https://hexdocs.pm/vix/Vix.Vips.Operation.html#thumbnail/3)
+to resize our image to a fixed width
+whilst maintaining aspect ratio.
+The `width` variable can be dependent on the model that you use.
+For example, `ResNet-50` is trained on `224px224` pictures,
+so you may want to resize the image to this width.
+
+> [!NOTE]
+>
+> We are using the `thumbnail/3` function
+> instead of `resize/3` because it's much faster.
+>
+> Check https://github.com/libvips/libvips/wiki/HOWTO----Image-shrinking
+> to know why.
 
 # 5. Final touches
 
