@@ -2,10 +2,9 @@
 # https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
 name: Fly Deploy
 on:
-    push:
-      branches: [ main ]
-    pull_request:
-      branches: [ main ]
+  push:
+    branches:
+      - main
 
 jobs:
   deploy:
