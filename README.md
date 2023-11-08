@@ -235,8 +235,8 @@ and use the following code.
 
 ```html
 <.flash_group flash={@flash} />
-<div class="px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32">
-  <div class="mx-auto max-w-xl w-[50vw] lg:mx-0">
+<div class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32">
+  <div class="flex justify-center items-center mx-auto max-w-xl w-[50vw] lg:mx-0">
     <form>
       <div class="space-y-12">
         <div>
@@ -326,8 +326,8 @@ let's make some changes to
 
 ```html
 <.flash_group flash={@flash} />
-<div class="px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32">
-  <div class="mx-auto max-w-xl w-[50vw] lg:mx-0">
+<div class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32">
+  <div class="flex justify-center items-center mx-auto max-w-xl w-[50vw] lg:mx-0">
     <div class="space-y-12">
       <div class="border-gray-900/10 pb-12">
         <h2 class="text-base font-semibold leading-7 text-gray-900">Image Classification</h2>
@@ -863,8 +863,8 @@ and change it to this.
 
 ```html
 <.flash_group flash={@flash} />
-<div class="px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32">
-  <div class="mx-auto max-w-xl w-[50vw] lg:mx-0">
+<div class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32">
+  <div class="flex justify-center items-center mx-auto max-w-xl w-[50vw] lg:mx-0">
     <div class="space-y-12">
       <div class="border-gray-900/10 pb-12">
         <h2 class="text-base font-semibold leading-7 text-gray-900">Image Classification</h2>
