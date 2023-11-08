@@ -39,6 +39,7 @@ within `Phoenix`!
   - [5.2 Show errors](#52-show-errors)
   - [5.3 Show image preview](#53-show-image-preview)
 - [6. What about other models?](#6-what-about-other-models)
+- [7. How do I deploy this thing?](#7-how-do-i-deploy-this-thing)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -1395,6 +1396,16 @@ Awesome! 🎉
 > This is a balancing act: the larger the model, the longer a prediction may take
 > and more resources your server will need to have to handle this heavier workload.
 
+
+# 7. How do I deploy this thing?
+
+There are a few considerations you may want to have
+before considering deploying this.
+Luckily for you,
+we've created a small document
+that will **guide you through deploying this app in `fly.io`**!
+
+Check the [`deployment.md`](./deployment.md) file for more information.
 
 # _Please_ Star the repo! ⭐️
 
