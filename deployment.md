@@ -21,6 +21,7 @@ Let's start 🏃‍♂️.
       - [3.1.2 Setting the local directory where `Bumblebee` models will load from](#312-setting-the-local-directory-where-bumblebee-models-will-load-from)
       - [3.1.3 Fixing `nonexistent` directory error](#313-fixing-nonexistent-directory-error)
     - [3.2 Changing `EXLA` settings](#32-changing-exla-settings)
+- [4. Deploy again!](#4-deploy-again)
 
 
 
@@ -512,3 +513,19 @@ check the `Bumblebee` repo
 at https://github.com/elixir-nx/bumblebee/tree/main/examples/phoenix#configuring-nx.
 
 
+
+# 4. Deploy again!
+
+Now that we've made the needed changes,
+we can deploy the application again!
+Simply run `fly launch`
+and re-use the same configuration
+(we've already run `fly launch` prior,
+so the configuration files are there already).
+
+If you walk through the steps,
+the deployment should run smoothly
+and your site should be up and running.
+
+Great job! 
+Give yourself a pat on the back! 👏
