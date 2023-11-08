@@ -62,7 +62,9 @@ defmodule AppWeb.PageLive do
     Process.demonitor(ref, [:flush])
 
     # And then destructure the result from the classifier.
-    %{results: [%{text: label}]} = result
+    # %{results: [%{text: label}]} = result      # BLIP
+    %{predictions: [%{label: label}]} = result   # ResNet-50
+
 
     # Update the socket assigns with result and stopping spinner.
     {:noreply, assign(socket, label: label, running: false)}
