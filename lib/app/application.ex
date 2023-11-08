@@ -48,7 +48,8 @@ defmodule App.Application do
     Bumblebee.Vision.image_classification(model_info, featurizer,
       top_k: 1,
       compile: [batch_size: 10],
-      defn_options: [compiler: EXLA]
+      defn_options: [compiler: EXLA],
+      preallocate_params: true        # needed to run on `Fly.io`
     )
 
   end

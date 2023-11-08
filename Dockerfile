@@ -20,12 +20,9 @@ ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
 
 FROM ${BUILDER_IMAGE} as builder
 
-# install build dependencies
-RUN apt-get update -y && apt-get install -y build-essential git \
+# install build dependencies (and curl for EXLA)
+RUN apt-get update -y && apt-get install -y build-essential git curl \
     && apt-get clean && rm -f /var/lib/apt/lists/*_*
-
-# install wget so EXLA can compile properly
-RUN apt-get update && apt-get install wget
 
 # prepare build dir
 WORKDIR /app
@@ -36,6 +33,8 @@ RUN mix local.hex --force && \
 
 # set build ENV
 ENV MIX_ENV="prod"
+ENV EXS_DRY_RUN="true"
+ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
 
 # install mix dependencies
 COPY mix.exs mix.lock ./
@@ -53,6 +52,8 @@ COPY priv priv
 COPY lib lib
 
 COPY assets assets
+
+COPY .bumblebee/ .bumblebee
 
 # compile assets
 RUN mix assets.deploy
@@ -86,9 +87,15 @@ RUN chown nobody /app
 
 # set runner ENV
 ENV MIX_ENV="prod"
+ENV EXS_DRY_RUN="true"
+ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
+
+# Adding this so model can be downloaded
+RUN mkdir -p /nonexistent
 
 # Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app ./
+COPY --from=builder --chown=nobody:root /app/.bumblebee/ ./.bumblebee
 
 USER nobody
 
