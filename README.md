@@ -25,8 +25,8 @@ within `Phoenix`!
   - [1. Installing initial dependencies](#1-installing-initial-dependencies)
   - [2. Adding `LiveView` capabilities to our project](#2-adding-liveview-capabilities-to-our-project)
   - [3. Receiving image files](#3-receiving-image-files)
-- [4. Integrating `Bumblebee`](#4-integrating-bumblebee)
-  - [4.1 `Nx` configuration](#41-nx-configuration)
+- [4. Integrating `Bumblebee` 🐝](#4-integrating-bumblebee-)
+  - [4.1 `Nx` configuration ⚙️](#41-nx-configuration-️)
   - [4.2 `Async` processing the image for classification](#42-async-processing-the-image-for-classification)
     - [4.2.1 Considerations regarding `async` processes](#421-considerations-regarding-async-processes)
     - [4.2.2 Alternative for better testing](#422-alternative-for-better-testing)
@@ -34,7 +34,7 @@ within `Phoenix`!
   - [4.4 Updating the view](#44-updating-the-view)
   - [4.5 Check it out!](#45-check-it-out)
   - [4.6 Considerations on user images](#46-considerations-on-user-images)
-- [5. Final touches](#5-final-touches)
+- [5. Final Touches](#5-final-touches)
   - [5.1 Setting max file size](#51-setting-max-file-size)
   - [5.2 Show errors](#52-show-errors)
   - [5.3 Show image preview](#53-show-image-preview)
@@ -86,13 +86,13 @@ so grab some coffee and let's get cracking!
 
 ## Prerequisites 
 
-This tutorial requires you have `Elixir` and `Phoenix` installed.
+This tutorial requires you have `Elixir` and `Phoenix` installed. <br />
 If you you don't, please see 
 [how to install Elixir](https://github.com/dwyl/learn-elixir#installation)
 and 
 [Phoenix](https://hexdocs.pm/phoenix/installation.html#phoenix).
 
-We assume you know the basics of `Phoenix` 
+This guide assumes you know the basics of `Phoenix` 
 and have *some* knowledge of how it works.
 If you don't, 
 we *highly suggest* you follow our other tutorials first.
@@ -121,17 +121,17 @@ mix phx.new . --app app --no-dashboard --no-ecto  --no-gettext --no-mailer
 We're running [`mix phx.new`](https://hexdocs.pm/phoenix/Mix.Tasks.Phx.New.html)
 to generate a new project without a dashboard
 and mailer (email) service,
-since we don't need those in our project.
+since we don't need those features in our project.
 
 After this,
 if you run `mix phx.server` to run your server,
 you should be able to see the following page.
 
 <p align="center">
-  <img src="https://github.com/dwyl/imgup/assets/17494745/b40f4e79-e225-4226-8112-c490b5b4bf46">
+  <img src="https://github.com/dwyl/fields/assets/194400/891e890e-c94a-402e-baee-ee47fd3725a7">
 </p>
 
-We're ready to start implementing!
+We're ready to start building.
 
 
 ## 1. Installing initial dependencies
@@ -154,7 +154,8 @@ to the `deps` section.
 a framework that will allows us to integrate
 [`Transformer Models`](https://huggingface.co/docs/transformers/index) in `Phoenix`.
 `Transformers` (from [Hugging Face](https://huggingface.co/))
-are APIs that allow us to easily download and train pretrained models.
+are APIs that allow us to easily download and train 
+[pretrained models](https://blogs.nvidia.com/blog/2022/12/08/what-is-a-pretrained-ai-model).
 `Bumblebee` aims to support all Transformer Models, 
 however some are lacking.
 You may check which ones are supported by visiting 
@@ -206,7 +207,7 @@ change the `scope "/"` to the following.
 ```
 
 Instead of using the `PageController`,
-we are going to be creating `ImgupLive`,
+we are going to be creating `PageLive`,
 a `LiveView` file.
 
 Let's create our `LiveView` files.
@@ -372,7 +373,8 @@ let's make some changes to
 
 We've added a few features:
 
-- used [`<.live_file_input/>`](https://hexdocs.pm/phoenix_live_view/Phoenix.Component.html#live_file_input/1)
+- used 
+[`<.live_file_input/>`](https://hexdocs.pm/phoenix_live_view/Phoenix.Component.html#live_file_input/1)
 for `LiveView` file upload.
 We've wrapped this component
 with an element that is annotated with the `phx-drop-target` attribute
@@ -380,11 +382,12 @@ pointing to the DOM `id` of the file input.
 - because `<.live_file_input/>` is being used,
 we need to annotate its wrapping element
 with `phx-submit` and `phx-change`, 
-as per https://hexdocs.pm/phoenix_live_view/uploads.html#render-reactive-elements.
+as per 
+[hexdocs.pm/phoenix_live_view/uploads.html#render-reactive-elements](https://hexdocs.pm/phoenix_live_view/uploads.html#render-reactive-elements)
 
 Because we've added these bindings,
 we need to add the event handlers in 
-`lib/app_web/live/imgup_live.ex`.
+`lib/app_web/live/page_live.ex`.
 Open it and update it to:
 
 ```elixir
@@ -450,7 +453,7 @@ we are telling `LiveView` that *whenever the person uploads a file*,
 We consume the file in this function by using 
 [`consume_uploaded_entry/3`](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html#consume_uploaded_entry/3).
 Whilst consuming the entry/file,
-we can access its path and then use it to our heart's content.
+we can access its path and then use its content.
 *For now*, we don't need to use it.
 But we will in the future to feed our image classifier with it!
 After the callback function is executed,
@@ -472,13 +475,13 @@ If you run `mix phx.server`,
 nothing will change.
 
 
-# 4. Integrating `Bumblebee`
+# 4. Integrating `Bumblebee` 🐝
 
 Now here comes the fun part!
 It's time to do some image captioning! 🎉
 
 
-## 4.1 `Nx` configuration
+## 4.1 `Nx` configuration ⚙️
 
 We first need to add some initial setup in the 
 `lib/app/application.ex` file.
@@ -486,46 +489,48 @@ Head over there and and change
 the `start` function like so:
 
 ```elixir
-  @impl true
-  def start(_type, _args) do
-    children = [
-      # Start the Telemetry supervisor
-      AppWeb.Telemetry,
-      # Start the PubSub system
-      {Phoenix.PubSub, name: App.PubSub},
-      {Nx.Serving, serving: serving(), name: ImageClassifier},
-      # Start the Endpoint (http/https)
-      AppWeb.Endpoint
-      # Start a worker by calling: App.Worker.start_link(arg)
-      # {App.Worker, arg}
-    ]
+@impl true
+def start(_type, _args) do
+  children = [
+    # Start the Telemetry supervisor
+    AppWeb.Telemetry,
+    # Start the PubSub system
+    {Phoenix.PubSub, name: App.PubSub},
+    {Nx.Serving, serving: serving(), name: ImageClassifier},
+    # Start the Endpoint (http/https)
+    AppWeb.Endpoint
+    # Start a worker by calling: App.Worker.start_link(arg)
+    # {App.Worker, arg}
+  ]
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: App.Supervisor]
-    Supervisor.start_link(children, opts)
-  end
+  # See https://hexdocs.pm/elixir/Supervisor.html
+  # for other strategies and supported options
+  opts = [strategy: :one_for_one, name: App.Supervisor]
+  Supervisor.start_link(children, opts)
+end
 
-  def serving do
-    {:ok, model_info} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
-    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
+def serving do
+  {:ok, model_info} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
+  {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
 
-    Bumblebee.Vision.image_classification(model_info, featurizer,
-      top_k: 1,
-      compile: [batch_size: 10],
-      defn_options: [compiler: EXLA]
-    )
-  end
+  Bumblebee.Vision.image_classification(model_info, featurizer,
+    top_k: 1,
+    compile: [batch_size: 10],
+    defn_options: [compiler: EXLA]
+  )
+end
 ```
 
-We are using [`Nx.Serving`](https://hexdocs.pm/nx/Nx.Serving.html),
+We are using 
+[`Nx.Serving`](https://hexdocs.pm/nx/Nx.Serving.html),
 which simply allows us to encapsulates tasks, 
 be it networking, machine learning, data processing or any other task.
 
 In this specific case,
 we are using it to **batch requests**.
 This is extremely useful and important
-because we are using models that typically run on GPU.
+because we are using models that typically run on 
+[GPU](https://en.wikipedia.org/wiki/Graphics_processing_unit).
 The GPU is *really good* at **parallelizing tasks**.
 Therefore, instead of sending an image classification request one by one,
 we can *batch them*/bundle them together as much as we can
@@ -540,17 +545,20 @@ that is then used by it,
 which in turn is executed in the supervision tree.
 
 In the `serving/0` function,
-we are loading the [`ResNet-50`](https://huggingface.co/microsoft/resnet-50) model
+we are loading the 
+[`ResNet-50`](https://huggingface.co/microsoft/resnet-50) 
+model
 and its featurizer.
 
-> [!NOTE]
->
-> A `featurizer` can be seen as a [`Feature Extractor`](https://huggingface.co/docs/transformers/main_classes/feature_extractor).
+> **Note**:
+> A `featurizer` can be seen as a 
+> [`Feature Extractor`](https://huggingface.co/docs/transformers/main_classes/feature_extractor).
 > It is essentially a component that is responsible for converting input data 
 > into a format that can be processed by a pre-trained language model.
 >
 > It takes raw information and performs various transformations, 
-> such as [tokenization](https://neptune.ai/blog/tokenization-in-nlp), 
+> such as 
+> [tokenization](https://neptune.ai/blog/tokenization-in-nlp), 
 > [padding](https://www.baeldung.com/cs/deep-neural-networks-padding), 
 > and encoding to prepare the data for model training or inference.
 
@@ -582,48 +590,46 @@ Go to `lib/app_web/live/page_live.ex`
 and change the following code.
 
 ```elixir
-  def handle_progress(:image_list, entry, socket) do
-    if entry.done? do
+def handle_progress(:image_list, entry, socket) do
+  if entry.done? do
 
-      # Consume the entry and get the tensor to feed to classifier
-      tensor = consume_uploaded_entry(socket, entry, fn %{} = meta ->
-        {:ok, vimage} = Vix.Vips.Image.new_from_file(meta.path)
-        pre_process_image(vimage)
-      end)
+    # Consume the entry and get the tensor to feed to classifier
+    tensor = consume_uploaded_entry(socket, entry, fn %{} = meta ->
+      {:ok, vimage} = Vix.Vips.Image.new_from_file(meta.path)
+      pre_process_image(vimage)
+    end)
 
-      # Create an async task to classify the image
-      task = Task.async(fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
+    # Create an async task to classify the image
+    task = Task.async(fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
 
-      # Update socket assigns to show spinner whilst task is running
-      {:noreply, assign(socket, running: true, task_ref: task.ref)}
-    else
-      {:noreply, socket}
-    end
+    # Update socket assigns to show spinner whilst task is running
+    {:noreply, assign(socket, running: true, task_ref: task.ref)}
+  else
+    {:noreply, socket}
   end
+end
 
-  @impl true
-  def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket) do
-    # This is called everytime an Async Task is created.
-    # We flush it here.
-    Process.demonitor(ref, [:flush])
+@impl true
+def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket) do
+  # This is called everytime an Async Task is created.
+  # We flush it here.
+  Process.demonitor(ref, [:flush])
 
-    # And then destructure the result from the classifier.
-    %{predictions: [%{label: label}]} = result
+  # And then destructure the result from the classifier.
+  %{predictions: [%{label: label}]} = result
 
-    # Update the socket assigns with result and stopping spinner.
-    {:noreply, assign(socket, label: label, running: false)}
-  end
+  # Update the socket assigns with result and stopping spinner.
+  {:noreply, assign(socket, label: label, running: false)}
+end
 ```
 
-> [!NOTE]
->
-> The `pre_process_image/1` function is yet to be defined.
+> **Note:** The `pre_process_image/1` function is yet to be defined.
 > We'll do that in the following section.
 
 In the `handle_progress/3` function,
 whilst we are consuming the image,
 we are first converting it to a 
-[`Vix.Vips.Image`](https://hexdocs.pm/vix/Vix.Vips.Image.html) struct.
+[`Vix.Vips.Image`](https://hexdocs.pm/vix/Vix.Vips.Image.html) `Struct`
 using the file path.
 We then feed this image to the `pre_process_image/1` function that we'll implement later.
 
@@ -633,7 +639,8 @@ What's important is to notice this line:
 task = Task.async(fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
 ```
 
-We are using [`Task.async/1`](https://hexdocs.pm/elixir/1.12/Task.html#async/1)
+We are using 
+[`Task.async/1`](https://hexdocs.pm/elixir/1.12/Task.html#async/1)
 to call our `Nx.Serving` build function `ImageClassifier` we've defined earlier,
 thus initiating a batched run with the image tensor.
 While the task is spawned,
@@ -644,12 +651,15 @@ so we can show a spinner or a loading animation.
 When the task is spawned using `Task.async/1`, 
 a couple of things happen in the background.
 The new process is monitored by the caller (our `LiveView`), 
-which means that the caller will receive a `{:DOWN, ref, :process, object, reason}` message once the process it is monitoring dies. 
+which means that the caller will receive a 
+`{:DOWN, ref, :process, object, reason}` 
+message once the process it is monitoring dies. 
 And, a link is created between both processes.
 
 Therefore, 
-we **don't need to use [`Task.await/2`](https://hexdocs.pm/elixir/1.12/Task.html#await/2)**.
-Instead, we create a new handelr to receive the aforementioned.
+we **don't need to use** 
+[**`Task.await/2`**](https://hexdocs.pm/elixir/1.12/Task.html#await/2).
+Instead, we create a new handler to receive the aforementioned.
 That's what we're doing in the
 `handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket)` function.
 The received message contains a `{ref, result}` tuple, 
@@ -666,15 +676,16 @@ Quite beautiful, isn't it?
 With this, we don't have to worry if the person closes the browser tab.
 The process dies (as does our `LiveView`),
 and the work is automatically cancelled,
-meaning no resources are spent on a process from which nobody expects 
-the model result anymore. 
+meaning no resources are spent 
+on a process for which nobody expects a result anymore. 
 
 
 ### 4.2.1 Considerations regarding `async` processes
 
 When a task is spawned using `Task.async/2`, 
 **it is linked to the caller**.
-Which means that they're related: if one dies, the other does too.
+Which means that they're related: 
+if one dies, the other does too.
 
 We ought to take this into account when developing our application.
 If we don't have control over the result of the task,
@@ -697,12 +708,13 @@ this is not the right solution.
 ### 4.2.2 Alternative for better testing
 
 We are spawning async tasks by calling `Task.async/1`.
-This is creating an ***unsupervised task**.
+This is creating an **_unsupervised_ task**.
 Although it's plausible for this simple app,
 it's best for us to create a 
 [**`Supervisor`**](https://hexdocs.pm/elixir/1.15.7/Supervisor.html)
 that manages their child tasks.
-This way, we have more control over the execution and lifetime of the child classes.
+This gives more control over the execution 
+and lifetime of the child tasks.
 
 Additionally, it's better to have these tasks supervised
 because it makes it possible to create tests for our `LiveView`.
@@ -712,32 +724,33 @@ First, head over to `lib/app/application.ex`
 and add a supervisor to the `start/2` function children array.
 
 ```elixir
-  def start(_type, _args) do
-    children = [
-      AppWeb.Telemetry,
-      {Phoenix.PubSub, name: App.PubSub},
-      {Nx.Serving, serving: serving(), name: ImageClassifier},
-      {Task.Supervisor, name: App.TaskSupervisor},      # add this line
-      AppWeb.Endpoint
-    ]
+def start(_type, _args) do
+  children = [
+    AppWeb.Telemetry,
+    {Phoenix.PubSub, name: App.PubSub},
+    {Nx.Serving, serving: serving(), name: ImageClassifier},
+    {Task.Supervisor, name: App.TaskSupervisor},      # add this line
+    AppWeb.Endpoint
+  ]
 
-    opts = [strategy: :one_for_one, name: App.Supervisor]
-    Supervisor.start_link(children, opts)
-  end
+  opts = [strategy: :one_for_one, name: App.Supervisor]
+  Supervisor.start_link(children, opts)
+end
 ```
 
-We are creating a [`Task.Supervisor`](https://hexdocs.pm/elixir/1.15.7/Supervisor.html)
+We are creating a [`Task.Supervisor`](https://hexdocs.pm/elixir/Supervisor.html)
 with the name `App.TaskSupervisor`.
 
 Now, in `lib/app_web/live/page_live.ex`,
 we create the async task like so:
 
 ```elixir
-  task = Task.Supervisor.async(App.TaskSupervisor, fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
+task = Task.Supervisor.async(App.TaskSupervisor, fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
 ```
 
-We are now using [`Task.Supervisor.async`](https://hexdocs.pm/elixir/1.15.7/Task.Supervisor.html#async/3),
-passing the name of the supervisor we've defined earlier.
+We are now using 
+[`Task.Supervisor.async`](https://hexdocs.pm/elixir/1.15.7/Task.Supervisor.html#async/3),
+passing the name of the supervisor defined earlier.
 
 And that's it!
 We are creating async tasks like before,
@@ -781,7 +794,7 @@ we do that until the *prediction is made*.
 ## 4.3 Image pre-processing
 
 As we've noted before,
-we need to **pre-process the image before feeding it to the model**.
+we need to **pre-process the image before passing it to the model**.
 For this, we have three main steps:
 
 - removing the [`alpha` ](https://en.wikipedia.org/wiki/Alpha_compositing) 
@@ -789,7 +802,7 @@ out of the image, flattening it out.
 - convert the image to `sRGB` [colourspace](https://en.wikipedia.org/wiki/Color_space).
 This is needed to ensure that the image is consistent
 and aligns with the model's training data images.
-- set the representation of the image as tensor
+- set the representation of the image as a `Tensor`
 to `height, width, bands`.
 The image tensor will then be organized as a three-dimensional array,
 where the first dimension represents the height of the image,
@@ -797,16 +810,15 @@ the second refers to the width of the image,
 and the third pertains to the different 
 [spectral bands/channels of the image](https://en.wikipedia.org/wiki/Multispectral_imaging).
 
-Our `pre_processing/3` function will implement these three steps.
-Let's go over it now!
-
+Our `pre_process_image/1` function will implement these three steps.
+Let's implement it now! <br />
 In `lib/app_web/live/page_live.ex`,
-add this piece of code.
+add the following:
 
 ```elixir
   defp pre_process_image(%Vimage{} = image) do
 
-    # If the image has an alpha channel, we flatten the alpha out of the image --------
+    # If the image has an alpha channel, flatten it:
     {:ok, flattened_image} = case Vix.Vips.Image.has_alpha?(image) do
       true -> Vix.Vips.Operation.flatten(image)
       false -> {:ok, image}
@@ -820,8 +832,6 @@ add this piece of code.
 
     # We reshape the tensor given a specific format.
     # In this case, we are using {height, width, channels/bands}.
-    # If you want to use {width, height, channels/bands},
-    # you need format = `[:width, :height, :bands]` and shape = `{y, x, bands}`.
     %Vix.Tensor{data: binary, type: type, shape: {x, y, bands}} = tensor
     format = [:height, :width, :bands]
     shape = {x, y, bands}
@@ -844,10 +854,13 @@ The resulting image has its colourspaced changed
 by calling [`colourspace/3`](https://hexdocs.pm/vix/Vix.Vips.Operation.html#colourspace/3),
 where we change the to `sRGB`.
 
-The colourspace-altered image is then converted to a [tensor](https://hexdocs.pm/vix/Vix.Tensor.html),
-by calling [`write_to_tensor/1`](https://hexdocs.pm/vix/Vix.Vips.Image.html#write_to_tensor/1).
+The colourspace-altered image is then converted to a 
+[tensor](https://hexdocs.pm/vix/Vix.Tensor.html),
+by calling 
+[`write_to_tensor/1`](https://hexdocs.pm/vix/Vix.Vips.Image.html#write_to_tensor/1).
 
-We then [reshape](https://hexdocs.pm/nx/Nx.html#reshape/3) 
+We then 
+[reshape](https://hexdocs.pm/nx/Nx.html#reshape/3) 
 the tensor according to the format that was previously mentioned.
 
 This function returns the processed tensor,
@@ -962,7 +975,7 @@ you can drag and drop or select an image.
 After this, a task will be spawned that will run the model
 against the image that was submitted.
 
-After the prediction is made, it's then shown to the person!
+Once a prediction is made, display it!
 
 <p align="center">
   <img src="https://github.com/dwyl/aws-sdk-mock/assets/17494745/894b988e-4f60-4781-8838-c7fd95e571f0" />
@@ -975,7 +988,7 @@ You can see the supported models in https://github.com/elixir-nx/bumblebee#model
 
 ## 4.6 Considerations on user images
 
-To maintain the app as simple as possible,
+To keep the app as simple as possible,
 we are receiving the image from the person as is.
 Although we are processing the image,
 we are doing it so **it is processable by the model**.
@@ -990,24 +1003,25 @@ increasing workload on the server to potentially downsize a large image.
 meaning more work on the server.
 
 We can avoid both of these downsides by moving this work to the client.
-We can leverage the [`Canvas API` ](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
+We can leverage the 
+[`Canvas API` ](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
 to decode and downsize this image in the client-side,
 reducing server workload.
 
 You can see an example implementation of this technique 
 in `Bumblebee`'s repository 
-at https://github.com/elixir-nx/bumblebee/blob/main/examples/phoenix/image_classification.exs.
+at https://github.com/elixir-nx/bumblebee/blob/main/examples/phoenix/image_classification.exs
 
-However, since we are not using `Javascript` for anything,
+However, since we are not using `JavaScript` for anything,
 we can (and *should*!) properly downsize our images
 so they better fit the training dataset of the model we use.
 This will allow the model to process faster, 
 since larger images carry over more data that is ultimately unnecessary
 for models to make predictions.
 
-For this,
-head over to `lib/app_web/live/page_live.ex`,
-locate the `handle_progress/3` function
+Open 
+`lib/app_web/live/page_live.ex`,
+find the `handle_progress/3` function
 and change resize the image *before processing it*.
 
 ```elixir
@@ -1025,26 +1039,24 @@ and change resize the image *before processing it*.
     #...
 ```
 
-We are using [`Vix.Vips.Operation.thumbnail/3`](https://hexdocs.pm/vix/Vix.Vips.Operation.html#thumbnail/3)
+We are using 
+[`Vix.Vips.Operation.thumbnail/3`](https://hexdocs.pm/vix/Vix.Vips.Operation.html#thumbnail/3)
 to resize our image to a fixed width
 whilst maintaining aspect ratio.
 The `width` variable can be dependent on the model that you use.
 For example, `ResNet-50` is trained on `224px224` pictures,
 so you may want to resize the image to this width.
 
-> [!NOTE]
->
-> We are using the `thumbnail/3` function
-> instead of `resize/3` because it's much faster.
->
-> Check https://github.com/libvips/libvips/wiki/HOWTO----Image-shrinking
+> **Note**: We are using the `thumbnail/3` function
+> instead of `resize/3` because it's _much_ faster. <br />
+> Check 
+> https://github.com/libvips/libvips/wiki/HOWTO----Image-shrinking
 > to know why.
 
-# 5. Final touches
+# 5. Final Touches
 
 Although our app is functional,
 we can make it **better**. 🎨
-
 
 ## 5.1 Setting max file size
 
@@ -1336,9 +1348,9 @@ you'll see that it will download the new models,
 tokenizers, featurizer and configs to run the model.
 
 ```sh
-|====================================================================================================| 100% (989.82 MB)
+|======================================================================| 100% (989.82 MB)
 [info] TfrtCpuClient created.
-|====================================================================================================| 100% (711.39 KB)
+|======================================================================| 100% (711.39 KB)
 [info] Running AppWeb.Endpoint with cowboy 2.10.0 at 127.0.0.1:4000 (http)
 [info] Access AppWeb.Endpoint at http://localhost:4000
 [watch] build finished, watching for changes...
@@ -1347,12 +1359,13 @@ tokenizers, featurizer and configs to run the model.
 You may think we're done here.
 But we are not! ✋
 
-The **destructuring of the output of the model may not be the same**.
+The **destructuring of the output of the model may not be the same**. <br />
 If you try to submit a photo,
 you'll get this error:
 
 ```sh
-no match of right hand side value: %{results: [%{text: "a person holding a large blue ball on a beach"}]}
+no match of right hand side value: 
+%{results: [%{text: "a person holding a large blue ball on a beach"}]}
 ```
 
 This means that we need to make some changes
@@ -1384,13 +1397,11 @@ you'll see that we got far more accurate results!
 
 Awesome! 🎉
 
-> [!NOTE]
->
-> Take note that `BLIP`, 
-> when compared to `ResNet-50` (for example),
-> is a larger model.
+> **Note**: Be aware that `BLIP` 
+> is a _much_ larger model than `ResNet-50`.
 > There are more accurate and even larger models out there
-> (for example, the [`blip-image-captioning-large`](https://huggingface.co/Salesforce/blip-image-captioning-large) model,
+> (e.g:
+> [`blip-image-captioning-large`](https://huggingface.co/Salesforce/blip-image-captioning-large),
 > the larger version of the model we've just used).
 > This is a balancing act: the larger the model, the longer a prediction may take
 > and more resources your server will need to have to handle this heavier workload.
