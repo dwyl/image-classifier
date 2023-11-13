@@ -33,8 +33,8 @@ RUN mix local.hex --force && \
 
 # set build ENV
 ENV MIX_ENV="prod"
-ENV EXS_DRY_RUN="true"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
+ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
+ENV BUMBLEBEE_OFFLINE="false"
 
 # install mix dependencies
 COPY mix.exs mix.lock ./
@@ -60,6 +60,11 @@ RUN mix assets.deploy
 
 # Compile the release
 RUN mix compile
+
+# IMPORTANT: This downloads the HuggingFace models from the `serving` function in the `lib/app/application.ex` file. 
+# And copies to `.bumblebee`.
+RUN mix run -e 'App.Application.load_models()' --no-start --no-halt; exit 0
+COPY .bumblebee/ .bumblebee
 
 # Changes to config/runtime.exs don't require recompiling the code
 COPY config/runtime.exs config/
@@ -87,8 +92,6 @@ RUN chown nobody /app
 
 # set runner ENV
 ENV MIX_ENV="prod"
-ENV EXS_DRY_RUN="true"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
 
 # Adding this so model can be downloaded
 RUN mkdir -p /nonexistent
@@ -103,5 +106,11 @@ USER nobody
 # advised to add an init process such as tini via `apt-get install`
 # above and adding an entrypoint. See https://github.com/krallin/tini for details
 # ENTRYPOINT ["/tini", "--"]
+
+# Set the runtime ENV
+ENV ECTO_IPV6="true"
+ENV ERL_AFLAGS="-proto_dist inet6_tcp"
+ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
+ENV BUMBLEBEE_OFFLINE="true"
 
 CMD ["/app/bin/server"]
