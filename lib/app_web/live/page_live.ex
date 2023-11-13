@@ -74,7 +74,7 @@ defmodule AppWeb.PageLive do
 
   defp pre_process_image(%Vimage{} = image) do
 
-    # If the image has an alpha channel, we flatten the alpha out of the image --------
+    # If the image has an alpha channel, flatten it:
     {:ok, flattened_image} = case Vix.Vips.Image.has_alpha?(image) do
       true -> Vix.Vips.Operation.flatten(image)
       false -> {:ok, image}
@@ -88,8 +88,6 @@ defmodule AppWeb.PageLive do
 
     # We reshape the tensor given a specific format.
     # In this case, we are using {height, width, channels/bands}.
-    # If you want to use {width, height, channels/bands},
-    # you need format = `[:width, :height, :bands]` and shape = `{y, x, bands}`.
     %Vix.Tensor{data: binary, type: type, shape: {x, y, bands}} = tensor
     format = [:height, :width, :bands]
     shape = {x, y, bands}
