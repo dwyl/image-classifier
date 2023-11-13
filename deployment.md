@@ -1,7 +1,11 @@
-# Deploying your `Bumblebee` app to `Fly.io`
+<div align="center">
 
-Now that you have your very own little `Bumblebee` application,
-it's time we think about **deploying it**,
+# Deploying a `Bumblebee` app to `Fly.io`
+
+</div>
+
+Now that our `Bumblebee` app is working,
+it's time to **deploy it**,
 so everyone can see it!
 
 Although you can check this repo's code yourself
@@ -12,7 +16,7 @@ when shipping your `Bumblebee` app to production.
 
 Let's start 🏃‍♂️.
 
-- [Deploying your `Bumblebee` app to `Fly.io`](#deploying-your-bumblebee-app-to-flyio)
+- [Deploying a `Bumblebee` app to `Fly.io`](#deploying-a-bumblebee-app-to-flyio)
   - [1.Considerations before you deploy](#1considerations-before-you-deploy)
   - [2. Initializing `fly.io`-related files](#2-initializing-flyio-related-files)
   - [3. Changing config files](#3-changing-config-files)
@@ -50,12 +54,12 @@ We can *set it*
 and `Bumblebee` will look for it in the set directory.
 
 > [!NOTE]
->
 > `Bumblebee` also recommends you set the `BUMBLEBEE_OFFLINE`
 > to `true` in the final image,
 > to make sure all the models are always loaded from the cache.
 >
-> See https://github.com/elixir-nx/bumblebee/tree/main/examples/phoenix#2-cached-from-hugging-face.
+> See: 
+> https://github.com/elixir-nx/bumblebee/tree/main/examples/phoenix#2-cached-from-hugging-face.
 
 We're going to follow the *second option*.
 
@@ -64,7 +68,8 @@ We're going to follow the *second option*.
 
 If you haven't installed the `flyctl`,
 install it.
-Follow the instructions at https://fly.io/docs/elixir/getting-started/.
+Follow the instructions at 
+[fly.io/docs/elixir/getting-started](https://fly.io/docs/elixir/getting-started) <br />
 This command is needed to deploy our `Phoenix` application
 to `fly.io`.
 
@@ -120,7 +125,6 @@ Remote builder fly-builder-little-glitter-8329 ready
 ```
 
 > [!NOTE]
->
 > The command will ask you to choose 
 > which server resources you want your app to run in.
 > If you run large models, you probably will have to scale up
@@ -132,7 +136,6 @@ Remote builder fly-builder-little-glitter-8329 ready
 
 
 > [!WARNING]
->
 > Your deployment may have failed.
 > Don't worry, this is normal. 
 > This is because we haven't configured some files
@@ -178,7 +181,9 @@ Chances are you ran into this error
 while running `fly launch`.
 
 ```
-#0 22.93 could not compile dependency :exla, "mix compile" failed. Errors may have been logged above. You can recompile this dependency with "mix deps.compile exla --force", update it with "mix deps.update exla" or clean it with "mix deps.clean exla"
+#0 22.93 could not compile dependency :exla, "mix compile" failed. Errors may have been logged above. 
+  You can recompile this dependency with "mix deps.compile exla --force", 
+  update it with "mix deps.update exla" or clean it with "mix deps.clean exla"
 #0 22.93 ** (RuntimeError) expected either curl or wget to be available in your system, but neither was found
 ```
 
@@ -517,7 +522,7 @@ at https://github.com/elixir-nx/bumblebee/tree/main/examples/phoenix#configuring
 # 4. Deploy again!
 
 Now that we've made the needed changes,
-we can deploy the application again!
+we can deploy the application again! <br />
 Simply run `fly launch`
 and re-use the same configuration
 (we've already run `fly launch` prior,

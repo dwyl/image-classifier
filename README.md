@@ -105,7 +105,8 @@ In addition to this,
 what it is, what an `S3` bucket is/does -
 **is assumed**. 
 
-> **Note**: if you have questions or get stuck,
+> [!NOTE]
+> if you have questions or get stuck,
 > please open an issue! 
 > [/dwyl/image-classifier/issues](https://github.com/dwyl/image-classifier/issues)
 
@@ -551,7 +552,7 @@ we are loading the
 model
 and its featurizer.
 
-> **Note**:
+> [!NOTE]
 > A `featurizer` can be seen as a 
 > [`Feature Extractor`](https://huggingface.co/docs/transformers/main_classes/feature_extractor).
 > It is essentially a component that is responsible for converting input data 
@@ -624,7 +625,8 @@ def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket) do
 end
 ```
 
-> **Note:** The `pre_process_image/1` function is yet to be defined.
+> [!NOTE]
+> The `pre_process_image/1` function is yet to be defined.
 > We'll do that in the following section.
 
 In the `handle_progress/3` function,
@@ -1398,7 +1400,8 @@ you'll see that we got far more accurate results!
 
 Awesome! 🎉
 
-> **Note**: Be aware that `BLIP` 
+> [!NOTE]
+> Be aware that `BLIP` 
 > is a _much_ larger model than `ResNet-50`.
 > There are more accurate and even larger models out there
 > (e.g:
