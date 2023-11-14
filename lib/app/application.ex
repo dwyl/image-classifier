@@ -2,7 +2,7 @@ defmodule App.Application do
   # See https://hexdocs.pm/elixir/Application.html
   # for more information on OTP Applications
   @moduledoc false
-
+  require Logger
   use Application
 
   @impl true
@@ -11,6 +11,7 @@ defmodule App.Application do
     # Checking if the models have been downloaded
     models_folder_path = Path.join(System.get_env("BUMBLEBEE_CACHE_DIR"), "huggingface")
     if not File.exists?(models_folder_path) or File.ls!(models_folder_path) == [] do
+      Logger.info("The folder `.bumblebee/huggingface` is empty or does not exist. Downloading the models in `load_models/1`...")
       load_models()
     end
 

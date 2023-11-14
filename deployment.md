@@ -25,6 +25,12 @@ Let's start 🏃‍♂️.
       - [2.1.2 Setting the local directory where `Bumblebee` models will load from](#212-setting-the-local-directory-where-bumblebee-models-will-load-from)
     - [2.2 Changing `EXLA` settings](#22-changing-exla-settings)
   - [3. Deploy again!](#3-deploy-again)
+  - [4. Adding volumes to our machine instances](#4-adding-volumes-to-our-machine-instances)
+    - [4.1 Deleting existing instances](#41-deleting-existing-instances)
+    - [4.2 Create brand new instances with volumes](#42-create-brand-new-instances-with-volumes)
+    - [4.3 Confirm that the volume is attached to the machine](#43-confirm-that-the-volume-is-attached-to-the-machine)
+    - [4.4 Extending the size of the volume](#44-extending-the-size-of-the-volume)
+    - [4.5 Running the application and checking new volume size and its usage](#45-running-the-application-and-checking-new-volume-size-and-its-usage)
 - [Scaling up `fly` machines](#scaling-up-fly-machines)
 
 
@@ -564,6 +570,222 @@ and your site should be up and running.
 
 Great job! 
 Give yourself a pat on the back! 👏
+
+
+## 4. Adding volumes to our machine instances
+
+We're now downloading the models on the first bootup
+into the path that we've defined in `BUMBLEBEE_CACHE_DIR`
+(we've personally set this to `/app/.bumblebee`).
+
+Because we want to persist these models in-between sessions
+(and because [according to `fly.io`](https://fly.io/docs/reference/volumes/), 
+"a machine's file system gets rebuilt from scratch every time we deploy our app/
+is restarted"),
+we ought to use **volumes**
+so we can place our models there to be persisted.
+
+Now we have two options:
+
+- if we have machines runnings,
+we probably have *two instances*,
+as this is the default of `fly.io`.
+If you wish to keep the same instances,
+you can follow https://fly.io/docs/apps/volume-storage/#add-volumes-to-an-existing-app
+to add a volume to the existing instances.
+
+- delete and create instances with volumes right off the bat.
+We'll use this approach because it's simpler
+and will show you how to create instances from the get-go.
+
+
+### 4.1 Deleting existing instances
+
+Before creating new instances, let's delete our current ones.
+
+Type `fly status` on your terminal.
+You should see something like this:
+
+```sh
+App
+  Name     = XXX                                        
+  Owner    = XXXXX                              
+  Hostname = xxx.fly.dev                                
+  Image    = xxxx:deployment-0O8U12JNDASOIU0H192YZXDH  
+  Platform = machines                                     
+
+Machines
+PROCESS ID              VERSION REGION  STATE   ROLE    CHECKS  LAST UPDATED         
+app     1857705f701e08  16      mad     started                 2023-11-14T22:03:22Z
+app     683d529c575228  16      mad     started                 2023-11-14T22:03:31Z
+```
+
+Let's delete both of these instances.
+Type:
+
+```sh
+fly m destroy <ID> --force  
+```
+
+Do this for both instances.
+If you run `fly status` now,
+you should not see any more instances.
+
+Let's also make sure we don't have any volumes.
+Run `fly volumes list` 
+and make sure if you don't have any volumes.
+
+
+### 4.2 Create brand new instances with volumes
+
+Awesome! 
+Now let's create some new shiny instances!
+
+Head over to `fly.toml`
+and add the following text to it.
+
+```toml
+[mounts]
+  source="models"
+  destination="/app/.bumblebee"
+```
+
+- **`source`** pertains to the *name of the volume*.
+You can name it whatever you want.
+- **`destination`** is the destination path of the volume 
+inside the `fly.io` instance.
+In this case,
+we want it to be the same as the one defined in 
+`BUMBLEBEE_CACHE_DIR`, 
+as it is the path we wish to persist.
+
+Now let's deploy the app!
+
+Run `fly deploy`.
+
+
+### 4.3 Confirm that the volume is attached to the machine
+
+To check our machines and volumes,
+let's run:
+
+```sh
+fly machine list
+```
+
+It should yield something like so.
+
+```
+ID                 NAME                    STATE   REGION  IMAGE                                           IP ADDRESS                      VOLUME                  CREATED                 LAST UPDATED            APP PLATFORM    PROCESS GROUP   SIZE                
+ID_OF_THE_MACHINE  dark-shadow-9681        started mad     XXXXX:deployment-01HF7YHSWEN8C3VTMSPYBMWRQB     IP_ADDRESS                      vol_24odk25k51wmn9xr    2023-11-14T22:17:20Z    2023-11-14T22:17:42Z    v2              app             shared-cpu-1x:256MB
+```
+
+As we can see, 
+a volume with ID `vol_24odk25k51wmn9xr`
+has been created and attached to the machine.
+
+You can see the volume 
+if you list `fly volumes list`.
+
+```
+ID                      STATE   NAME    SIZE    REGION  ZONE    ENCRYPTED       ATTACHED VM     CREATED AT    
+vol_24odk25k51wmn9xr    created models  1GB     mad     20a7    true            d891394fee9318  4 minutes ago
+```
+
+Awesome!
+
+
+### 4.4 Extending the size of the volume
+
+We want our volume to comfortably accommodate our models.
+Depending on the model *you choose*,
+you may need a bigger or smaller volume size.
+
+`fly.io` offers up to 
+`3GB` of free volume space.
+You can see the pricing in https://fly.io/docs/about/pricing/#persistent-storage-volumes.
+
+Let's [extend our volume](https://fly.io/docs/apps/volume-manage/#extend-a-volume) 
+to from `1GB` to `3GB`!
+
+For this, simply run the following command.
+
+```sh
+fly vol extend <volume id> -s <new size in GB>
+```
+
+And you're sorted! 🎉
+
+You will need to restart the instance for the changes
+to take effect.
+
+
+### 4.5 Running the application and checking new volume size and its usage
+
+Now let's see our handiwork in action!
+Start your application
+(you do this by visiting the URL of your application,
+it will boot up the instance).
+
+After it's up and running,
+we can **access it through an `SSH` connection**.
+
+First, let's see the new volume size in the machine's file system.
+Run `fly ssh console -s -C df`.
+You will see something like so:
+
+```
+Filesystem     1K-blocks    Used Available Use% Mounted on
+devtmpfs           98380       0     98380   0% /dev
+/dev/vda         8154588 1130176   6588600  15% /
+shm               111340       0    111340   0% /dev/shm
+tmpfs             111340       0    111340   0% /sys/fs/cgroup
+/dev/vdb         3061336  100284   2809836   4% /app/.bumblebee
+```
+
+As you can see, our `/app/.bumblebee` storage volume
+has roughly `3GB` available.
+`1GB` is being used by the models that have been downloaded
+when we initiated our machine instance.
+
+Oh, you don't believe it?
+Let's check the files ourselves! 🔍
+
+Let's connect to the machine instance.
+Run `fly ssh console`.
+
+After running the command,
+you'll be able to execute commands inside the machine instance!
+Run `ls -a` to see the directories.
+
+```sh
+root@f2453124fee9318:/app# ls -a
+```
+
+The terminal should yield the list of directories under `/app`.
+
+```
+.  ..  bin  .bumblebee  erts-14.0.2  lib  releases
+```
+
+There's `.bumblebee`!
+If you run `ls .bumblebee/huggingface/`,
+you'll see the models that have been downloaded
+when the application first initiated!
+
+```sh
+root@d891394fee9318:/app# ls .bumblebee/huggingface/
+45jmafnchxcbm43dsoretzry4i.eiztamryhfrtsnzzgjstmnrymq3tgyzzheytqmrzmm4dqnbshe3tozjsmi4tanjthera                                        7p34k3zbgum6n3sspclx3dv3aq.json
+45jmafnchxcbm43dsoretzry4i.json                                                                                                        7p34k3zbgum6n3sspclx3dv3aq.k4xsenbtguwtmuclmfdgum3enjuwosljkrbuc42govrhcudqlbde6ujc
+6scgvbvxgc6kagvthh26fzl53a.ejtgmobrgyzwcmjtgiztgmztgezdmnzqgzsdmnbzmnstom3fmnsdontfgq2wimrugfrdimtegyzdgzdfme3ggnzsgm3dsmddmftgkmbxei  sw75gnfcnl7bhl6e5urvb65r6i.ei4wcnbwmnrwcobrgeztqy3fgq4tanrzmq3dgzrwha4gczjvg42taobygjsgmmbxmura
+6scgvbvxgc6kagvthh26fzl53a.json                                                                                                        sw75gnfcnl7bhl6e5urvb65r6i.json
+```
+
+Hurray! 🥳
+
+Now we know our models are being correctly downloaded
+and persisted to a volume.
+So we know we won't lose this data in-between app restarts!
 
 
 # Scaling up `fly` machines

@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for imgai on 2023-11-13T13:41:47Z
+# fly.toml app configuration file generated for imgai on 2023-11-14T20:41:26Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -9,6 +9,10 @@ kill_signal = "SIGTERM"
 swap_size_mb = 512
 
 [build]
+
+[mounts]
+  source="models"
+  destination="/app/.bumblebee"
 
 [env]
   PHX_HOST = "imgai.fly.dev"
