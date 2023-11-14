@@ -230,8 +230,9 @@ and make the application fetch the model locally.
 This is why we set the `BUMBLEBEE_CACHE_DIR` directory.
 
 To force the application to fetch the model locally,
-we set the `BUMBLEBEE_OFFLINE` to `true`
-**only after the model has been downloaded**.
+we can either set the `BUMBLEBEE_OFFLINE` to `true`
+**only after the model has been downloaded**
+or do it [programmatically](https://hexdocs.pm/bumblebee/Bumblebee.html#t:repository/0).
 By forcing this env variable to `true`,
 this will force `Bumblebee` to look for the model locally 
 (it disables any outgoing traffic connections,
@@ -293,7 +294,7 @@ RUN mix local.hex --force && \
 # set build ENV
 ENV MIX_ENV="prod"
 ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
-ENV BUMBLEBEE_OFFLINE="false"
+
 
 # install mix dependencies
 COPY mix.exs mix.lock ./
@@ -312,8 +313,6 @@ COPY lib lib
 
 COPY assets assets
 
-# IMPORTANT: This assumes `.bumblebee` is already populated. 
-# A command is run on the `fly.yml` workflow that first loads the models into this directory.
 COPY .bumblebee/ .bumblebee
 
 # compile assets
@@ -349,10 +348,9 @@ RUN chown nobody /app
 # set runner ENV
 ENV MIX_ENV="prod"
 
-
 # Only copy the final release from the build stage
-COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app ./
-COPY --from=builder --chown=nobody:root /app/.bumblebee/ ./.bumblebee
+COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app /app
+COPY --from=builder --chown=nobody:root /app/.bumblebee/ /app/.bumblebee
 
 USER nobody
 
@@ -365,57 +363,63 @@ USER nobody
 ENV ECTO_IPV6="true"
 ENV ERL_AFLAGS="-proto_dist inet6_tcp"
 ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
-ENV BUMBLEBEE_OFFLINE="true"
+
 
 CMD ["/app/bin/server"]
 ```
 
+
 As you can see,
-we are setting the `BUMBLEBEE_OFFLINE` env variable
-**only after the image has been compiled and the models have been downloaded**.
-This assumes that the `.bumblebee` directory has the model downloaded into it.
-This is why we need to run `mix run -e 'App.Application.load_models()' --no-start --no-halt; exit 0`
-before running the `Dockerfile`.
-You can find this process in `.github/workflows/fly.yml`.
+this `Dockerfile` focuses on bundling the application
+and creating the `/app/.bumblebee` directory
+wherein the models will be downloaded into.
 
-```yml
-# Continuous Deployment to Fly.io
-# https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
-name: Fly Deploy
-on:
-  push:
-    branches:
-      - main
-
-jobs:
-  deploy:
-    name: Deploy app
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-
-      # Downloads the models so they can be copied in the dockerfile
-      - run: mix run -e 'App.Application.load_models()' --no-start --no-halt; return 0
-        env:
-          BUMBLEBEE_OFFLINE: false 
-          BUMBLEBEE_CACHE_DIR: "./.bumblebee"
-
-      # Runs the flyctl deploy command
-      - run: flyctl deploy --remote-only
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-```
-
-You may also have noticed that we are calling
-a function in `lib/app/application.ex`
-called `load_models/0`.
-We haven't created it yet.
-
-So, go to `application.ex`
-and add it!
+In order to download the models
+so they can later be reused
+whenever the app is restarted
+without downloading the model again,
+we need to make a couple of changes to `lib/app/application.ex`.
 
 ```elixir
+defmodule App.Application do
+  # See https://hexdocs.pm/elixir/Application.html
+  # for more information on OTP Applications
+  @moduledoc false
+
+  use Application
+
+  @impl true
+  def start(_type, _args) do
+
+    # Checking if the models have been downloaded
+    models_folder_path = Path.join(System.get_env("BUMBLEBEE_CACHE_DIR"), "huggingface")
+    if not File.exists?(models_folder_path) or File.ls!(models_folder_path) == [] do
+      load_models()
+    end
+
+
+    children = [
+      # Start the Telemetry supervisor
+      AppWeb.Telemetry,
+      # Start the PubSub system
+      {Phoenix.PubSub, name: App.PubSub},
+      # Nx serving for image classifier
+      {Nx.Serving, serving: serving(), name: ImageClassifier},
+      # Adding a supervisor
+      {Task.Supervisor, name: App.TaskSupervisor},
+      # Start the Endpoint (http/https)
+      AppWeb.Endpoint
+      # Start a worker by calling: App.Worker.start_link(arg)
+      # {App.Worker, arg}
+    ]
+
+    # Check if the models have been downloaded
+
+    # See https://hexdocs.pm/elixir/Supervisor.html
+    # for other strategies and supported options
+    opts = [strategy: :one_for_one, name: App.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
 
   def load_models do
     # ResNet-50 -----
@@ -425,27 +429,40 @@ and add it!
 
   def serving do
     # ResNet-50 -----
-    {:ok, model_info} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
-    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
+    {:ok, model_info} = Bumblebee.load_model({:hf, "microsoft/resnet-50", offline: true})
+    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50", offline: true})
 
     Bumblebee.Vision.image_classification(model_info, featurizer,
       top_k: 1,
       compile: [batch_size: 10],
       defn_options: [compiler: EXLA],
-      preallocate_params: true 
+      preallocate_params: true        # needed to run on `Fly.io`
     )
 
   end
+
+  # Tell Phoenix to update the endpoint configuration
+  # whenever the application is updated.
+  @impl true
+  def config_change(changed, _new, removed) do
+    AppWeb.Endpoint.config_change(changed, removed)
+    :ok
+  end
+end
+
 ```
 
 Inside `load_models/0`, 
 we are fetching all the models that are needed in the application.
 This will download the models into our `BUMBLEBEE_CACHE_DIR`
-during the build stage.
+on application startup.
+The model will only be downloaded when no models are found.
+Therefore, only the first boot will be affected.
+Subsequent ones won't.
 
-When executing the application,
-because `BUMBLEBEE_OFFLINE` is set to `true`,
-the `serving/0` `load_model` functions will load the models locally.
+Our `serving/0` function now fetches the models locally,
+because we're passing the `:offline` option 
+and setting it to `true`.
 
 
 ### 2.2 Changing `EXLA` settings
@@ -536,20 +553,7 @@ at https://github.com/elixir-nx/bumblebee/tree/main/examples/phoenix#configuring
 Now that we've made the needed changes,
 we can deploy the application again!
 
-If you want to deploy locally,
-run the following command:
-
-```sh
-BUMBLEBEE_OFFLINE=false BUMBLEBEE_CACHE_DIR=./.bumblebee mix run -e 'App.Application.load_models()' --no-start --no-halt; return 0
-```
-
-We are setting the env variables `BUMBLEBEE_OFFLINE` to `false`
-so it downloads the model from the web;
-`BUMBLEBEE_CACHE_DIR` is set to the `.bumblebee` directory
-so the model is downloaded there.
-We then run `load_models/0` to download the models.
-
-After this, you should run `fly launch`
+You should run `fly launch`
 and re-use the same configuration
 (we've already run `fly launch` prior,
 so the configuration files are there already).
@@ -557,13 +561,6 @@ so the configuration files are there already).
 If you walk through the steps,
 the deployment should run smoothly
 and your site should be up and running.
-
-Your `Docker` image may be big 
-but that's the only downsize we have.
-We have a big upside though:
-**our boot up time is greatly increased**,
-meaning the model is not re-downloaded unnecessary 
-even if the application has been restarted.
 
 Great job! 
 Give yourself a pat on the back! 👏

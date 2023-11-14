@@ -7,6 +7,14 @@ defmodule App.Application do
 
   @impl true
   def start(_type, _args) do
+
+    # Checking if the models have been downloaded
+    models_folder_path = Path.join(System.get_env("BUMBLEBEE_CACHE_DIR"), "huggingface")
+    if not File.exists?(models_folder_path) or File.ls!(models_folder_path) == [] do
+      load_models()
+    end
+
+
     children = [
       # Start the Telemetry supervisor
       AppWeb.Telemetry,
@@ -21,6 +29,8 @@ defmodule App.Application do
       # Start a worker by calling: App.Worker.start_link(arg)
       # {App.Worker, arg}
     ]
+
+    # Check if the models have been downloaded
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
@@ -41,14 +51,14 @@ defmodule App.Application do
     # {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "Salesforce/blip-image-captioning-base"})
     # {:ok, generation_config} = Bumblebee.load_generation_config({:hf, "Salesforce/blip-image-captioning-base"})
 
-    # Bumblebee.Vision.image_to_text(model_info, featurizer, tokenizer, generation_config,
+    # Bumblebee.Vision.image` _to_text(model_info, featurizer, tokenizer, generation_config,
     #   compile: [batch_size: 10],
     #   defn_options: [compiler: EXLA]
     # )
 
     # ResNet-50 -----
-    {:ok, model_info} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
-    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
+    {:ok, model_info} = Bumblebee.load_model({:hf, "microsoft/resnet-50", offline: true})
+    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50", offline: true})
 
     Bumblebee.Vision.image_classification(model_info, featurizer,
       top_k: 1,

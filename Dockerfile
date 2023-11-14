@@ -34,7 +34,7 @@ RUN mix local.hex --force && \
 # set build ENV
 ENV MIX_ENV="prod"
 ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
-ENV BUMBLEBEE_OFFLINE="false"
+
 
 # install mix dependencies
 COPY mix.exs mix.lock ./
@@ -53,8 +53,6 @@ COPY lib lib
 
 COPY assets assets
 
-# IMPORTANT: This assumes `.bumblebee` is already populated. 
-# A command is run on the `fly.yml` workflow that first loads the models into this directory.
 COPY .bumblebee/ .bumblebee
 
 # compile assets
@@ -90,12 +88,9 @@ RUN chown nobody /app
 # set runner ENV
 ENV MIX_ENV="prod"
 
-# Adding this so model can be downloaded
-RUN mkdir -p /nonexistent
-
 # Only copy the final release from the build stage
-COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app ./
-COPY --from=builder --chown=nobody:root /app/.bumblebee/ ./.bumblebee
+COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app /app
+COPY --from=builder --chown=nobody:root /app/.bumblebee/ /app/.bumblebee
 
 USER nobody
 
@@ -108,6 +103,6 @@ USER nobody
 ENV ECTO_IPV6="true"
 ENV ERL_AFLAGS="-proto_dist inet6_tcp"
 ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
-ENV BUMBLEBEE_OFFLINE="true"
+
 
 CMD ["/app/bin/server"]
