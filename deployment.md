@@ -17,19 +17,19 @@ when shipping your `Bumblebee` app to production.
 Let's start 🏃‍♂️.
 
 - [Deploying a `Bumblebee` app to `Fly.io`](#deploying-a-bumblebee-app-to-flyio)
-  - [1.Considerations before you deploy](#1considerations-before-you-deploy)
-  - [2. Initializing `fly.io`-related files](#2-initializing-flyio-related-files)
-  - [3. Changing config files](#3-changing-config-files)
-    - [3.1 `Dockerfile`](#31-dockerfile)
-      - [3.1.1 Installing `wget` so `ESLA` can be properly downloaded](#311-installing-wget-so-esla-can-be-properly-downloaded)
-      - [3.1.2 Setting the local directory where `Bumblebee` models will load from](#312-setting-the-local-directory-where-bumblebee-models-will-load-from)
-      - [3.1.3 Fixing `nonexistent` directory error](#313-fixing-nonexistent-directory-error)
-    - [3.2 Changing `EXLA` settings](#32-changing-exla-settings)
-- [4. Deploy again!](#4-deploy-again)
+- [Considerations before you deploy](#considerations-before-you-deploy)
+  - [1. Initializing `fly.io`-related files](#1-initializing-flyio-related-files)
+  - [2. Changing config files](#2-changing-config-files)
+    - [2.1 `Dockerfile`](#21-dockerfile)
+      - [2.1.1 Installing `wget` so `ESLA` can be properly downloaded](#211-installing-wget-so-esla-can-be-properly-downloaded)
+      - [2.1.2 Setting the local directory where `Bumblebee` models will load from](#212-setting-the-local-directory-where-bumblebee-models-will-load-from)
+      - [2.1.3 Fixing `nonexistent` directory error](#213-fixing-nonexistent-directory-error)
+    - [2.2 Changing `EXLA` settings](#22-changing-exla-settings)
+  - [3. Deploy again!](#3-deploy-again)
+- [Scaling up `fly` machines](#scaling-up-fly-machines)
 
 
-
-## 1.Considerations before you deploy
+# Considerations before you deploy
 
 When you run your app on `localhost`, 
 you'll see that the model data is downloaded
@@ -64,7 +64,7 @@ and `Bumblebee` will look for it in the set directory.
 We're going to follow the *second option*.
 
 
-## 2. Initializing `fly.io`-related files
+## 1. Initializing `fly.io`-related files
 
 If you haven't installed the `flyctl`,
 install it.
@@ -143,7 +143,7 @@ Remote builder fly-builder-little-glitter-8329 ready
 > for the app's execution on `fly.io`.
 
 
-## 3. Changing config files
+## 2. Changing config files
 
 After the command has executed,
 you may have realized a few files have been created:
@@ -168,14 +168,14 @@ it's the `.bumblebee` directory
 
 Let's start!
 
-### 3.1 `Dockerfile`
+### 2.1 `Dockerfile`
 
 Let's make some changes to the `Dockerfile`.
 This is the bulk of the changes we need to make,
 so let's go over them.
 
 
-#### 3.1.1 Installing `wget` so `ESLA` can be properly downloaded
+#### 2.1.1 Installing `wget` so `ESLA` can be properly downloaded
 
 Chances are you ran into this error 
 while running `fly launch`.
@@ -207,7 +207,7 @@ RUN apt-get update -y && apt-get install -y build-essential git curl \
 ```
 
 
-#### 3.1.2 Setting the local directory where `Bumblebee` models will load from
+#### 2.1.2 Setting the local directory where `Bumblebee` models will load from
 
 As mentioned earlier, 
 we are going to set the 
@@ -340,7 +340,7 @@ CMD ["/app/bin/server"]
 ```
 
 
-#### 3.1.3 Fixing `nonexistent` directory error
+#### 2.1.3 Fixing `nonexistent` directory error
 
 After making these changes,
 the deployment whilst running `fly launch`
@@ -436,7 +436,7 @@ That's it!
 We just needed to create the directory! 😅
 
 
-### 3.2 Changing `EXLA` settings
+### 2.2 Changing `EXLA` settings
 
 `Bumblebee` recommends using `EXLA` to compile the numerical computations.
 That's what we have used to do those.
@@ -519,7 +519,7 @@ at https://github.com/elixir-nx/bumblebee/tree/main/examples/phoenix#configuring
 
 
 
-# 4. Deploy again!
+## 3. Deploy again!
 
 Now that we've made the needed changes,
 we can deploy the application again! <br />
@@ -534,3 +534,6 @@ and your site should be up and running.
 
 Great job! 
 Give yourself a pat on the back! 👏
+
+
+# Scaling up `fly` machines
