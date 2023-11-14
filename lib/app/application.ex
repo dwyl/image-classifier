@@ -28,14 +28,19 @@ defmodule App.Application do
     Supervisor.start_link(children, opts)
   end
 
-  def serving do
+  def load_models do
+    # ResNet-50 -----
+    {:ok, _} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
+    {:ok, _} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
+  end
 
+  def serving do
     # BLIP -----
     # {:ok, model_info} = Bumblebee.load_model({:hf, "Salesforce/blip-image-captioning-base"})
     # {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "Salesforce/blip-image-captioning-base"})
     # {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, "Salesforce/blip-image-captioning-base"})
     # {:ok, generation_config} = Bumblebee.load_generation_config({:hf, "Salesforce/blip-image-captioning-base"})
-#
+
     # Bumblebee.Vision.image_to_text(model_info, featurizer, tokenizer, generation_config,
     #   compile: [batch_size: 10],
     #   defn_options: [compiler: EXLA]
