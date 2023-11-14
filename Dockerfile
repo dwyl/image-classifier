@@ -53,6 +53,8 @@ COPY lib lib
 
 COPY assets assets
 
+# IMPORTANT: This assumes `.bumblebee` is already populated. 
+# A command is run on the `fly.yml` workflow that first loads the models into this directory.
 COPY .bumblebee/ .bumblebee
 
 # compile assets
@@ -60,11 +62,6 @@ RUN mix assets.deploy
 
 # Compile the release
 RUN mix compile
-
-# IMPORTANT: This downloads the HuggingFace models from the `serving` function in the `lib/app/application.ex` file. 
-# And copies to `.bumblebee`.
-RUN mix run -e 'App.Application.load_models()' --no-start --no-halt; exit 0
-COPY .bumblebee/ .bumblebee
 
 # Changes to config/runtime.exs don't require recompiling the code
 COPY config/runtime.exs config/

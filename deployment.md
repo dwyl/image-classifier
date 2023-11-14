@@ -23,7 +23,6 @@ Let's start 🏃‍♂️.
     - [2.1 `Dockerfile`](#21-dockerfile)
       - [2.1.1 Installing `wget` so `ESLA` can be properly downloaded](#211-installing-wget-so-esla-can-be-properly-downloaded)
       - [2.1.2 Setting the local directory where `Bumblebee` models will load from](#212-setting-the-local-directory-where-bumblebee-models-will-load-from)
-      - [2.1.3 Fixing `nonexistent` directory error](#213-fixing-nonexistent-directory-error)
     - [2.2 Changing `EXLA` settings](#22-changing-exla-settings)
   - [3. Deploy again!](#3-deploy-again)
 - [Scaling up `fly` machines](#scaling-up-fly-machines)
@@ -313,6 +312,8 @@ COPY lib lib
 
 COPY assets assets
 
+# IMPORTANT: This assumes `.bumblebee` is already populated. 
+# A command is run on the `fly.yml` workflow that first loads the models into this directory.
 COPY .bumblebee/ .bumblebee
 
 # compile assets
@@ -320,11 +321,6 @@ RUN mix assets.deploy
 
 # Compile the release
 RUN mix compile
-
-# IMPORTANT: This downloads the HuggingFace models from the `serving` function in the `lib/app/application.ex` file. 
-# And copies to `.bumblebee`.
-RUN mix run -e 'App.Application.load_models()' --no-start --no-halt; exit 0
-COPY .bumblebee/ .bumblebee
 
 # Changes to config/runtime.exs don't require recompiling the code
 COPY config/runtime.exs config/
@@ -353,6 +349,7 @@ RUN chown nobody /app
 # set runner ENV
 ENV MIX_ENV="prod"
 
+
 # Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app ./
 COPY --from=builder --chown=nobody:root /app/.bumblebee/ ./.bumblebee
@@ -376,6 +373,39 @@ CMD ["/app/bin/server"]
 As you can see,
 we are setting the `BUMBLEBEE_OFFLINE` env variable
 **only after the image has been compiled and the models have been downloaded**.
+This assumes that the `.bumblebee` directory has the model downloaded into it.
+This is why we need to run `mix run -e 'App.Application.load_models()' --no-start --no-halt; exit 0`
+before running the `Dockerfile`.
+You can find this process in `.github/workflows/fly.yml`.
+
+```yml
+# Continuous Deployment to Fly.io
+# https://fly.io/docs/app-guides/continuous-deployment-with-github-actions/
+name: Fly Deploy
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Downloads the models so they can be copied in the dockerfile
+      - run: mix run -e 'App.Application.load_models()' --no-start --no-halt; return 0
+        env:
+          BUMBLEBEE_OFFLINE: false 
+          BUMBLEBEE_CACHE_DIR: "./.bumblebee"
+
+      # Runs the flyctl deploy command
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+```
 
 You may also have noticed that we are calling
 a function in `lib/app/application.ex`
@@ -416,65 +446,6 @@ during the build stage.
 When executing the application,
 because `BUMBLEBEE_OFFLINE` is set to `true`,
 the `serving/0` `load_model` functions will load the models locally.
-
-
-#### 2.1.3 Fixing `nonexistent` directory error
-
-After making these changes,
-the deployment whilst running `fly launch`
-will probably succeed 🥳.
-
-However, 
-you may notice that the instance errors out when trying to use it.
-
-This is because `Bumblebee` needs a cache directory
-in order to download the models.
-
-To fix this,
-you simply need to add one line to the Dockerfile.
-
-```dockerfile
-
-# ...........
-
-# Set the locale
-RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
-
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US:en
-ENV LC_ALL en_US.UTF-8
-
-WORKDIR "/app"
-RUN chown nobody /app
-
-# set runner ENV
-ENV MIX_ENV="prod"
-
-# Adding this so model can be downloaded
-RUN mkdir -p /nonexistent
-
-# Only copy the final release from the build stage
-COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app ./
-COPY --from=builder --chown=nobody:root /app/.bumblebee/ ./.bumblebee
-
-USER nobody
-
-# If using an environment that doesn't automatically reap zombie processes, it is
-# advised to add an init process such as tini via `apt-get install`
-# above and adding an entrypoint. See https://github.com/krallin/tini for details
-# ENTRYPOINT ["/tini", "--"]
-
-# Set the runtime ENV
-ENV ECTO_IPV6="true"
-ENV ERL_AFLAGS="-proto_dist inet6_tcp"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
-ENV BUMBLEBEE_OFFLINE="true"
-
-CMD ["/app/bin/server"]
-```
-
-That's it! 
-We just needed to create the directory! 😅
 
 
 ### 2.2 Changing `EXLA` settings
@@ -527,7 +498,7 @@ we need to set this property to `true`.
 > copy all parameters to the GPU before each computation and discard afterwards. 
 > This requires less memory, but the copying increases the inference time.
 > 
-> d`efn_options: [compiler: EXLA, lazy_transfers: :always]` - 
+> `defn_options: [compiler: EXLA, lazy_transfers: :always]` - 
 > lazily copy parameters to the GPU during the computation as needed. 
 > This requires the least memory, at the cost of inference time.
 
@@ -563,8 +534,22 @@ at https://github.com/elixir-nx/bumblebee/tree/main/examples/phoenix#configuring
 ## 3. Deploy again!
 
 Now that we've made the needed changes,
-we can deploy the application again! <br />
-Simply run `fly launch`
+we can deploy the application again!
+
+If you want to deploy locally,
+run the following command:
+
+```sh
+BUMBLEBEE_OFFLINE=false BUMBLEBEE_CACHE_DIR=./.bumblebee mix run -e 'App.Application.load_models()' --no-start --no-halt; return 0
+```
+
+We are setting the env variables `BUMBLEBEE_OFFLINE` to `false`
+so it downloads the model from the web;
+`BUMBLEBEE_CACHE_DIR` is set to the `.bumblebee` directory
+so the model is downloaded there.
+We then run `load_models/0` to download the models.
+
+After this, you should run `fly launch`
 and re-use the same configuration
 (we've already run `fly launch` prior,
 so the configuration files are there already).
@@ -586,3 +571,35 @@ Give yourself a pat on the back! 👏
 
 # Scaling up `fly` machines
 
+Working with LLMs takes up CPU/GPU and RAM power to execute inference.
+
+If you've followed the previous guide, 
+you'll already have a simple, 
+free-tier'd `fly.io` machine instance up and running.
+However, you may run into some problems:
+
+- the machine is suspended after an hour of inactivity.
+This means that it takes time to restart,
+and the model needs to be imported again every time.
+On bigger models, *this is a problem*.
+
+- you run out of memory.
+You may have come across log messages from `fly.io`
+stating `Out of memory: Killed progress XXX`.
+
+To fix these problems,
+we need to [*scale up*](https://microservices.io/articles/scalecube.html)
+our machine instance. 
+That is, we need to give it more resources,
+such as `RAM` and processing power.
+
+
+> [!WARNING]
+>
+> This incurs a *cost*.
+> Scaling up `fly.io` machines is **not free**.
+> Check their [pricing list ](https://fly.io/docs/about/pricing/#fly-machines)
+> for more information.
+
+
+In order to scale up, we\ll

@@ -13,6 +13,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # Downloads the models so they can be copied in the dockerfile
+      - run: mix run -e 'App.Application.load_models()' --no-start --no-halt; return 0
+        env:
+          BUMBLEBEE_OFFLINE: false 
+          BUMBLEBEE_CACHE_DIR: "./.bumblebee"
+
+      # Runs the flyctl deploy command
       - run: flyctl deploy --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
