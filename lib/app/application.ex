@@ -12,7 +12,11 @@ defmodule App.Application do
     models_folder_path = Path.join(System.get_env("BUMBLEBEE_CACHE_DIR") || Application.fetch_env!(:bumblebee, :cache_dir), "huggingface")
     if not File.exists?(models_folder_path) or File.ls!(models_folder_path) == [] do
       Logger.info("The folder `.bumblebee/huggingface` is empty or does not exist. Downloading the models in `load_models/1`...")
-      load_models()
+
+      case Mix.env() do
+        :test -> load_models_test()
+        _-> load_models_prod()
+      end
     end
 
 
@@ -39,7 +43,13 @@ defmodule App.Application do
     Supervisor.start_link(children, opts)
   end
 
-  def load_models do
+  def load_models_test do
+    # Loads `ResNet-50`, which is fairly lightweight.
+    {:ok, _} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
+    {:ok, _} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
+  end
+
+  def load_models_prod do
     # ResNet-50 -----
     {:ok, _} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
     {:ok, _} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
