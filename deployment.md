@@ -222,8 +222,40 @@ We want to:
 - copy the `.bumblebee` directory (or any other name you defined)
 into the `Docker` instance.
 
-Therefore, change the `Dockerfile` so it looks like this
-(look for the `# ADD THIS` comments):
+We want to **download the model during the build stage of the `Dockerfile`**.
+This is because we want to make our `fly.io` instance
+*sleep after one hour of inactivity* to save resources/reduce costs.
+In order to not make the app re-download the model,
+we want to **preemptively download it**
+and make the application fetch the model locally.
+This is why we set the `BUMBLEBEE_CACHE_DIR` directory.
+
+To force the application to fetch the model locally,
+we set the `BUMBLEBEE_OFFLINE` to `true`
+**only after the model has been downloaded**.
+By forcing this env variable to `true`,
+this will force `Bumblebee` to look for the model locally 
+(it disables any outgoing traffic connections,
+so it doesn't download any model from the web).
+
+> [!NOTE]
+>
+> You may have seen there's an option
+> to load the model locally
+> when calling [`load_model/2`](https://hexdocs.pm/bumblebee/Bumblebee.html#t:repository/0).
+>
+> However, there's a distinction to be made.
+> **`:local` should only be used when you've downloaded the model *yourself* and placed it on your repository manually**.
+>
+> The files that are downloaded when you use `:hf` 
+> **are not the same as downloading the model from HuggingFace's repo**.
+>
+> This is why we'll continue to use `:hf`.
+> By setting `BUMBLEBEE_OFFLINE` to `true`, 
+> it will load the files locally 
+> that were previously downloaded during the building stage.
+
+Therefore, change the `Dockerfile` so it looks like this.
 
 ```dockerfile
 # Find eligible builder and runner images on Docker Hub. We use Ubuntu/Debian
@@ -261,10 +293,8 @@ RUN mix local.hex --force && \
 
 # set build ENV
 ENV MIX_ENV="prod"
-# ADD THIS
-ENV EXS_DRY_RUN="true"  
-# ADD THIS
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
+ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
+ENV BUMBLEBEE_OFFLINE="false"
 
 # install mix dependencies
 COPY mix.exs mix.lock ./
@@ -283,7 +313,6 @@ COPY lib lib
 
 COPY assets assets
 
-# ADD THIS
 COPY .bumblebee/ .bumblebee
 
 # compile assets
@@ -291,6 +320,11 @@ RUN mix assets.deploy
 
 # Compile the release
 RUN mix compile
+
+# IMPORTANT: This downloads the HuggingFace models from the `serving` function in the `lib/app/application.ex` file. 
+# And copies to `.bumblebee`.
+RUN mix run -e 'App.Application.load_models()' --no-start --no-halt; exit 0
+COPY .bumblebee/ .bumblebee
 
 # Changes to config/runtime.exs don't require recompiling the code
 COPY config/runtime.exs config/
@@ -318,14 +352,9 @@ RUN chown nobody /app
 
 # set runner ENV
 ENV MIX_ENV="prod"
-# ADD THIS
-ENV EXS_DRY_RUN="true"
-# ADD THIS
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
 
 # Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app ./
-# ADD THIS
 COPY --from=builder --chown=nobody:root /app/.bumblebee/ ./.bumblebee
 
 USER nobody
@@ -335,9 +364,58 @@ USER nobody
 # above and adding an entrypoint. See https://github.com/krallin/tini for details
 # ENTRYPOINT ["/tini", "--"]
 
-CMD ["/app/bin/server"]
+# Set the runtime ENV
+ENV ECTO_IPV6="true"
+ENV ERL_AFLAGS="-proto_dist inet6_tcp"
+ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
+ENV BUMBLEBEE_OFFLINE="true"
 
+CMD ["/app/bin/server"]
 ```
+
+As you can see,
+we are setting the `BUMBLEBEE_OFFLINE` env variable
+**only after the image has been compiled and the models have been downloaded**.
+
+You may also have noticed that we are calling
+a function in `lib/app/application.ex`
+called `load_models/0`.
+We haven't created it yet.
+
+So, go to `application.ex`
+and add it!
+
+```elixir
+
+  def load_models do
+    # ResNet-50 -----
+    {:ok, _} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
+    {:ok, _} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
+  end
+
+  def serving do
+    # ResNet-50 -----
+    {:ok, model_info} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
+    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
+
+    Bumblebee.Vision.image_classification(model_info, featurizer,
+      top_k: 1,
+      compile: [batch_size: 10],
+      defn_options: [compiler: EXLA],
+      preallocate_params: true 
+    )
+
+  end
+```
+
+Inside `load_models/0`, 
+we are fetching all the models that are needed in the application.
+This will download the models into our `BUMBLEBEE_CACHE_DIR`
+during the build stage.
+
+When executing the application,
+because `BUMBLEBEE_OFFLINE` is set to `true`,
+the `serving/0` `load_model` functions will load the models locally.
 
 
 #### 2.1.3 Fixing `nonexistent` directory error
@@ -356,58 +434,10 @@ To fix this,
 you simply need to add one line to the Dockerfile.
 
 ```dockerfile
-ARG ELIXIR_VERSION=1.15.7
-ARG OTP_VERSION=26.0.2
-ARG DEBIAN_VERSION=bullseye-20231009-slim
 
-ARG BUILDER_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
-ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
+# ...........
 
-FROM ${BUILDER_IMAGE} as builder
-
-RUN apt-get update -y && apt-get install -y build-essential git curl \
-    && apt-get clean && rm -f /var/lib/apt/lists/*_*
-
-
-WORKDIR /app
-
-RUN mix local.hex --force && \
-    mix local.rebar --force
-
-ENV MIX_ENV="prod"
-ENV EXS_DRY_RUN="true"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
-
-COPY mix.exs mix.lock ./
-RUN mix deps.get --only $MIX_ENV
-RUN mkdir config
-
-COPY config/config.exs config/${MIX_ENV}.exs config/
-RUN mix deps.compile
-
-COPY priv priv
-
-COPY lib lib
-
-COPY assets assets
-
-COPY .bumblebee/ .bumblebee
-
-RUN mix assets.deploy
-
-RUN mix compile
-
-COPY config/runtime.exs config/
-
-COPY rel rel
-RUN mix release
-
-FROM ${RUNNER_IMAGE}
-
-RUN apt-get update -y && \
-  apt-get install -y libstdc++6 openssl libncurses5 locales ca-certificates \
-  && apt-get clean && rm -f /var/lib/apt/lists/*_*
-
+# Set the locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
 
 ENV LANG en_US.UTF-8
@@ -417,17 +447,28 @@ ENV LC_ALL en_US.UTF-8
 WORKDIR "/app"
 RUN chown nobody /app
 
+# set runner ENV
 ENV MIX_ENV="prod"
-ENV EXS_DRY_RUN="true"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
 
-# ADD THIS
-RUN mkdir -p /nonexistent 
+# Adding this so model can be downloaded
+RUN mkdir -p /nonexistent
 
+# Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app ./
 COPY --from=builder --chown=nobody:root /app/.bumblebee/ ./.bumblebee
 
 USER nobody
+
+# If using an environment that doesn't automatically reap zombie processes, it is
+# advised to add an init process such as tini via `apt-get install`
+# above and adding an entrypoint. See https://github.com/krallin/tini for details
+# ENTRYPOINT ["/tini", "--"]
+
+# Set the runtime ENV
+ENV ECTO_IPV6="true"
+ENV ERL_AFLAGS="-proto_dist inet6_tcp"
+ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
+ENV BUMBLEBEE_OFFLINE="true"
 
 CMD ["/app/bin/server"]
 ```
@@ -532,8 +573,16 @@ If you walk through the steps,
 the deployment should run smoothly
 and your site should be up and running.
 
+Your `Docker` image may be big 
+but that's the only downsize we have.
+We have a big upside though:
+**our boot up time is greatly increased**,
+meaning the model is not re-downloaded unnecessary 
+even if the application has been restarted.
+
 Great job! 
 Give yourself a pat on the back! 👏
 
 
 # Scaling up `fly` machines
+
