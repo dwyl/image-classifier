@@ -24,26 +24,31 @@ defmodule AppWeb.PageLive do
 
   def handle_progress(:image_list, entry, socket) do
     if entry.done? do
-
       # Consume the entry and get the tensor to feed to classifier
-      %{tensor: tensor, file_binary: file_binary} = consume_uploaded_entry(socket, entry, fn %{} = meta ->
-        file_binary = File.read!(meta.path)
+      %{tensor: tensor, file_binary: file_binary} =
+        consume_uploaded_entry(socket, entry, fn %{} = meta ->
+          file_binary = File.read!(meta.path)
 
-        # Get image and resize
-        # This is dependant on the resolution of the model's dataset.
-        # In our case, we want the width to be closer to 640, whilst maintaining aspect ratio.
-        width = 640
-        {:ok, thumbnail_vimage} = Vix.Vips.Operation.thumbnail(meta.path, width, size: :VIPS_SIZE_DOWN)
+          # Get image and resize
+          # This is dependant on the resolution of the model's dataset.
+          # In our case, we want the width to be closer to 640, whilst maintaining aspect ratio.
+          width = 640
 
-        # Pre-process it
-        {:ok, tensor} = pre_process_image(thumbnail_vimage)
+          {:ok, thumbnail_vimage} =
+            Vix.Vips.Operation.thumbnail(meta.path, width, size: :VIPS_SIZE_DOWN)
 
-        # Return it
-        {:ok, %{tensor: tensor, file_binary: file_binary}}
-      end)
+          # Pre-process it
+          {:ok, tensor} = pre_process_image(thumbnail_vimage)
+
+          # Return it
+          {:ok, %{tensor: tensor, file_binary: file_binary}}
+        end)
 
       # Create an async task to classify the image
-      task = Task.Supervisor.async(App.TaskSupervisor, fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
+      task =
+        Task.Supervisor.async(App.TaskSupervisor, fn ->
+          Nx.Serving.batched_run(ImageClassifier, tensor)
+        end)
 
       # Encode the image to base64
       base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
@@ -62,9 +67,21 @@ defmodule AppWeb.PageLive do
     Process.demonitor(ref, [:flush])
 
     # And then destructure the result from the classifier.
-    # %{results: [%{text: label}]} = result      # BLIP
-    %{predictions: [%{label: label}]} = result   # ResNet-50
+    # (when testing, we are using `ResNet-50` because it's lightweight.
+    # You need to change how you destructure the output of the model depending
+    # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
+    label =
+      case Mix.env() do
+        :test ->
+          %{predictions: [%{label: label}]} = result
+          label
 
+        # coveralls-ignore-start
+        _ ->
+          %{results: [%{text: label}]} = result
+          label
+        # coveralls-ignore-stop
+      end
 
     # Update the socket assigns with result and stopping spinner.
     {:noreply, assign(socket, label: label, running: false)}
@@ -73,12 +90,12 @@ defmodule AppWeb.PageLive do
   def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 10MB."
 
   defp pre_process_image(%Vimage{} = image) do
-
     # If the image has an alpha channel, flatten it:
-    {:ok, flattened_image} = case Vix.Vips.Image.has_alpha?(image) do
-      true -> Vix.Vips.Operation.flatten(image)
-      false -> {:ok, image}
-    end
+    {:ok, flattened_image} =
+      case Vix.Vips.Image.has_alpha?(image) do
+        true -> Vix.Vips.Operation.flatten(image)
+        false -> {:ok, image}
+      end
 
     # Convert the image to sRGB colourspace ----------------
     {:ok, srgb_image} = Vix.Vips.Operation.colourspace(flattened_image, :VIPS_INTERPRETATION_sRGB)

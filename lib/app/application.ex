@@ -7,7 +7,6 @@ defmodule App.Application do
 
   @impl true
   def start(_type, _args) do
-
     App.Models.verify_and_download_models()
 
     children = [
@@ -16,7 +15,14 @@ defmodule App.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
       # Nx serving for image classifier
-      {Nx.Serving, serving: App.Models.serving(), name: ImageClassifier},
+      {Nx.Serving,
+       serving:
+         if Mix.env() == :test do
+           App.Models.serving_test()
+         else
+           App.Models.serving()
+         end,
+       name: ImageClassifier},
       # Adding a supervisor
       {Task.Supervisor, name: App.TaskSupervisor},
       # Start the Endpoint (http/https)

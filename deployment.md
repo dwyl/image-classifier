@@ -815,39 +815,48 @@ defmodule App.Models do
 
   # IMPORTANT: This should be the same directory as defined in the `Dockerfile`.
   @models_folder_path Path.join(
-                        System.get_env("BUMBLEBEE_CACHE_DIR") || Application.compile_env!(:app, :models_cache_dir),
+                        System.get_env("BUMBLEBEE_CACHE_DIR") ||
+                          Application.compile_env!(:app, :models_cache_dir),
                         "huggingface"
                       )
 
-
   @doc """
   Verifies if downloaded models folder is populated or not.
-  If `:force_download` is set to true in `config.ex`, it also downloads the models.
+  We re-download the models if:
+  - the directory is empty.
+  - `force_download` in `config.ex` is set to `true`.
+  - we're in a testing environment
 
   If it is not populated, downloads the models according to env.
   If it is populated, does nothing.
   """
   def verify_and_download_models() do
-
     # If `force_models_download` is enabled, we delete the files in the folder.
-    force_download = case Application.fetch_env(:app, :force_models_download) do
-      {:ok, true} ->
-        Logger.info(
-          "Deleting models..."
-        )
-        File.rm_rf!(@models_folder_path)
-        true
-      _ -> false
-    end
+    force_download =
+      case Application.fetch_env(:app, :force_models_download) do
+        {:ok, true} ->
+          Logger.info("Deleting models...")
+          File.rm_rf!(@models_folder_path)
+          true
 
-    if not File.exists?(@models_folder_path) or File.ls!(@models_folder_path) == [] or force_download == true do
+        _ ->
+          false
+      end
+
+    # Re-download the models
+    if not File.exists?(@models_folder_path) or File.ls!(@models_folder_path) == [] or
+         force_download == true or Mix.env() == :test do
       Logger.info(
         "The downloaded models folder is empty or does not exist. Downloading the models..."
       )
 
       case Mix.env() do
-        :test -> download_models_test()
-        _ -> download_models_prod()
+        :test ->
+          download_models_test()
+
+        _ ->
+          dbg("wtf")
+          download_models()
       end
     end
   end
@@ -867,20 +876,42 @@ defmodule App.Models do
       top_k: 1,
       compile: [batch_size: 10],
       defn_options: [compiler: EXLA],
-      preallocate_params: true        # needed to run on `Fly.io`
+      # needed to run on `Fly.io`
+      preallocate_params: true
+    )
+  end
+
+  @doc """
+  Serving function for tests only.
+  Downloads `ResNet-50`, since it's lightweight.
+  """
+  def serving_test do
+    # ResNet-50 -----
+    {:ok, model_info} = Bumblebee.load_model({:hf, "microsoft/resnet-50", offline: true})
+    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50", offline: true})
+
+    Bumblebee.Vision.image_classification(model_info, featurizer,
+      top_k: 1,
+      compile: [batch_size: 10],
+      defn_options: [compiler: EXLA],
+      # needed to run on `Fly.io`
+      preallocate_params: true
     )
   end
 
   # Downloads the models for the test environment.
-  # Downloads `ResNet-50`, which is fairly lightweight.
+  # Downloads `ResNet-50`, which is fairly lightweight
+  # (if you change the model, make sure to change `handle_info/3` in `page_live.ex`
+  # so extracting the output from the model works properly with the one you've chosen).
   defp download_models_test do
+    # ResNet-50 -----
     {:ok, _} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
     {:ok, _} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
   end
 
   # Downloads the models used in the production environment.
   # They must download the same models that are used in the `serving/0` function for this to work.
-  defp download_models_prod do
+  defp download_models do
     # ResNet-50 -----
     {:ok, _} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
     {:ok, _} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
@@ -919,6 +950,50 @@ config :app,
 ```
 
 - the **`serving/0`** function is the same as the one found in `application.ex`.
+We've just created one for a `production` env 
+and another for `test` env.
+Think of `serving` and `load_models` as pairs.
+You have a `serving/0` and `load_models/0` pair
+(pertaining to production env)
+and `serving_test/0` and `load_models_test/0`
+(pertaining to testing env).
+
+This is done like so testing can use a lightweight model
+to execute much faster.
+
+> [!WARNING]
+>
+> Don't forget that if you are using different model for production,
+> you will probably need to change how the output of the model is destructured.
+>
+> Inside `lib/app_web/live/page_live.ex`,
+> you can change the `handle_info/3` to something like so:
+>
+> ```elixir
+>   def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket) do
+>   # This is called everytime an Async Task is created.
+>   # We flush it here.
+>   Process.demonitor(ref, [:flush])
+>
+>   # And then destructure the result from the classifier.
+>   # (when testing, we are using `ResNet-50` because it's lightweight.
+>   # You need to change how you destructure the output of the model depending
+>   # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
+>   label =
+>     case Mix.env() do
+>       :test ->
+>         %{predictions: [%{label: label}]} = result
+>         label
+>
+>       _ ->
+>         %{results: [%{text: label}]} = result
+>         label
+>     end
+>
+>   # Update the socket assigns with result and stopping spinner.
+>   {:noreply, assign(socket, label: label, running: false)}
+> end
+> ```
 
 
 Now all we need to do is change `lib/app/application.ex`
@@ -934,7 +1009,6 @@ defmodule App.Application do
 
   @impl true
   def start(_type, _args) do
-
     App.Models.verify_and_download_models()
 
     children = [
@@ -943,7 +1017,14 @@ defmodule App.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
       # Nx serving for image classifier
-      {Nx.Serving, serving: App.Models.serving(), name: ImageClassifier},
+      {Nx.Serving,
+       serving:
+         if Mix.env() == :test do
+           App.Models.serving_test()
+         else
+           App.Models.serving()
+         end,
+       name: ImageClassifier},
       # Adding a supervisor
       {Task.Supervisor, name: App.TaskSupervisor},
       # Start the Endpoint (http/https)
@@ -967,6 +1048,12 @@ defmodule App.Application do
   end
 end
 ```
+
+As you can see,
+we've made `application.ex` much more readable!
+Take note that we're now conditionally
+serving the correct `serving` function
+according to the environment.
 
 And you're done! 👏
 
