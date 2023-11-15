@@ -60,7 +60,6 @@ defmodule App.MixProject do
       {:nx, "~> 0.6.4 "},
 
       # Image
-      {:stb_image, "0.6.4"},
       {:vix, "~> 0.24.0"},
 
       # Testing
