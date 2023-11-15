@@ -17,7 +17,7 @@ defmodule App.Application do
       # Nx serving for image classifier
       {Nx.Serving,
        serving:
-         if Mix.env() == :test do
+         if Application.get_env(:app, :use_test_models) == true do
            App.Models.serving_test()
          else
            App.Models.serving()

@@ -322,7 +322,7 @@ COPY lib lib
 
 COPY assets assets
 
-COPY .bumblebee/ .bumblebee
+RUN mkdir -p /app/.bumblebee
 
 # compile assets
 RUN mix assets.deploy
@@ -822,36 +822,31 @@ defmodule App.Models do
 
   @doc """
   Verifies if downloaded models folder is populated or not.
-  We re-download the models if:
+  We clear the folder and re-download the models if:
   - the directory is empty.
-  - `force_download` in `config.ex` is set to `true`.
-  - we're in a testing environment
-
-  If it is not populated, downloads the models according to env.
-  If it is populated, does nothing.
+  - `force_download` in configs is set to `true`.
+  - `use_test_models` in configs is set to `true`.
   """
   def verify_and_download_models() do
-    # If `force_models_download` is enabled, we delete the files in the folder.
-    force_download =
-      case Application.fetch_env(:app, :force_models_download) do
-        {:ok, true} ->
-          Logger.info("Deleting models...")
-          File.rm_rf!(@models_folder_path)
-          true
 
-        _ ->
-          false
-      end
+    force_models_download = Application.get_env(:app, :force_models_download, false)
+    use_test_models = Application.get_env(:app, :use_test_models, false)
 
     # Re-download the models
     if not File.exists?(@models_folder_path) or File.ls!(@models_folder_path) == [] or
-         force_download == true or Mix.env() == :test do
-      Logger.info(
-        "The downloaded models folder is empty or does not exist. Downloading the models..."
-      )
+    force_models_download == true or
+    use_test_models == true do
 
-      case Mix.env() do
-        :test ->
+      # Delete any pre-existing models
+      Logger.info("Deleting models...")
+      File.rm_rf!(@models_folder_path)
+
+      # Download the models according to env
+      Logger.info(
+        "Downloading the models..."
+      )
+      case use_test_models do
+        true ->
           download_models_test()
 
         _ ->
@@ -929,8 +924,14 @@ to define the location where the tests will be downloaded during tests.
 
 ```elixir
 config :app,
+  use_test_models: true,
+  force_models_download: true,
   models_cache_dir: ".bumblebee"
 ```
+
+> [!NOTE]
+> The `use_test_models` and `force_models_download`
+> are going to be used later.
 
 - **`verify_and_download_models/0`**, as the name entails,
 checks if the model cache directory is empty or not.
@@ -939,11 +940,13 @@ by calling `download_models_test/0` (if it's a `:test` env)
 or by calling `download_models_prod/0` (if it's not a `:test` env).
 
 We can override this behaviour by setting `force_models_download`
-in `config/config.ex`.
-This will download the models regardless.
+in either `config/dev.exs` or `config/prod.exs`.
+This will make the application
+forcefully download the models,
+which can be useful when you want to deploy
+a different model to `fly.io`.
 
 ```elixir
-# App configuration (general)
 config :app,
   force_models_download: true
 ```
@@ -959,6 +962,10 @@ and `serving_test/0` and `load_models_test/0`
 
 This is done like so testing can use a lightweight model
 to execute much faster.
+
+We've also defined the `use_test_models` in either `prod.exs` or `dev.exs` configs.
+These flags will allow us to conditionally use either test or production models,
+which tend to be larger in size.
 
 > [!WARNING]
 >
@@ -979,8 +986,8 @@ to execute much faster.
 >   # You need to change how you destructure the output of the model depending
 >   # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
 >   label =
->     case Mix.env() do
->       :test ->
+>    case Application.get_env(:app, :use_test_models, false) do
+>       true ->
 >         %{predictions: [%{label: label}]} = result
 >         label
 >
@@ -1018,7 +1025,7 @@ defmodule App.Application do
       # Nx serving for image classifier
       {Nx.Serving,
        serving:
-         if Mix.env() == :test do
+         if Application.get_env(:app, :use_test_models) == true do
            App.Models.serving_test()
          else
            App.Models.serving()
@@ -1054,12 +1061,38 @@ Take note that we're now conditionally
 serving the correct `serving` function
 according to the environment.
 
+Don't forget to add this to `config/config.exs`,
+since we're using it in our `application.ex` file.
+
+```elixir
+# App configuration
+config :app,
+  use_test_models: false
+```
+
 And you're done! 👏
 
 Now you can:
 - conditionally set the model cache directory
 for tests and for production.
-- define which models are loaded according to the env.
+- define which models are loaded according to what env.
+
+Here's how your config files can look like:
+
+```elixir
+# config.exs
+# No need to change anything.
+
+# dev.exs
+config :app,
+  use_test_models: true,
+  force_models_download: true,
+  models_cache_dir: ".bumblebee"
+
+
+# prod.exs
+# No need to change anything
+```
 
 
 # Scaling up `fly` machines

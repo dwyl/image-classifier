@@ -13,36 +13,31 @@ defmodule App.Models do
 
   @doc """
   Verifies if downloaded models folder is populated or not.
-  We re-download the models if:
+  We clear the folder and re-download the models if:
   - the directory is empty.
-  - `force_download` in `config.ex` is set to `true`.
-  - we're in a testing environment
-
-  If it is not populated, downloads the models according to env.
-  If it is populated, does nothing.
+  - `force_download` in configs is set to `true`.
+  - `use_test_models` in configs is set to `true`.
   """
   def verify_and_download_models() do
-    # If `force_models_download` is enabled, we delete the files in the folder.
-    force_download =
-      case Application.fetch_env(:app, :force_models_download) do
-        {:ok, true} ->
-          Logger.info("Deleting models...")
-          File.rm_rf!(@models_folder_path)
-          true
 
-        _ ->
-          false
-      end
+    force_models_download = Application.get_env(:app, :force_models_download, false)
+    use_test_models = Application.get_env(:app, :use_test_models, false)
 
     # Re-download the models
     if not File.exists?(@models_folder_path) or File.ls!(@models_folder_path) == [] or
-         force_download == true or Mix.env() == :test do
-      Logger.info(
-        "The downloaded models folder is empty or does not exist. Downloading the models..."
-      )
+    force_models_download == true or
+    use_test_models == true do
 
-      case Mix.env() do
-        :test ->
+      # Delete any pre-existing models
+      Logger.info("Deleting models...")
+      File.rm_rf!(@models_folder_path)
+
+      # Download the models according to env
+      Logger.info(
+        "Downloading the models..."
+      )
+      case use_test_models do
+        true ->
           download_models_test()
 
         _ ->

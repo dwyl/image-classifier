@@ -71,8 +71,8 @@ defmodule AppWeb.PageLive do
     # You need to change how you destructure the output of the model depending
     # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
     label =
-      case Mix.env() do
-        :test ->
+      case Application.get_env(:app, :use_test_models, false) do
+        true ->
           %{predictions: [%{label: label}]} = result
           label
 

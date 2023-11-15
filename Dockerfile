@@ -53,7 +53,7 @@ COPY lib lib
 
 COPY assets assets
 
-COPY .bumblebee/ .bumblebee
+RUN mkdir -p /app/.bumblebee
 
 # compile assets
 RUN mix assets.deploy
