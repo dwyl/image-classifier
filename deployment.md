@@ -36,6 +36,10 @@ Let's start 🏃‍♂️.
 - [Scaling up `fly` machines](#scaling-up-fly-machines)
   - [1. Creating another `machine` and `volume` pair](#1-creating-another-machine-and-volume-pair)
   - [2. Scaling machine `CPU` and `RAM`](#2-scaling-machine-cpu-and-ram)
+- [Moving to a better model](#moving-to-a-better-model)
+  - [1. Scale the machine to a better preset](#1-scale-the-machine-to-a-better-preset)
+  - [2. Change your model](#2-change-your-model)
+  - [3. Deploy... and deploy again!](#3-deploy-and-deploy-again)
 
 
 # Considerations before you deploy
@@ -1293,3 +1297,138 @@ And that's it! 🎉
 We've successfully scaled our `fly.io` machine instances!
 We should now be able to run larger models
 that should yield better results 🙂.
+
+
+# Moving to a better model
+
+Now that we know how to scale our application,
+let's take this following example.
+
+Imagine we're using `ResNet-50` model.
+This model is *lightweight* and isn't heavy on the memory.
+However, this comes at a cost:
+its predictions and inference are a bit underwhelming.
+
+What if we wanted to use a much bigger model?
+Like 
+[`Salesforce/blip-image-captioning-base`](https://huggingface.co/Salesforce/blip-image-captioning-base)?
+
+For this, we need a much more powerful machine!
+
+For this specific model, 
+we need *at least*
+the machine with preset `performance-4x`,
+a machine with **4 `CPU` cores** 
+and **8 `GB` of `RAM`**.
+
+> [!NOTE]
+>
+> Recently `fly.io` has rolled out 
+> the possibility for you to have **`GPUs` on your machines** -
+> https://fly.io/blog/transcribing-on-fly-gpu-machines/.
+>
+> While it's definitely much better to run these models on `GPUs`,
+> it's *much costlier*.
+> Therefore, we'll stick with running this model on the `CPU`,
+> for now.
+>
+> If you're interested, 
+> you can find more information on their official documentation
+> at https://fly.io/docs/gpus/gpu-quickstart/.
+
+After testing weaker-resourced machines,
+we found that running this model 
+would result in a 
+`Out of memory: Killed process` error.
+Which makes sense, this model is *big*.
+The file size of the model itself is `1GB`
+and is going to be running on the `CPU`.
+So it needs plenty of `RAM`!
+
+
+## 1. Scale the machine to a better preset
+
+First, we need to scale our machine.
+You already know how to do this.
+Simply run:
+
+```sh
+fly scale vm performance-4x
+```
+
+and choose the machine you want to scale up.
+
+We can keep our volume at `3GB`,
+as it's enough for our use case.
+
+
+## 2. Change your model
+
+We've already covered this
+in [`README`](./README.md#6-what-about-other-models).
+
+You can change the model to your liking,
+as long as it's supported by `Bumblebee`.
+
+
+## 3. Deploy... and deploy again!
+
+You've made the changes to your code 
+so it uses another model and you're ready to go.
+However, we can't deploy just yet!
+
+As it stands, our deployed application is scaled up
+**but it has model files from the old model**.
+We want to force the application to download our new models 
+when booting up.
+
+Luckily, we've already created the groundwork for this 
+before on this guide. 
+Now we just need to use it!
+
+Go to `config/config.exs`
+and add the following:
+
+```elixir
+config :app,
+  force_models_download: true
+```
+
+**This flag will make it so the application wipes out the models cache folder and download the new ones.**
+
+Run `fly deploy` 
+and let it finish.
+
+But now we have to
+**re-deploy it again**,
+with the `config/config.exs` changed to.
+
+```elixir
+config :app,
+  force_models_download: false
+
+# you can alternatively delete this configuration,
+# since it is defaulted to `false`.
+```
+
+This is because the application that we've just deployed
+will download the models every time it is restarted.
+But now that we've deployed it with the flag to `true`,
+we know the new models have been downloaded.
+So we just set it back to `false` (or delete it altogether)
+and run `fly deploy` again!
+
+This way, 
+we've successfully upgraded the model in our application!
+The app is correctly caching the new model 
+and everything's good to go! 🏃‍♂️
+
+Awesome! 🥳
+
+
+
+
+
+
+
+

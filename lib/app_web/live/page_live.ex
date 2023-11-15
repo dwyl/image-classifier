@@ -70,7 +70,6 @@ defmodule AppWeb.PageLive do
     # (when testing, we are using `ResNet-50` because it's lightweight.
     # You need to change how you destructure the output of the model depending
     # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
-    dbg(Application.get_env(:app, :use_test_models, false))
     label =
       case Application.get_env(:app, :use_test_models, false) do
         true ->
