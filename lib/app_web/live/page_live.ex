@@ -63,7 +63,6 @@ defmodule AppWeb.PageLive do
         Task.Supervisor.async_nolink(App.TaskSupervisor, fn ->
           Nx.Serving.batched_run(ImageClassifier, tensor)
         end)
-        |> dbg()
 
       # Encode the image to base64
       base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
@@ -97,9 +96,6 @@ defmodule AppWeb.PageLive do
            running: false,
            display_list?: true
          )}
-
-      true ->
-        {:noreply, socket}
     end
   end
 

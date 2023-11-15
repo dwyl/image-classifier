@@ -3,7 +3,6 @@ defmodule AppWeb.PageLiveTest do
   import Phoenix.LiveViewTest
   import AppWeb.UploadSupport
 
-
   test "connected mount", %{conn: conn} do
     conn = get(conn, "/")
     assert html_response(conn, 200) =~ "Image Classification"
@@ -81,5 +80,38 @@ defmodule AppWeb.PageLiveTest do
     ret = AppWeb.PageLive.handle_event("noop", %{}, %{})
 
     assert ret == {:noreply, %{}}
+  end
+
+  test "send_after", %{conn: conn} do
+    {:ok, lv, _html} = live(conn, "/")
+    send(lv.pid, :example_list)
+
+    [%{pid: pid1, ref: ref1}, %{pid: pid2, ref: ref2}] =
+      [
+        "https://source.unsplash.com/_CFv3bntQlQ",
+        "https://source.unsplash.com/r1SwcagHVG0"
+      ]
+      |> Enum.map(&AppWeb.PageLive.handle_image/1)
+
+    receive do
+      {:DOWN, ^ref1, :process, ^pid1, _reason} ->
+        assert true
+    end
+
+    receive do
+      {:DOWN, ^ref2, :process, ^pid2, _reason} ->
+        assert true
+    end
+  end
+
+  test "send_after_bad_url", %{conn: conn} do
+    {:ok, lv, _html} = live(conn, "/")
+    send(lv.pid, :example_list)
+
+    response =
+      ["https://example.com"]
+      |> Enum.map(&AppWeb.PageLive.handle_image/1)
+
+    assert response == [error: "Failed to find load buffer"]
   end
 end
