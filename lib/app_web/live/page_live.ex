@@ -118,7 +118,7 @@ defmodule AppWeb.PageLive do
       end)
       |> Map.merge(%{url: url})
     else
-      error -> dbg(error)
+      {_stage, error} -> dbg(error)
     end
   end
 
