@@ -46,7 +46,6 @@ defmodule App.Models do
           download_models_test()
 
         _ ->
-          dbg("wtf")
           download_models()
       end
     end
