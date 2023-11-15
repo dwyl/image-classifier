@@ -116,17 +116,17 @@
     </div>
   </div>
 </div>
-<%= if length(@displayed_list)>0 do %>
-  <div class="grid grid-cols-3 gap-4">
-    <%= for elt <- @displayed_list do %>
-      <div class="rounded overflow-hidden shadow-lg">
-        <img class="w-full h-20 object-cover" src={elt.url} alt="Image" width="100" id={elt.url} />
-        <div class="px-6 py-4">
-          <div class="font-bold text-xl mb-2"><%= inspect(elt.label) %></div>
+<div class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32">
+  <%= if @display_list? do %>
+    <div class="flex flex-wrap gap-4">
+      <%= for elt <- @displayed_list do %>
+        <div class="rounded overflow-hidden shadow-lg">
+          <img class="w-3/4 h-10 object-cover" src={elt.url} alt="Image" id={elt.url} />
+          <div class="px-6 py-4">
+            <div class="font-bold text-xl mb-2"><%= inspect(elt.label) %></div>
+          </div>
         </div>
-      </div>
-    <% end %>
-  </div>
-<% end %>
-
-<div></div>
+      <% end %>
+    </div>
+  <% end %>
+</div>

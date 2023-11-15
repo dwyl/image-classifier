@@ -60,9 +60,10 @@ defmodule AppWeb.PageLive do
 
       # Create an async task to classify the image
       task =
-        Task.Supervisor.async(App.TaskSupervisor, fn ->
+        Task.Supervisor.async_nolink(App.TaskSupervisor, fn ->
           Nx.Serving.batched_run(ImageClassifier, tensor)
         end)
+        |> dbg()
 
       # Encode the image to base64
       base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
@@ -109,16 +110,16 @@ defmodule AppWeb.PageLive do
   end
 
   def handle_image(url) do
-    {:ok, img} =
-      Req.get!(url).body
-      |> Vix.Vips.Image.new_from_buffer()
-
-    {:ok, t_img} = pre_process_image(img)
-
-    Task.Supervisor.async(App.TaskSupervisor, fn ->
-      Nx.Serving.batched_run(ImageClassifier, t_img)
-    end)
-    |> Map.merge(%{url: url})
+    with {:req, body} <- {:req, Req.get!(url).body},
+         {:vix, {:ok, img}} <- {:vix, Vix.Vips.Image.new_from_buffer(body)},
+         {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img)} do
+      Task.Supervisor.async_nolink(App.TaskSupervisor, fn ->
+        Nx.Serving.batched_run(ImageClassifier, t_img)
+      end)
+      |> Map.merge(%{url: url})
+    else
+      error -> dbg(error)
+    end
   end
 
   def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 10MB."
