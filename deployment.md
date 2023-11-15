@@ -32,6 +32,7 @@ Let's start 🏃‍♂️.
     - [4.4 Extending the size of the volume](#44-extending-the-size-of-the-volume)
     - [4.5 Running the application and checking new volume size and its usage](#45-running-the-application-and-checking-new-volume-size-and-its-usage)
   - [5. Forcing re-download](#5-forcing-re-download)
+    - [5.1. Why are you not using `Mix.env/0`?](#51-why-are-you-not-using-mixenv0)
 - [Scaling up `fly` machines](#scaling-up-fly-machines)
   - [1. Creating another `machine` and `volume` pair](#1-creating-another-machine-and-volume-pair)
   - [2. Scaling machine `CPU` and `RAM`](#2-scaling-machine-cpu-and-ram)
@@ -1093,6 +1094,29 @@ config :app,
   force_models_download: true,
   models_cache_dir: ".bumblebee"
 ```
+
+
+
+### 5.1. Why are you not using `Mix.env/0`?
+
+You may be wondering why we're not using 
+[`Mix.env/0`](https://hexdocs.pm/mix/1.13.4/Mix.html#env/0)
+to conditionally do stuff 
+and to check if we're on a `:test` or `:prod` environment. 
+
+The documentation pretty much explains it to us.
+
+> This function should not be used at runtime in application code 
+> (as opposed to infrastructure and build code like `Mix` tasks). 
+> `Mix` is a build tool and may not be available after the code is compiled 
+> (for example in a release).
+
+This is what happens in `fly.io`.
+They don't have `Mix` on runtime,
+so we hae to do things **at compile time**.
+
+Check https://community.fly.io/t/function-mix-env-0-is-undefined-module-mix-is-not-available/4181
+for more information.
 
 
 # Scaling up `fly` machines
