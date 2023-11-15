@@ -31,8 +31,9 @@ Let's start 🏃‍♂️.
     - [4.3 Confirm that the volume is attached to the machine](#43-confirm-that-the-volume-is-attached-to-the-machine)
     - [4.4 Extending the size of the volume](#44-extending-the-size-of-the-volume)
     - [4.5 Running the application and checking new volume size and its usage](#45-running-the-application-and-checking-new-volume-size-and-its-usage)
-- [5. Forcing re-download](#5-forcing-re-download)
+  - [5. Forcing re-download](#5-forcing-re-download)
 - [Scaling up `fly` machines](#scaling-up-fly-machines)
+  - [1. Creating another `machine` and `volume` pair](#1-creating-another-machine-and-volume-pair)
 
 
 # Considerations before you deploy
@@ -789,7 +790,7 @@ and persisted to a volume.
 So we know we won't lose this data in-between app restarts!
 
 
-# 5. Forcing re-download
+## 5. Forcing re-download
 
 Sometimes we make change to the code 
 and we want to use other models.
@@ -976,20 +977,13 @@ for tests and for production.
 
 # Scaling up `fly` machines
 
-
 Working with LLMs takes up CPU/GPU and RAM power to execute inference.
 
 If you've followed the previous guide, 
 you'll already have a simple, 
 free-tier'd `fly.io` machine instance up and running.
-However, you may run into some problems:
-
-- the machine is suspended after an hour of inactivity.
-This means that it takes time to restart,
-and the model needs to be imported again every time.
-On bigger models, *this is a problem*.
-
-- you run out of memory.
+However, you may run into some memory problems.
+You run out of memory.
 You may have come across log messages from `fly.io`
 stating `Out of memory: Killed progress XXX`.
 
@@ -1008,4 +1002,65 @@ such as `RAM` and processing power.
 > for more information.
 
 
-In order to scale up, we\ll
+In order to scale our solution, we'll do two things:
+
+- we'll **create another instance**
+with **its own volume**,
+leaving us with two instances with a volume each.
+
+- give each instance more resources 
+(essentially more CPU power).
+
+
+## 1. Creating another `machine` and `volume` pair
+
+Let's scale our application
+so it has two instances.
+Luckily for us, 
+because we have a clean slate 
+(one machine instance and one volume),
+we just need to run the following command.
+
+```sh
+fly scale count 2
+```
+
+Your terminal will be shown the following information,
+and ask you how it will scale.
+
+```sh
+App 'XXX' is going to be scaled according to this plan:
+  +1 machines for group 'app' on region 'mad' of size 'shared-cpu-1x'
+  +1 volumes  for group 'app' in region 'mad'
+? Scale app XXX? (y/N) 
+```
+
+Type `y` and press `Enter`.
+Wait for the volumes and instances to be created.
+
+And that should be it!
+If you run `fly volume list`
+and `fly machine list`,
+you should see the newly created volume 
+and it being attached to the newly created machine instance.
+
+
+> [!NOTE]
+>
+> You may find yourself in different scenarios.
+> For example, you have `2` machine instances
+> and `1` volume.
+> In this case, you can still run `fly scale count 2`.
+> It will prompt you to create a new volume,
+> which you will need to attach yourself to the instance you desire.
+>
+> In other scenarios, you may want to explicitly clone or destroy
+> existing machines on your application.
+> You can use a combination of the `fly machine clone`/`fly machine destroy`
+> and `fly volume destroy` to achieve what you want.
+>
+> For more information about this,
+> check the official documentation in 
+> https://fly.io/docs/apps/scale-count/#scale-an-app-with-volumes.
+
+
