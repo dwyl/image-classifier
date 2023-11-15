@@ -9,7 +9,7 @@ defmodule AppWeb.PageLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    Process.send_after(self(), :populate_list, 3_000)
+    Process.send_after(self(), :example_list, 3_000)
 
     {:ok,
      socket
@@ -89,7 +89,7 @@ defmodule AppWeb.PageLive do
       Map.get(assigns, :task_ref) == ref ->
         {:noreply, assign(socket, label: label, running: false)}
 
-      img = Map.get(assigns, :pre_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
+      img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
         {:noreply,
          assign(socket,
            displayed_list: [%{url: img.url, label: label} | assigns.displayed_list],
@@ -98,15 +98,14 @@ defmodule AppWeb.PageLive do
          )}
 
       true ->
-        nil
         {:noreply, socket}
     end
   end
 
-  def handle_info(:populate_list, socket) do
+  def handle_info(:example_list, socket) do
     tasks = @unsplashes |> Enum.map(&handle_image/1)
 
-    {:noreply, assign(socket, pre_list_tasks: tasks)}
+    {:noreply, assign(socket, example_list_tasks: tasks)}
   end
 
   def handle_image(url) do

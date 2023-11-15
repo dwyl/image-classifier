@@ -1,4 +1,4 @@
-<.flash_group flash={@flash} />
+<%!-- <.flash_group flash={@flash} /> --%>
 <div class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32">
   <div class="flex justify-center items-center mx-auto max-w-xl w-[50vw] lg:mx-0">
     <div class="space-y-12">
@@ -120,7 +120,7 @@
   <div class="grid grid-cols-3 gap-4">
     <%= for elt <- @displayed_list do %>
       <div class="rounded overflow-hidden shadow-lg">
-        <img class="w-full h-20 object-cover" src={elt.url} alt="Image" />
+        <img class="w-full h-20 object-cover" src={elt.url} alt="Image" width="100" id={elt.url} />
         <div class="px-6 py-4">
           <div class="font-bold text-xl mb-2"><%= inspect(elt.label) %></div>
         </div>
