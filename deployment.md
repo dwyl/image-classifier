@@ -940,7 +940,7 @@ by calling `download_models_test/0` (if it's a `:test` env)
 or by calling `download_models_prod/0` (if it's not a `:test` env).
 
 We can override this behaviour by setting `force_models_download`
-in either `config/dev.exs` or `config/prod.exs`.
+in either `config/test.exs` or `config/prod.exs`.
 This will make the application
 forcefully download the models,
 which can be useful when you want to deploy
@@ -963,7 +963,7 @@ and `serving_test/0` and `load_models_test/0`
 This is done like so testing can use a lightweight model
 to execute much faster.
 
-We've also defined the `use_test_models` in either `prod.exs` or `dev.exs` configs.
+We've also defined the `use_test_models` in either `prod.exs` or `test.exs` configs.
 These flags will allow us to conditionally use either test or production models,
 which tend to be larger in size.
 
@@ -1077,21 +1077,21 @@ Now you can:
 for tests and for production.
 - define which models are loaded according to what env.
 
-Here's how your config files can look like:
+Here's how your `config/test.exs` should look like.
+You don't need to add any configuration in other env
+because, by default,
+they behave correctly.
 
 ```elixir
-# config.exs
-# No need to change anything.
-
 # dev.exs
+config :app,
+  models_cache_dir: ".bumblebee"
+
+# test.exs
 config :app,
   use_test_models: true,
   force_models_download: true,
   models_cache_dir: ".bumblebee"
-
-
-# prod.exs
-# No need to change anything
 ```
 
 

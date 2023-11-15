@@ -66,6 +66,4 @@ config :phoenix, :plug_init_mode, :runtime
 
 # App configuration
 config :app,
-  use_test_models: true,
-  force_models_download: true,
   models_cache_dir: ".bumblebee"
