@@ -34,6 +34,7 @@ Let's start 🏃‍♂️.
   - [5. Forcing re-download](#5-forcing-re-download)
 - [Scaling up `fly` machines](#scaling-up-fly-machines)
   - [1. Creating another `machine` and `volume` pair](#1-creating-another-machine-and-volume-pair)
+  - [2. Scaling machine `CPU` and `RAM`](#2-scaling-machine-cpu-and-ram)
 
 
 # Considerations before you deploy
@@ -1064,3 +1065,88 @@ and it being attached to the newly created machine instance.
 > https://fly.io/docs/apps/scale-count/#scale-an-app-with-volumes.
 
 
+## 2. Scaling machine `CPU` and `RAM`
+
+Now it's time to add more resources to our machines.
+To simplify, 
+we are assuming you only have one machine and one volume deployed.
+You can surely scale up later if you want to
+(just follow the steps above).
+
+> [!NOTE]
+>
+> For the official documentation
+> about scaling machine's `CPU` and `RAM`,
+> you can find more information 
+> in the official documentation at 
+> https://fly.io/docs/apps/scale-machine/#select-a-preset-cpu-ram-combination.
+
+If you are happy with the provisioned `CPU` resources
+and simply want more memory, 
+you can use the `fly scale memory` to increase the `RAM`.
+
+In our case, we will use of the 
+[`CPU`/`RAM` presets that `fly.io` provides](https://fly.io/docs/about/pricing/#fly-machines)
+to scale our machines.
+You can see the presets by running `fly platform vm-sizes`.
+
+```
+NAME            CPU CORES       MEMORY   
+shared-cpu-1x   1               256 MB
+shared-cpu-2x   2               512 MB
+shared-cpu-4x   4               1 GB  
+shared-cpu-8x   8               2 GB  
+
+NAME            CPU CORES       MEMORY   
+performance-1x  1               2 GB  
+performance-2x  2               4 GB  
+performance-4x  4               8 GB  
+performance-8x  8               16 GB 
+performance-16x 16              32 GB 
+
+NAME            CPU CORES       MEMORY  GPU MODEL      
+a100-40gb       8               32 GB   a100-pcie-40gb
+a100-80gb       8               32 GB   a100-sxm4-80gb
+```
+
+In our case, we'll use the **`performance-1x`** preset.
+
+> [!WARNING]
+>
+> Your are billed according to your provisioned resources.
+> Meaning that if you aren't using `CPU` or `RAM`, 
+> you're not being billed 
+> (though you are charged if you use more than the free `3GB` of volume size - 
+> see https://fly.io/docs/about/pricing/#persistent-storage-volumes).
+>
+> This means that you are **not being billed while the machine is stopped**.
+> You can define for the machine to auto-stop after a period of inactivity
+> [on your `fly.toml` file](https://fly.io/docs/reference/configuration/#the-http_service-section)
+> (it's turned on by default).
+>
+> You can find more information on billing 
+> in https://community.fly.io/t/how-does-billing-work/13613.
+
+To scale our machine to a preset,
+we need to run:
+
+```sh
+fly scale vm <preset-name>
+```
+
+Wait while your machine is being updated.
+
+```
+Updating machine d82301294fee9256
+No health checks found
+Machine d82301294fee9256 updated successfully!
+Scaled VM Type to 'performance-1x'
+      CPU Cores: 1
+         Memory: 2048 MB
+```
+
+And that's it! 🎉
+
+We've successfully scaled our `fly.io` machine instances!
+We should now be able to run larger models
+that should yield better results 🙂.
