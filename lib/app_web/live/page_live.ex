@@ -2,11 +2,25 @@ defmodule AppWeb.PageLive do
   use AppWeb, :live_view
   alias Vix.Vips.Image, as: Vimage
 
+  @unsplashes [
+    "https://source.unsplash.com/_CFv3bntQlQ",
+    "https://source.unsplash.com/r1SwcagHVG0"
+  ]
+
   @impl true
   def mount(_params, _session, socket) do
+    Process.send_after(self(), :populate_list, 3_000)
+
     {:ok,
      socket
-     |> assign(label: nil, running: false, task_ref: nil, image_preview_base64: nil)
+     |> assign(
+       label: nil,
+       running: false,
+       task_ref: nil,
+       image_preview_base64: nil,
+       display_list?: false,
+       displayed_list: []
+     )
      |> allow_upload(:image_list,
        accept: ~w(image/*),
        auto_upload: true,
@@ -24,26 +38,31 @@ defmodule AppWeb.PageLive do
 
   def handle_progress(:image_list, entry, socket) do
     if entry.done? do
-
       # Consume the entry and get the tensor to feed to classifier
-      %{tensor: tensor, file_binary: file_binary} = consume_uploaded_entry(socket, entry, fn %{} = meta ->
-        file_binary = File.read!(meta.path)
+      %{tensor: tensor, file_binary: file_binary} =
+        consume_uploaded_entry(socket, entry, fn %{} = meta ->
+          file_binary = File.read!(meta.path)
 
-        # Get image and resize
-        # This is dependant on the resolution of the model's dataset.
-        # In our case, we want the width to be closer to 640, whilst maintaining aspect ratio.
-        width = 640
-        {:ok, thumbnail_vimage} = Vix.Vips.Operation.thumbnail(meta.path, width, size: :VIPS_SIZE_DOWN)
+          # Get image and resize
+          # This is dependant on the resolution of the model's dataset.
+          # In our case, we want the width to be closer to 640, whilst maintaining aspect ratio.
+          width = 640
 
-        # Pre-process it
-        {:ok, tensor} = pre_process_image(thumbnail_vimage)
+          {:ok, thumbnail_vimage} =
+            Vix.Vips.Operation.thumbnail(meta.path, width, size: :VIPS_SIZE_DOWN)
 
-        # Return it
-        {:ok, %{tensor: tensor, file_binary: file_binary}}
-      end)
+          # Pre-process it
+          {:ok, tensor} = pre_process_image(thumbnail_vimage)
+
+          # Return it
+          {:ok, %{tensor: tensor, file_binary: file_binary}}
+        end)
 
       # Create an async task to classify the image
-      task = Task.Supervisor.async(App.TaskSupervisor, fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
+      task =
+        Task.Supervisor.async(App.TaskSupervisor, fn ->
+          Nx.Serving.batched_run(ImageClassifier, tensor)
+        end)
 
       # Encode the image to base64
       base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
@@ -56,29 +75,62 @@ defmodule AppWeb.PageLive do
   end
 
   @impl true
-  def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket) do
+  def handle_info({ref, result}, %{assigns: assigns} = socket) do
     # This is called everytime an Async Task is created.
     # We flush it here.
     Process.demonitor(ref, [:flush])
 
     # And then destructure the result from the classifier.
     # %{results: [%{text: label}]} = result      # BLIP
-    %{predictions: [%{label: label}]} = result   # ResNet-50
+    # ResNet-50
+    %{predictions: [%{label: label}]} = result
 
+    cond do
+      Map.get(assigns, :task_ref) == ref ->
+        {:noreply, assign(socket, label: label, running: false)}
 
-    # Update the socket assigns with result and stopping spinner.
-    {:noreply, assign(socket, label: label, running: false)}
+      img = Map.get(assigns, :pre_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
+        {:noreply,
+         assign(socket,
+           displayed_list: [%{url: img.url, label: label} | assigns.displayed_list],
+           running: false,
+           display_list?: true
+         )}
+
+      true ->
+        nil
+        {:noreply, socket}
+    end
+  end
+
+  def handle_info(:populate_list, socket) do
+    tasks = @unsplashes |> Enum.map(&handle_image/1)
+
+    {:noreply, assign(socket, pre_list_tasks: tasks)}
+  end
+
+  def handle_image(url) do
+    {:ok, img} =
+      Req.get!(url).body
+      |> Vix.Vips.Image.new_from_buffer()
+
+    {:ok, t_img} = pre_process_image(img)
+
+    Task.Supervisor.async(App.TaskSupervisor, fn ->
+      Nx.Serving.batched_run(ImageClassifier, t_img)
+    end)
+    |> Map.merge(%{url: url})
   end
 
   def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 10MB."
 
   defp pre_process_image(%Vimage{} = image) do
-
     # If the image has an alpha channel, flatten it:
-    {:ok, flattened_image} = case Vix.Vips.Image.has_alpha?(image) do
-      true -> Vix.Vips.Operation.flatten(image)
-      false -> {:ok, image}
-    end
+    {:ok, flattened_image} =
+      case Vix.Vips.Image.has_alpha?(image) do
+        true -> Vix.Vips.Operation.flatten(image)
+        false -> {:ok, image}
+      end
 
     # Convert the image to sRGB colourspace ----------------
     {:ok, srgb_image} = Vix.Vips.Operation.colourspace(flattened_image, :VIPS_INTERPRETATION_sRGB)
