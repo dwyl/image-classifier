@@ -31,6 +31,7 @@ Let's start 🏃‍♂️.
     - [4.3 Confirm that the volume is attached to the machine](#43-confirm-that-the-volume-is-attached-to-the-machine)
     - [4.4 Extending the size of the volume](#44-extending-the-size-of-the-volume)
     - [4.5 Running the application and checking new volume size and its usage](#45-running-the-application-and-checking-new-volume-size-and-its-usage)
+- [5. Forcing re-download](#5-forcing-re-download)
 - [Scaling up `fly` machines](#scaling-up-fly-machines)
 
 
@@ -788,7 +789,193 @@ and persisted to a volume.
 So we know we won't lose this data in-between app restarts!
 
 
+# 5. Forcing re-download
+
+Sometimes we make change to the code 
+and we want to use other models.
+As it stands, if the models cache directory is populated,
+it won't download any new models.
+
+We can allow the person to **force re-downloading the models**.
+While we're at it, 
+we can move all of this logic to a different module so it's easier for us to manage it!
+
+Let's do it!
+
+In `lib/app`, create a file called `models.ex`.
+
+```elixir
+defmodule App.Models do
+  @moduledoc """
+  Manages loading the modules and their location according to env.
+  """
+  require Logger
+
+  # IMPORTANT: This should be the same directory as defined in the `Dockerfile`.
+  @models_folder_path Path.join(
+                        System.get_env("BUMBLEBEE_CACHE_DIR") || Application.compile_env!(:app, :models_cache_dir),
+                        "huggingface"
+                      )
+
+
+  @doc """
+  Verifies if downloaded models folder is populated or not.
+  If `:force_download` is set to true in `config.ex`, it also downloads the models.
+
+  If it is not populated, downloads the models according to env.
+  If it is populated, does nothing.
+  """
+  def verify_and_download_models() do
+
+    # If `force_models_download` is enabled, we delete the files in the folder.
+    force_download = case Application.fetch_env(:app, :force_models_download) do
+      {:ok, true} ->
+        Logger.info(
+          "Deleting models..."
+        )
+        File.rm_rf!(@models_folder_path)
+        true
+      _ -> false
+    end
+
+    if not File.exists?(@models_folder_path) or File.ls!(@models_folder_path) == [] or force_download == true do
+      Logger.info(
+        "The downloaded models folder is empty or does not exist. Downloading the models..."
+      )
+
+      case Mix.env() do
+        :test -> download_models_test()
+        _ -> download_models_prod()
+      end
+    end
+  end
+
+  @doc """
+  Serving function that serves the `Bumblebee` models used throughout the app.
+  This function is meant to be called and served by `Nx` in `lib/app/application.ex`.
+
+  This assumes the models that are being used exist locally, in the @models_folder_path.
+  """
+  def serving do
+    # ResNet-50 -----
+    {:ok, model_info} = Bumblebee.load_model({:hf, "microsoft/resnet-50", offline: true})
+    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50", offline: true})
+
+    Bumblebee.Vision.image_classification(model_info, featurizer,
+      top_k: 1,
+      compile: [batch_size: 10],
+      defn_options: [compiler: EXLA],
+      preallocate_params: true        # needed to run on `Fly.io`
+    )
+  end
+
+  # Downloads the models for the test environment.
+  # Downloads `ResNet-50`, which is fairly lightweight.
+  defp download_models_test do
+    {:ok, _} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
+    {:ok, _} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
+  end
+
+  # Downloads the models used in the production environment.
+  # They must download the same models that are used in the `serving/0` function for this to work.
+  defp download_models_prod do
+    # ResNet-50 -----
+    {:ok, _} = Bumblebee.load_model({:hf, "microsoft/resnet-50"})
+    {:ok, _} = Bumblebee.load_featurizer({:hf, "microsoft/resnet-50"})
+  end
+end
+```
+
+There's a lot to unpack here!
+
+- we've created a module constant called **`@models_folder_path`**,
+pertaining to the path where the models will be downloaded to.
+This path is the same as the one defined in `BUMBLEBEE_CACHE_DIR`,
+with `huggingface` appended to it.
+Optionally, you can define a configuration variable in `config/test.exs`
+to define the location where the tests will be downloaded during tests.
+
+```elixir
+config :app,
+  models_cache_dir: ".bumblebee"
+```
+
+- **`verify_and_download_models/0`**, as the name entails,
+checks if the model cache directory is empty or not.
+If it's empty, it downloads the models 
+by calling `download_models_test/0` (if it's a `:test` env)
+or by calling `download_models_prod/0` (if it's not a `:test` env).
+
+We can override this behaviour by setting `force_models_download`
+in `config/config.ex`.
+This will download the models regardless.
+
+```elixir
+# App configuration (general)
+config :app,
+  force_models_download: true
+```
+
+- the **`serving/0`** function is the same as the one found in `application.ex`.
+
+
+Now all we need to do is change `lib/app/application.ex`
+to make use of our newly-created module!
+
+```elixir
+defmodule App.Application do
+  # See https://hexdocs.pm/elixir/Application.html
+  # for more information on OTP Applications
+  @moduledoc false
+  require Logger
+  use Application
+
+  @impl true
+  def start(_type, _args) do
+
+    App.Models.verify_and_download_models()
+
+    children = [
+      # Start the Telemetry supervisor
+      AppWeb.Telemetry,
+      # Start the PubSub system
+      {Phoenix.PubSub, name: App.PubSub},
+      # Nx serving for image classifier
+      {Nx.Serving, serving: App.Models.serving(), name: ImageClassifier},
+      # Adding a supervisor
+      {Task.Supervisor, name: App.TaskSupervisor},
+      # Start the Endpoint (http/https)
+      AppWeb.Endpoint
+      # Start a worker by calling: App.Worker.start_link(arg)
+      # {App.Worker, arg}
+    ]
+
+    # See https://hexdocs.pm/elixir/Supervisor.html
+    # for other strategies and supported options
+    opts = [strategy: :one_for_one, name: App.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+
+  # Tell Phoenix to update the endpoint configuration
+  # whenever the application is updated.
+  @impl true
+  def config_change(changed, _new, removed) do
+    AppWeb.Endpoint.config_change(changed, removed)
+    :ok
+  end
+end
+```
+
+And you're done! 👏
+
+Now you can:
+- conditionally set the model cache directory
+for tests and for production.
+- define which models are loaded according to the env.
+
+
 # Scaling up `fly` machines
+
 
 Working with LLMs takes up CPU/GPU and RAM power to execute inference.
 

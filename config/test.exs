@@ -13,5 +13,6 @@ config :logger, level: :warning
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 
-config :bumblebee,
-  cache_dir: ".bumblebee"
+# Configuring app (general)
+config :app,
+  models_cache_dir: ".bumblebee"
