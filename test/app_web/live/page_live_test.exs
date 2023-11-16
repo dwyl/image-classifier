@@ -104,7 +104,7 @@ defmodule AppWeb.PageLiveTest do
     end
   end
 
-  test "send_after_bad_url", %{conn: conn} do
+  test "send_after_no_image", %{conn: conn} do
     {:ok, lv, _html} = live(conn, "/")
     send(lv.pid, :example_list)
 
@@ -112,6 +112,6 @@ defmodule AppWeb.PageLiveTest do
       ["https://example.com"]
       |> Enum.map(&AppWeb.PageLive.handle_image/1)
 
-    assert response == [error: "Failed to find load buffer"]
+    assert response == [vix: {:error, "Failed to find load buffer"}]
   end
 end

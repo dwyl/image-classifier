@@ -60,7 +60,7 @@ defmodule AppWeb.PageLive do
 
       # Create an async task to classify the image
       task =
-        Task.Supervisor.async_nolink(App.TaskSupervisor, fn ->
+        Task.Supervisor.async(App.TaskSupervisor, fn ->
           Nx.Serving.batched_run(ImageClassifier, tensor)
         end)
 
@@ -109,12 +109,12 @@ defmodule AppWeb.PageLive do
     with {:req, body} <- {:req, Req.get!(url).body},
          {:vix, {:ok, img}} <- {:vix, Vix.Vips.Image.new_from_buffer(body)},
          {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img)} do
-      Task.Supervisor.async_nolink(App.TaskSupervisor, fn ->
+      Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)
       |> Map.merge(%{url: url})
     else
-      {_stage, error} -> dbg(error)
+      {stage, error} -> {stage, error}
     end
   end
 
