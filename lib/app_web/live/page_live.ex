@@ -105,10 +105,16 @@ defmodule AppWeb.PageLive do
     {:noreply, assign(socket, example_list_tasks: tasks)}
   end
 
+  @doc """
+  This function fetches a public image from the Unsplash website with the Req library.
+  Vix is used to produce an optimized thumbnail of size 640 to match the COCO dataset
+  used to train the BLIP model.
+  """
   def handle_image(url) do
     with {:req, body} <- {:req, Req.get!(url).body},
-         {:vix, {:ok, img}} <- {:vix, Vix.Vips.Image.new_from_buffer(body)},
-         {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img)} do
+         {:vix, {:ok, img_thumb}} <-
+           {:vix, Vix.Vips.Operation.thumbnail_buffer(body, 640)},
+         {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)

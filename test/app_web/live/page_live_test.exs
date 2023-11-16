@@ -112,6 +112,8 @@ defmodule AppWeb.PageLiveTest do
       ["https://example.com"]
       |> Enum.map(&AppWeb.PageLive.handle_image/1)
 
-    assert response == [vix: {:error, "Failed to find load buffer"}]
+    assert response == [
+             vix: {:error, "operation build: VipsForeignLoad: buffer is not in a known format"}
+           ]
   end
 end
