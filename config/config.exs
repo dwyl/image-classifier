@@ -51,7 +51,16 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
+
+# When deploying to `fly.io`, you can delete this or leave it in.
+# It only makes sense to set it to `true` if you're changing models
+# in deployment.
+#
+# So, you run `fly deploy` with this set to `true`.
+# After deploying, you set it to `false` and deploy it again,
+# so the application doesn't download the model again on every restart.
+config :app,
+  force_models_download: false

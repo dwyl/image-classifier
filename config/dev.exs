@@ -63,3 +63,7 @@ config :phoenix, :stacktrace_depth, 20
 
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# App configuration
+config :app,
+  models_cache_dir: ".bumblebee"

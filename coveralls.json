@@ -3,6 +3,7 @@
       "test/",
       "lib/app.ex",
       "lib/app/application.ex",
+      "lib/app/models.ex",
       "lib/app_web.ex",
       "lib/app/repo.ex",
       "lib/app/release.ex",
