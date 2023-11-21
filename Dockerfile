@@ -33,8 +33,6 @@ RUN mix local.hex --force && \
 
 # set build ENV
 ENV MIX_ENV="prod"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
-
 
 # install mix dependencies
 COPY mix.exs mix.lock ./
@@ -102,7 +100,5 @@ USER nobody
 # Set the runtime ENV
 ENV ECTO_IPV6="true"
 ENV ERL_AFLAGS="-proto_dist inet6_tcp"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
-
 
 CMD ["/app/bin/server"]

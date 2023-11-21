@@ -22,6 +22,8 @@ defmodule App.Models do
     cache_path: Path.join(@models_folder_path, "resnet-50"),
     load_featurizer: true
   }
+  def extract_test_label(result) do %{predictions: [%{label: label}]} = result; label end
+
   @prod_model %ModelInfo{
     name: "Salesforce/blip-image-captioning-base",
     cache_path: Path.join(@models_folder_path, "blip-image-captioning-base"),
@@ -29,6 +31,7 @@ defmodule App.Models do
     load_tokenizer: true,
     load_generation_config: true
   }
+  def extract_prod_label(result) do %{results: [%{text: label}]} = result; label end
 
   @doc """
   Verifies and downloads the models according to configuration
