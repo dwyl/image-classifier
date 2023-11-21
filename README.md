@@ -1411,6 +1411,14 @@ Awesome! 🎉
 > and more resources your server will need to have to handle this heavier workload.
 
 
+> [!WARNING]
+>
+> We've created a small module that allows you to have multiple models
+> cached and downloaded and keep this logic contained.
+>
+> For this, check the [`deployment guide`](./deployment.md#5-a-better-model-management).
+
+
 # 7. How do I deploy this thing?
 
 There are a few considerations you may want to have
