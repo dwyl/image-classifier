@@ -1597,8 +1597,12 @@ config :app,
 
 **This flag will make it so the application wipes out the models cache folder and download the new ones.**
 
-Run `fly deploy` 
+Run `fly deploy --no-cache` 
 and let it finish.
+After deploying, make sure the application has started,
+so the cache is correctly purged
+(you can force the application to start
+by visiting the URL).
 
 But now we have to
 **re-deploy it again**,
