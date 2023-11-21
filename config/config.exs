@@ -63,4 +63,4 @@ import_config "#{config_env()}.exs"
 # After deploying, you set it to `false` and deploy it again,
 # so the application doesn't download the model again on every restart.
 config :app,
-  force_models_download: false
+  models_cache_dir: ".bumblebee"

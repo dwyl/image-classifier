@@ -67,19 +67,16 @@ defmodule AppWeb.PageLive do
     Process.demonitor(ref, [:flush])
 
     # And then destructure the result from the classifier.
-    # (when testing, we are using `ResNet-50` because it's lightweight.
     # You need to change how you destructure the output of the model depending
     # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
     label =
       case Application.get_env(:app, :use_test_models, false) do
         true ->
-          %{predictions: [%{label: label}]} = result
-          label
+          App.Models.extract_test_label(result)
 
         # coveralls-ignore-start
-        _ ->
-          %{results: [%{text: label}]} = result
-          label
+        false ->
+          App.Models.extract_prod_label(result)
         # coveralls-ignore-stop
       end
 
