@@ -33,8 +33,6 @@ RUN mix local.hex --force && \
 
 # set build ENV
 ENV MIX_ENV="prod"
-ENV EXS_DRY_RUN="true"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
 
 # install mix dependencies
 COPY mix.exs mix.lock ./
@@ -53,7 +51,7 @@ COPY lib lib
 
 COPY assets assets
 
-COPY .bumblebee/ .bumblebee
+RUN mkdir -p /app/.bumblebee
 
 # compile assets
 RUN mix assets.deploy
@@ -87,15 +85,10 @@ RUN chown nobody /app
 
 # set runner ENV
 ENV MIX_ENV="prod"
-ENV EXS_DRY_RUN="true"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee"
-
-# Adding this so model can be downloaded
-RUN mkdir -p /nonexistent
 
 # Only copy the final release from the build stage
-COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app ./
-COPY --from=builder --chown=nobody:root /app/.bumblebee/ ./.bumblebee
+COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app /app
+COPY --from=builder --chown=nobody:root /app/.bumblebee/ /app/.bumblebee
 
 USER nobody
 
@@ -103,5 +96,9 @@ USER nobody
 # advised to add an init process such as tini via `apt-get install`
 # above and adding an entrypoint. See https://github.com/krallin/tini for details
 # ENTRYPOINT ["/tini", "--"]
+
+# Set the runtime ENV
+ENV ECTO_IPV6="true"
+ENV ERL_AFLAGS="-proto_dist inet6_tcp"
 
 CMD ["/app/bin/server"]

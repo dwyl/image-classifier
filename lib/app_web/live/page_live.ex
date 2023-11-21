@@ -80,10 +80,18 @@ defmodule AppWeb.PageLive do
     # We flush it here.
     Process.demonitor(ref, [:flush])
 
-    # And then destructure the result from the classifier.
-    # %{results: [%{text: label}]} = result      # BLIP
-    # ResNet-50
-    %{predictions: [%{label: label}]} = result
+    # You need to change how you destructure the output of the model depending
+    # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
+    label =
+      case Application.get_env(:app, :use_test_models, false) do
+        true ->
+          App.Models.extract_test_label(result)
+
+        # coveralls-ignore-start
+        false ->
+          App.Models.extract_prod_label(result)
+        # coveralls-ignore-stop
+      end
 
     cond do
       Map.get(assigns, :task_ref) == ref ->

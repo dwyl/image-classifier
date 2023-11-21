@@ -35,5 +35,6 @@ app-*.tar
 npm-debug.log
 /assets/node_modules/
 
-.bumblebee
+# Bumblebee model directory
+.bumblebee/*
 .elixir_ls

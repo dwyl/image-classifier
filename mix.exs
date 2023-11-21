@@ -60,7 +60,7 @@ defmodule App.MixProject do
       {:nx, "~> 0.6.4 "},
 
       # Image
-      {:vix, "~> 0.24.0"},
+      {:vix, "~> 0.25.0"},
 
       # Testing
       {:excoveralls, "~> 0.15", only: [:test, :dev]}
