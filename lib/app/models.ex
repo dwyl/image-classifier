@@ -1,9 +1,10 @@
 defmodule ModelInfo do
   @doc """
-  The name of the model. It corresponds to the name of the repository of the model.
+  Information regarding the model being loaded.
+  It holds the name of the model repository and the directory it will be saved into.
   It also has booleans to load each model parameter at will - this is because some models (like BLIP) require featurizer, tokenizations and generation configuration.
   """
-  defstruct [:name, :load_featurizer, :load_tokenizer, :load_generation_config]
+  defstruct [:name, :cache_path, :load_featurizer, :load_tokenizer, :load_generation_config]
 end
 
 defmodule App.Models do
@@ -12,48 +13,55 @@ defmodule App.Models do
   """
   require Logger
 
+  # IMPORTANT: This should be the same directory as defined in the `Dockerfile`.
+  @models_folder_path Application.compile_env!(:app, :models_cache_dir)
+
   # Test and prod models information
-  @test_model %ModelInfo{name: "microsoft/resnet-50", load_featurizer: true}
+  @test_model %ModelInfo{
+    name: "microsoft/resnet-50",
+    cache_path: Path.join(@models_folder_path, "resnet-50"),
+    load_featurizer: true
+  }
   @prod_model %ModelInfo{
     name: "Salesforce/blip-image-captioning-base",
+    cache_path: Path.join(@models_folder_path, "blip-image-captioning-base"),
     load_featurizer: true,
     load_tokenizer: true,
     load_generation_config: true
   }
 
-  # IMPORTANT: This should be the same directory as defined in the `Dockerfile`.
-  @models_folder_path Path.join(
-                        System.get_env("BUMBLEBEE_CACHE_DIR") ||
-                          Application.compile_env!(:app, :models_cache_dir),
-                        "huggingface"
-                      )
-
   @doc """
-  Verifies if downloaded models folder is populated or not.
-  We clear the folder and re-download the models if:
-  - the directory is empty.
-  - `force_download` in configs is set to `true`.
-  - `use_test_models` in configs is set to `true`.
+  Verifies and downloads the models according to configuration
+  and if they are already cached locally or not.
   """
   def verify_and_download_models() do
     force_models_download = Application.get_env(:app, :force_models_download, false)
     use_test_models = Application.get_env(:app, :use_test_models, false)
 
-    # Re-download the models
-    if not File.exists?(@models_folder_path) or File.ls!(@models_folder_path) == [] or
-         force_models_download == true or
-         use_test_models == true do
-      # Delete any pre-existing models
-      Logger.info("Deleting models...")
-      File.rm_rf!(@models_folder_path)
+    case {force_models_download, use_test_models} do
+      {true, true} ->
+        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
+        download_model(@test_model)      # Download test models
 
-      case use_test_models do
-        true ->
-          download_model(@test_model)
+      {true, false} ->
+        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
+        download_model(@prod_model)      # Download prod models
 
-        _ ->
+      {false, false} ->
+        # Check if the prod model cache directory exists or if it's not empty.
+        # If so, we download the prod model.
+        model_location = Path.join(@prod_model.cache_path, "huggingface")
+        if not File.exists?(model_location) or File.ls!(model_location) == [] do
           download_model(@prod_model)
-      end
+        end
+
+      {false, true} ->
+        # Check if the test model cache directory exists or if it's not empty.
+        # If so, we download the test model.
+        model_location = Path.join(@test_model.cache_path, "huggingface")
+        if not File.exists?(model_location) or File.ls!(model_location) == [] do
+          download_model(@test_model)
+        end
     end
   end
 
@@ -64,8 +72,7 @@ defmodule App.Models do
   This assumes the models that are being used exist locally, in the @models_folder_path.
   """
   def serving do
-    model = load_offline_models(@prod_model)
-    Logger.info("Loading #{@prod_model.name}...")
+    model = load_offline_model(@prod_model)
 
     Bumblebee.Vision.image_to_text(
       model.model_info,
@@ -86,8 +93,7 @@ defmodule App.Models do
   This assumes the models that are being used exist locally, in the @models_folder_path.
   """
   def serving_test do
-    model = load_offline_models(@test_model)
-    Logger.info("Loading #{@test_model.name}...")
+    model = load_offline_model(@test_model)
 
     Bumblebee.Vision.image_classification(model.model_info, model.featurizer,
       top_k: 1,
@@ -101,16 +107,19 @@ defmodule App.Models do
   # Loads the models from the cache folder.
   # It will load the model and the respective the featurizer, tokenizer and generation config if needed,
   # and return a map with all of these at the end.
-  defp load_offline_models(model) do
+  defp load_offline_model(model) do
+    Logger.info("Loading #{model.name}...")
+
     # Loading model
-    {:ok, model_info} = Bumblebee.load_model({:hf, model.name, offline: true})
+    loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: true}
+    {:ok, model_info} = Bumblebee.load_model(loading_settings)
 
     info = %{model_info: model_info}
 
     # Load featurizer, tokenizer and generation config if needed
     info =
       if(model.load_featurizer) do
-        {:ok, featurizer} = Bumblebee.load_featurizer({:hf, model.name, offline: true})
+        {:ok, featurizer} = Bumblebee.load_featurizer(loading_settings)
         Map.put(info, :featurizer, featurizer)
       else
         info
@@ -118,7 +127,7 @@ defmodule App.Models do
 
     info =
       if(model.load_tokenizer) do
-        {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, model.name, offline: true})
+        {:ok, tokenizer} = Bumblebee.load_tokenizer(loading_settings)
         Map.put(info, :tokenizer, tokenizer)
       else
         info
@@ -127,7 +136,7 @@ defmodule App.Models do
     info =
       if(model.load_generation_config) do
         {:ok, generation_config} =
-          Bumblebee.load_generation_config({:hf, model.name, offline: true})
+          Bumblebee.load_generation_config(loading_settings)
 
         Map.put(info, :generation_config, generation_config)
       else
@@ -141,23 +150,23 @@ defmodule App.Models do
   # Downloads the models according to a given %ModelInfo struct.
   # It will load the model and the respective the featurizer, tokenizer and generation config if needed.
   defp download_model(model) do
-    # Download the models according to env
     Logger.info("Downloading #{model.name}...")
 
-    # Loading model
-    Bumblebee.load_model({:hf, model.name})
+    # Download model
+    downloading_settings = {:hf, model.name, cache_dir: model.cache_path}
+    Bumblebee.load_model(downloading_settings)
 
-    # Load featurizer, tokenizer and generation config if needed
+    # Download featurizer, tokenizer and generation config if needed
     if(model.load_featurizer) do
-      Bumblebee.load_featurizer({:hf, model.name})
+      Bumblebee.load_featurizer(downloading_settings)
     end
 
     if(model.load_tokenizer) do
-      Bumblebee.load_tokenizer({:hf, model.name})
+      Bumblebee.load_tokenizer(downloading_settings)
     end
 
     if(model.load_generation_config) do
-      Bumblebee.load_generation_config({:hf, model.name})
+      Bumblebee.load_generation_config(downloading_settings)
     end
   end
 end
