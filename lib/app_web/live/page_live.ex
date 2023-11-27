@@ -16,10 +16,14 @@ defmodule AppWeb.PageLive do
     {:ok,
      socket
      |> assign(
+       # Related to the file uploaded by the user
        label: nil,
        running?: false,
        task_ref: nil,
        image_preview_base64: nil,
+
+       # Related to the list of examples
+       example_list_tasks: [],
        display_list?: false,
        displayed_list: []
      )
