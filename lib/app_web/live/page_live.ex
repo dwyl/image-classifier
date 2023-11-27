@@ -22,10 +22,10 @@ defmodule AppWeb.PageLive do
        task_ref: nil,
        image_preview_base64: nil,
 
-       # Related to the list of examples
+       # Related to the list of image examples
        example_list_tasks: [],
-       display_list?: false,
-       displayed_list: []
+       example_list: [],
+       display_list?: false
      )
      |> allow_upload(:image_list,
        accept: ~w(image/*),
@@ -55,11 +55,14 @@ defmodule AppWeb.PageLive do
     # Spawns prediction tasks for example image from random Unsplash image
     tasks = for _ <- 1..2 do
       {:req, body} = {:req, Req.get!(random_image).body}
-      handle_example_image(body)
+      predict_example_image(body)
     end
 
+    # List to change `example_list` socket assign to show skeleton loading
+    display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
+
     # Updates the socket assigns
-    {:noreply, assign(socket, example_list_tasks: tasks)}
+    {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
   end
 
   @doc """
@@ -134,9 +137,22 @@ defmodule AppWeb.PageLive do
 
       # If the example task has finished executing, we upload the socket assigns.
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
+
+        # Update the element in the `example_list` enum to turn "predicting?" to `false`
+        updated_example_list = Map.get(assigns, :example_list)
+        |> Enum.map(fn obj ->
+          if obj.ref == img.ref do
+            Map.put(obj, :base64_encoded_url, img.base64_encoded_url)
+            |> Map.put(:label, label)
+            |> Map.put(:predicting?, false)
+
+          else
+            obj
+          end end)
+
         {:noreply,
          assign(socket,
-           displayed_list: [%{base64_encoded_url: img.base64_encoded_url, label: label} | assigns.displayed_list],
+           example_list: updated_example_list,
            running?: false,
            display_list?: true
          )}
@@ -145,13 +161,14 @@ defmodule AppWeb.PageLive do
 
   @doc """
   This function receives a `body` binary of an image
-  and pre_processes it and sends it over to the model for classification.
+  and pre_processes it and sends it over to the model for classification asynchronously.
   Vix is used to produce an optimized thumbnail of `@image_width` to match the COCO dataset
   used to train the BLIP model.
 
-  It updates the socket assigns with the classification result.
+  Returns the task object with the base64 encoded image to be displayed on the page.
+  Returns an error if processing the image fails.
   """
-  def handle_example_image(body) do
+  def predict_example_image(body) do
     with {:vix, {:ok, img_thumb}} <-
            {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
          {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
