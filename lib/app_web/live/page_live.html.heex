@@ -146,12 +146,12 @@
       <%= if @display_list? do %>
       <div class="flex flex-col">
          <h3 class="mt-10 text-xl lg:text-center font-light tracking-tight text-gray-900 lg:text-2xl">Examples</h3>
-         <div class="flex flex-row my-8">
+         <div class="flex flex-row justify-center my-8">
             <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2">
-               <%= for elt <- @displayed_list do %>
+               <%= for example_img <- @displayed_list do %>
                <div>
-                  <img id={elt.url} src={elt.url} class="aspect-[3/2] rounded-2xl object-cover" src="https://images.unsplash.com/photo-1505840717430-882ce147ef2d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=8&w=1024&h=1024&q=80" alt="">
-                  <h3 class="mt-6 text-lg font-semibold leading-8 text-gray-900 text-center"><%= inspect(elt.label) %></h3>
+                  <img id={example_img.base64_encoded_url} src={example_img.base64_encoded_url} class="rounded-2xl object-cover">
+                  <h3 class="mt-1 text-lg leading-8 text-gray-900 text-center"><%= example_img.label %></h3>
                </div>
                <% end %>
             </div>

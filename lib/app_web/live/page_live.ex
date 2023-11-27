@@ -9,11 +9,6 @@ defmodule AppWeb.PageLive do
   """
   @image_width 640
 
-  @unsplashes [
-    "https://source.unsplash.com/_CFv3bntQlQ",
-    "https://source.unsplash.com/r1SwcagHVG0"
-  ]
-
   @impl true
   def mount(_params, _session, socket) do
     Process.send_after(self(), :example_list, 0)
@@ -86,6 +81,8 @@ defmodule AppWeb.PageLive do
   @doc """
   Every time an `async task` is created, this function is called.
   We destructure the output of the task and update the socket assigns.
+
+  This function handles both the image that is uploaded by the user and the example images.
   """
   @impl true
   def handle_info({ref, result}, %{assigns: assigns} = socket) do
@@ -115,26 +112,44 @@ defmodule AppWeb.PageLive do
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
         {:noreply,
          assign(socket,
-           displayed_list: [%{url: img.url, label: label} | assigns.displayed_list],
+           displayed_list: [%{base64_encoded_url: img.base64_encoded_url, label: label} | assigns.displayed_list],
            running: false,
            display_list?: true
          )}
     end
   end
 
+
+  @doc """
+  This function retrieves a random image from Unsplash API through a URL like "https://source.unsplash.com/random/640x640"
+  and creates async tasks to classify it.
+
+  Should be invoked after some seconds when LiveView is mounted.
+  """
   def handle_info(:example_list, socket) do
-    tasks = @unsplashes |> Enum.map(&handle_example_image/1)
+    # Retrieves a random image from Unsplash with a given `image_width` dimension
+    random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
+
+    # Spawns prediction tasks for example image from random Unsplash image
+    tasks = for _ <- 1..2 do
+      {:req, body} = {:req, Req.get!(random_image).body}
+      handle_example_image(body)
+    end
+
+    # Updates the socket assigns
     {:noreply, assign(socket, example_list_tasks: tasks)}
   end
 
   @doc """
-  This function fetches a public image from the Unsplash website with the Req library.
+  This function receives a `body` binary of an image
+  and pre_processes it and sends it over to the model for classification.
   Vix is used to produce an optimized thumbnail of `@image_width` to match the COCO dataset
   used to train the BLIP model.
+
+  It updates the socket assigns with the classification result.
   """
-  def handle_example_image(url) do
-    with {:req, body} <- {:req, Req.get!(url).body},
-         {:vix, {:ok, img_thumb}} <-
+  def handle_example_image(body) do
+    with {:vix, {:ok, img_thumb}} <-
            {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
          {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
 
@@ -142,7 +157,7 @@ defmodule AppWeb.PageLive do
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)
-      |> Map.merge(%{url: url})
+      |> Map.merge(%{base64_encoded_url: "data:image/png;base64, " <> Base.encode64(body)})
 
     else
       {stage, error} -> {stage, error}
