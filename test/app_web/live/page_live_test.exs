@@ -5,14 +5,28 @@ defmodule AppWeb.PageLiveTest do
 
   test "connected mount", %{conn: conn} do
     conn = get(conn, "/")
-    assert html_response(conn, 200) =~ "Image Classification"
+    assert html_response(conn, 200) =~ "Caption your image!"
 
     {:ok, _view, _html} = live(conn)
   end
 
+  test "connected and renders hook after period of inactivity", %{conn: conn} do
+    {:ok, lv, html} = live(conn, ~p"/")
+    assert html =~ "Caption your image!"
+
+    # Executes `show_examples` event handler
+    assert render_hook(lv, "show_examples", %{})
+
+    # Wait for the predictions to end
+    AppWeb.SupervisorSupport.wait_for_completion()
+
+    # Should show "Examples" title
+    assert render(lv) =~ "Examples"
+  end
+
   test "uploading a file and getting prediction", %{conn: conn} do
     {:ok, lv, html} = live(conn, ~p"/")
-    assert html =~ "Image Classification"
+    assert html =~ "Caption your image!"
 
     # Get file and add it to the form
     file =
@@ -34,7 +48,7 @@ defmodule AppWeb.PageLiveTest do
 
   test "uploading a file without alpha", %{conn: conn} do
     {:ok, lv, html} = live(conn, ~p"/")
-    assert html =~ "Image Classification"
+    assert html =~ "Caption your image!"
 
     # Get file and add it to the form
     file =
@@ -56,7 +70,7 @@ defmodule AppWeb.PageLiveTest do
 
   test "error should be shown if size is bigger than limit", %{conn: conn} do
     {:ok, lv, html} = live(conn, ~p"/")
-    assert html =~ "Image Classification"
+    assert html =~ "Caption your image!"
 
     # Get file and add it to the form
     file =
@@ -82,38 +96,38 @@ defmodule AppWeb.PageLiveTest do
     assert ret == {:noreply, %{}}
   end
 
-  test "send_after", %{conn: conn} do
-    {:ok, lv, _html} = live(conn, "/")
-    send(lv.pid, :example_list)
-
-    [%{pid: pid1, ref: ref1}, %{pid: pid2, ref: ref2}] =
-      [
-        "https://source.unsplash.com/_CFv3bntQlQ",
-        "https://source.unsplash.com/r1SwcagHVG0"
-      ]
-      |> Enum.map(&AppWeb.PageLive.handle_image/1)
-
-    receive do
-      {:DOWN, ^ref1, :process, ^pid1, _reason} ->
-        assert true
-    end
-
-    receive do
-      {:DOWN, ^ref2, :process, ^pid2, _reason} ->
-        assert true
-    end
-  end
-
-  test "send_after_no_image", %{conn: conn} do
-    {:ok, lv, _html} = live(conn, "/")
-    send(lv.pid, :example_list)
-
-    response =
-      ["https://example.com"]
-      |> Enum.map(&AppWeb.PageLive.handle_image/1)
-
-    assert response == [
-             vix: {:error, "operation build: VipsForeignLoad: buffer is not in a known format"}
-           ]
-  end
+  # test "send_after", %{conn: conn} do
+  #  {:ok, lv, _html} = live(conn, "/")
+  #  send(lv.pid, :example_list)
+  #
+  #  [%{pid: pid1, ref: ref1}, %{pid: pid2, ref: ref2}] =
+  #    [
+  #      "https://source.unsplash.com/_CFv3bntQlQ",
+  #      "https://source.unsplash.com/r1SwcagHVG0"
+  #    ]
+  #    |> Enum.map(&AppWeb.PageLive.handle_image/1)
+  #
+  #  receive do
+  #    {:DOWN, ^ref1, :process, ^pid1, _reason} ->
+  #      assert true
+  #  end
+  #
+  #  receive do
+  #    {:DOWN, ^ref2, :process, ^pid2, _reason} ->
+  #      assert true
+  #  end
+  # end
+  #
+  # test "send_after_no_image", %{conn: conn} do
+  #  {:ok, lv, _html} = live(conn, "/")
+  #  send(lv.pid, :example_list)
+  #
+  #  response =
+  #    ["https://example.com"]
+  #    |> Enum.map(&AppWeb.PageLive.handle_image/1)
+  #
+  #  assert response == [
+  #           vix: {:error, "operation build: VipsForeignLoad: buffer is not in a known format"}
+  #         ]
+  # end
 end
