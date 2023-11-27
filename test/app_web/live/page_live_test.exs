@@ -95,39 +95,4 @@ defmodule AppWeb.PageLiveTest do
 
     assert ret == {:noreply, %{}}
   end
-
-  # test "send_after", %{conn: conn} do
-  #  {:ok, lv, _html} = live(conn, "/")
-  #  send(lv.pid, :example_list)
-  #
-  #  [%{pid: pid1, ref: ref1}, %{pid: pid2, ref: ref2}] =
-  #    [
-  #      "https://source.unsplash.com/_CFv3bntQlQ",
-  #      "https://source.unsplash.com/r1SwcagHVG0"
-  #    ]
-  #    |> Enum.map(&AppWeb.PageLive.handle_image/1)
-  #
-  #  receive do
-  #    {:DOWN, ^ref1, :process, ^pid1, _reason} ->
-  #      assert true
-  #  end
-  #
-  #  receive do
-  #    {:DOWN, ^ref2, :process, ^pid2, _reason} ->
-  #      assert true
-  #  end
-  # end
-  #
-  # test "send_after_no_image", %{conn: conn} do
-  #  {:ok, lv, _html} = live(conn, "/")
-  #  send(lv.pid, :example_list)
-  #
-  #  response =
-  #    ["https://example.com"]
-  #    |> Enum.map(&AppWeb.PageLive.handle_image/1)
-  #
-  #  assert response == [
-  #           vix: {:error, "operation build: VipsForeignLoad: buffer is not in a known format"}
-  #         ]
-  # end
 end
