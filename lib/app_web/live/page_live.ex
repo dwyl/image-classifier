@@ -17,7 +17,7 @@ defmodule AppWeb.PageLive do
      socket
      |> assign(
        label: nil,
-       running: false,
+       running?: false,
        task_ref: nil,
        image_preview_base64: nil,
        display_list?: false,
@@ -92,7 +92,7 @@ defmodule AppWeb.PageLive do
       base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
 
       # Update socket assigns to show spinner whilst task is running
-      {:noreply, assign(socket, running: true, task_ref: task.ref, image_preview_base64: base64)}
+      {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64)}
     else
       {:noreply, socket}
     end
@@ -126,14 +126,14 @@ defmodule AppWeb.PageLive do
 
       # If the upload task has finished executing, we update the socket assigns.
       Map.get(assigns, :task_ref) == ref ->
-        {:noreply, assign(socket, label: label, running: false)}
+        {:noreply, assign(socket, label: label, running?: false)}
 
       # If the example task has finished executing, we upload the socket assigns.
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
         {:noreply,
          assign(socket,
            displayed_list: [%{base64_encoded_url: img.base64_encoded_url, label: label} | assigns.displayed_list],
-           running: false,
+           running?: false,
            display_list?: true
          )}
     end
