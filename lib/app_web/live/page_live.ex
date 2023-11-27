@@ -11,7 +11,7 @@ defmodule AppWeb.PageLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    Process.send_after(self(), :example_list, 0)
+    #Process.send_after(self(), :example_list, 0)
 
     {:ok,
      socket
@@ -36,6 +36,26 @@ defmodule AppWeb.PageLive do
   @impl true
   def handle_event("noop", _params, socket) do
     {:noreply, socket}
+  end
+
+  @doc """
+  This function retrieves a random image from Unsplash API through a URL like "https://source.unsplash.com/random/640x640"
+  and creates async tasks to classify it.
+
+  Should be invoked after some seconds when LiveView is mounted.
+  """
+  def handle_event("show_examples", _data, socket) do
+    # Retrieves a random image from Unsplash with a given `image_width` dimension
+    random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
+
+    # Spawns prediction tasks for example image from random Unsplash image
+    tasks = for _ <- 1..2 do
+      {:req, body} = {:req, Req.get!(random_image).body}
+      handle_example_image(body)
+    end
+
+    # Updates the socket assigns
+    {:noreply, assign(socket, example_list_tasks: tasks)}
   end
 
   @doc """
@@ -117,27 +137,6 @@ defmodule AppWeb.PageLive do
            display_list?: true
          )}
     end
-  end
-
-
-  @doc """
-  This function retrieves a random image from Unsplash API through a URL like "https://source.unsplash.com/random/640x640"
-  and creates async tasks to classify it.
-
-  Should be invoked after some seconds when LiveView is mounted.
-  """
-  def handle_info(:example_list, socket) do
-    # Retrieves a random image from Unsplash with a given `image_width` dimension
-    random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
-
-    # Spawns prediction tasks for example image from random Unsplash image
-    tasks = for _ <- 1..2 do
-      {:req, body} = {:req, Req.get!(random_image).body}
-      handle_example_image(body)
-    end
-
-    # Updates the socket assigns
-    {:noreply, assign(socket, example_list_tasks: tasks)}
   end
 
   @doc """
