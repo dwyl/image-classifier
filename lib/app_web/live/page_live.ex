@@ -11,8 +11,6 @@ defmodule AppWeb.PageLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    #Process.send_after(self(), :example_list, 0)
-
     {:ok,
      socket
      |> assign(

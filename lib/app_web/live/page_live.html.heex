@@ -151,7 +151,7 @@
             <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2">
                <%= for example_img <- @example_list do %>
 
-                     <!-- Loading skeleton if it is precting -->
+                     <!-- Loading skeleton if it is predicting -->
                      <%= if example_img.predicting? == true do %>
                       <div role="status" class="flex items-center justify-center w-full h-full max-w-sm bg-gray-300 rounded-lg animate-pulse">
                           <svg class="w-10 h-10 text-gray-200 dark:text-gray-600" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 18">

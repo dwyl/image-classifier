@@ -42,7 +42,9 @@ within `Phoenix`!
 - [7. How do I deploy this thing?](#7-how-do-i-deploy-this-thing)
 - [8. Showing example images](#8-showing-example-images)
   - [8.1 Creating a hook in client](#81-creating-a-hook-in-client)
-  - [8.2 Handling the example images list event inside our liveview](#82-handling-the-example-images-list-event-inside-our-liveview)
+  - [8.2 Handling the example images list event inside our LiveView](#82-handling-the-example-images-list-event-inside-our-liveview)
+  - [8.3 Updating the view](#83-updating-the-view)
+  - [8.4 See it running](#84-see-it-running)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -1452,7 +1454,7 @@ we are going to need to make **three changes**.
 - create a hook in the **client** (`Javascript`)
 to send an event when there's inactivity after
 a given number of seconds.
-- change `page_live.ex` **liveview** to accommodate
+- change `page_live.ex` **LiveView** to accommodate
 this new event.
 - change the **view** m `page_live.html.heex`
 to show these changes to the person.
@@ -1563,7 +1565,7 @@ This function resets the timer
 that is run whilst there is lack of inactivity.
 - if the person is inactive for *8 seconds*,
 we create an event `"show_examples"`.
-We will create a handler in the liveview 
+We will create a handler in the LiveView 
 to handle this event later.
 - we add the `Hooks` variable to the `hooks`
 property when initializing the `livesocket`.
@@ -1599,9 +1601,443 @@ to handle the ``"show_examples"`` event.
 Let's do that right now!
 
 
-## 8.2 Handling the example images list event inside our liveview
+## 8.2 Handling the example images list event inside our LiveView
+
+Now that we have our client sorted,
+let's head over to our LiveView
+at `lib/app_web/live/page_live.ex`
+and make the needed changes!
+
+Before anything,
+let's add socket assigns that we will need throughout our adventure!
+On top of the file, 
+change the socket assigns to the following.
+
+```elixir
+  socket
+    |> assign(
+      # Related to the file uploaded by the user
+      label: nil,
+      running?: false,
+      task_ref: nil,
+      image_preview_base64: nil,
+
+      # Related to the list of image examples
+      example_list_tasks: [],
+      example_list: [],
+      display_list?: false
+    )
+```
+
+We've added **three new assigns**:
+
+- **`example_list_tasks`** is a list of 
+the async tasks that are created for each example image.
+- **`example_list`** is a list of the example images
+with their respective predictions.
+- **`display_list?`** is a boolean that
+tells us if the list is to be shown or not.
+
+Awesome! Let's continue.
+
+As we've mentioned before,
+we need to create a handler to our `"show_examples"` event.
+
+Add the following function to the file.
+
+```elixir
+
+  @image_width 640
+
+  def handle_event("show_examples", _data, socket) do
+    # Retrieves a random image from Unsplash with a given `image_width` dimension
+    random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
+
+    # Spawns prediction tasks for example image from random Unsplash image
+    tasks = for _ <- 1..2 do
+      {:req, body} = {:req, Req.get!(random_image).body}
+      predict_example_image(body)
+    end
+
+    # List to change `example_list` socket assign to show skeleton loading
+    display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
+
+    # Updates the socket assigns
+    {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
+  end
+```
+
+> [!WARNING]
+>
+> We are using the 
+> [`req`](https://github.com/wojtekmach/req) package
+> to download the file binary from the URL.
+> Make sure to install it in the `mix.exs` file.
+
+- we are using the [Unsplash API](https://unsplash.com/developers),
+an *awesome* image API with lots of photos!
+They provide a `/random` URL that yields a random photo.
+In this URL we can inclusively define the dimensions we want!
+That's what we're doing in the first line of the function.
+We are using a module constant `@image_width 640` on top of the file,
+so add that to the top of the file.
+This function is relevant because we preferably want to deal
+with images that are in the same resolution of the dataset the model was trained in.
+- we are creating **two async tasks** that retrieve the binary of the image
+and pass it on to a `predict_example_image/1` function 
+(we will create this function next).
+- the two tasks that we've created are in an array `tasks`.
+We create *another array* `display_example_images` with the same number of elements as `tasks`,
+which will have two properties:
+**`predicting`**, meaning if the image is being predicted by the model;
+and **`ref`**, the reference of the task.
+- we assign the `tasks` array to the `example_list_tasks` socket assign
+and `display_example_images` array to the `example_list` array.
+So `example_list` will temporarily hold 
+objects with `:predicting` and `:ref` properties
+whilst the model is being executed.
 
 
+As we've just mentioned,
+we are making use of a function called 
+`predict_example_image/1` to make predictions
+of a given file binary.
+
+Let's implement it now!
+In the same file, add:
+
+```elixir
+  def predict_example_image(body) do
+    with {:vix, {:ok, img_thumb}} <-
+           {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
+         {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
+
+      # Create an async task to classify the image from unsplash
+      Task.Supervisor.async(App.TaskSupervisor, fn ->
+        Nx.Serving.batched_run(ImageClassifier, t_img)
+      end)
+      |> Map.merge(%{base64_encoded_url: "data:image/png;base64, " <> Base.encode64(body)})
+
+    else
+      {stage, error} -> {stage, error}
+    end
+  end
+```
+
+For the body of the image to be executed by the model,
+it needs to go through some pre-processing.
+
+- we are using [`thumbnail_buffer/3`](https://hexdocs.pm/vix/Vix.Vips.Operation.html#thumbnail_buffer/3)
+to make sure it's properly resized
+and then feeding the result to our own implemented
+`pre_process_image/1` function
+so it can be converted to a parseable tensor by the model.
+- after these two operations are successfully completed,
+we spawn two async tasks (like we've done before)
+and feed it to the model.
+We add the base64-encoded image 
+to the return value so it can later be shown to the person.
+- if these operations fail, we return an error.
+
+
+Great job! 👏
+
+Our example images async tasks have successfully been created
+and are on their way to the model!
+
+Now we need to handle these newly-created async tasks
+once they are completed.
+As we know, we are handling our async tasks completion
+in the `def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket)` function.
+Let's change it like so.
+
+```elixir
+  def handle_info({ref, result}, %{assigns: assigns} = socket) do
+    # Flush async call
+    Process.demonitor(ref, [:flush])
+
+    # You need to change how you destructure the output of the model depending
+    # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
+    label =
+      case Application.get_env(:app, :use_test_models, false) do
+        true ->
+          App.Models.extract_test_label(result)
+
+        # coveralls-ignore-start
+        false ->
+          App.Models.extract_prod_label(result)
+        # coveralls-ignore-stop
+      end
+
+    cond do
+
+      # If the upload task has finished executing, we update the socket assigns.
+      Map.get(assigns, :task_ref) == ref ->
+        {:noreply, assign(socket, label: label, running?: false)}
+
+      # If the example task has finished executing, we upload the socket assigns.
+      img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
+
+        # Update the element in the `example_list` enum to turn "predicting?" to `false`
+        updated_example_list = Map.get(assigns, :example_list)
+        |> Enum.map(fn obj ->
+          if obj.ref == img.ref do
+            Map.put(obj, :base64_encoded_url, img.base64_encoded_url)
+            |> Map.put(:label, label)
+            |> Map.put(:predicting?, false)
+
+          else
+            obj
+          end end)
+
+        {:noreply,
+         assign(socket,
+           example_list: updated_example_list,
+           running?: false,
+           display_list?: true
+         )}
+    end
+  end
+```
+
+The only change we've made is that
+we've added a [`cond`](https://hexdocs.pm/elixir/1.16/case-cond-and-if.html#cond) 
+flow structure.
+We are essentially checking 
+if the task reference that has been completed
+is **from the uploaded image from the person** (`:task_ref` socket assign)
+or **from an example image** (inside the `:example_list_tasks` socket assign list).
+
+If it's the latter,
+we retrieve we are updating 
+the `example_list` socket assign list
+with the **prediction** (`:label`),
+the **base64-encoded image from the task list** (`:base64_encoded_url`)
+and setting the `:predicting` property to `false`.
+
+And that's it! 
+Great job! 🥳
+
+
+## 8.3 Updating the view 
+
+Now that we've made all the necessary changes to our LiveView,
+we need to update our view so it reflects them!
+
+Head over to `lib/app_web/live/page_live.html.heex`
+and change it to the following piece of code.
+
+```html
+<div class="hidden" id="tracker_el" phx-hook="ActivityTracker" />
+<div class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-24 lg:px-8 xl:px-28 xl:py-32">
+   <div class="flex flex-col justify-start">
+      <div class="flex justify-center items-center w-full">
+         <div class="2xl:space-y-12">
+            <div class="mx-auto max-w-2xl lg:text-center">
+               <p>
+                  <span class="rounded-full w-fit bg-brand/5 px-2 py-1 text-[0.8125rem] font-medium text-center leading-6 text-brand">
+                  <a
+                     href="https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html"
+                     target="_blank" rel="noopener noreferrer"
+                     >
+                  🔥 LiveView
+                  </a>  +  <a
+                     href="https://github.com/elixir-nx/bumblebee"
+                     target="_blank" rel="noopener noreferrer"
+                     >
+                  🐝 Bumblebee
+                  </a>
+                  </span>
+               </p>
+               <p class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Caption your image!</p>
+               <h3 class="mt-6 text-lg leading-8 text-gray-600">
+                  Upload your own image (up to 5MB) and perform image captioning with
+                  <a
+                     href="https://elixir-lang.org/"
+                     target="_blank" rel="noopener noreferrer"
+                     class="font-mono font-medium text-sky-500"
+                     >
+                  Elixir
+                  </a>
+                  !
+               </h3>
+               <p class="text-lg leading-8 text-gray-400">
+                  Powered with
+                  <a
+                     href="https://elixir-lang.org/"
+                     target="_blank" rel="noopener noreferrer"
+                     class="font-mono font-medium text-sky-500"
+                     >
+                  HuggingFace🤗
+                  </a>
+                  transformer models,
+                  you can run this project locally and perform machine learning tasks with a handful lines of code.
+               </p>
+            </div>
+            <div class="border-gray-900/10">
+               <!-- File upload section -->
+               <div class="col-span-full">
+                  <div
+                     class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10"
+                     phx-drop-target={@uploads.image_list.ref}
+                     >
+                     <div class="text-center">
+                        <!-- Show image preview -->
+                        <%= if @image_preview_base64 do %>
+                        <form id="upload-form" phx-change="noop" phx-submit="noop">
+                           <label class="cursor-pointer">
+                           <.live_file_input upload={@uploads.image_list} class="hidden" />
+                           <img src={@image_preview_base64} />
+                           </label>
+                        </form>
+                        <% else %>
+                        <svg
+                           class="mx-auto h-12 w-12 text-gray-300"
+                           viewBox="0 0 24 24"
+                           fill="currentColor"
+                           aria-hidden="true"
+                           >
+                           <path
+                              fill-rule="evenodd"
+                              d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z"
+                              clip-rule="evenodd"
+                              />
+                        </svg>
+                        <div class="mt-4 flex text-sm leading-6 text-gray-600">
+                           <label
+                              for="file-upload"
+                              class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500"
+                              >
+                              <form id="upload-form" phx-change="noop" phx-submit="noop">
+                           <label class="cursor-pointer">
+                           <.live_file_input upload={@uploads.image_list} class="hidden" /> Upload
+                           </label>
+                           </form>
+                           </label>
+                           <p class="pl-1">or drag and drop</p>
+                        </div>
+                        <p class="text-xs leading-5 text-gray-600">PNG, JPG, GIF up to 5MB</p>
+                        <% end %>
+                     </div>
+                  </div>
+               </div>
+            </div>
+            <!-- Show errors -->
+            <%= for entry <- @uploads.image_list.entries do %>
+            <div class="mt-2">
+               <%= for err <- upload_errors(@uploads.image_list, entry) do %>
+               <div class="rounded-md bg-red-50 p-4 mb-2">
+                  <div class="flex">
+                     <div class="flex-shrink-0">
+                        <svg
+                           class="h-5 w-5 text-red-400"
+                           viewBox="0 0 20 20"
+                           fill="currentColor"
+                           aria-hidden="true"
+                           >
+                           <path
+                              fill-rule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                              clip-rule="evenodd"
+                              />
+                        </svg>
+                     </div>
+                     <div class="ml-3">
+                        <h3 class="text-sm font-medium text-red-800">
+                           <%= error_to_string(err) %>
+                        </h3>
+                     </div>
+                  </div>
+               </div>
+               <% end %>
+            </div>
+            <% end %>
+            <!-- Prediction text -->
+            <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
+               <span>Description: </span>
+               <!-- Spinner -->
+               <%= if @running? do %>
+               <div role="status">
+                  <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
+                     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
+                     </div>
+                  </div>
+               </div>
+               <% else %>
+               <%= if @label do %>
+               <span class="text-gray-700 font-light"><%= @label %></span>
+               <% else %>
+               <span class="text-gray-300 font-light">Waiting for image input.</span>
+               <% end %>
+               <% end %>
+            </div>
+         </div>
+      </div>
+      <!-- Examples -->
+      <%= if @display_list? do %>
+      <div class="flex flex-col">
+         <h3 class="mt-10 text-xl lg:text-center font-light tracking-tight text-gray-900 lg:text-2xl">Examples</h3>
+         <div class="flex flex-row justify-center my-8">
+            <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2">
+               <%= for example_img <- @example_list do %>
+
+                     <!-- Loading skeleton if it is predicting -->
+                     <%= if example_img.predicting? == true do %>
+                      <div role="status" class="flex items-center justify-center w-full h-full max-w-sm bg-gray-300 rounded-lg animate-pulse">
+                          <svg class="w-10 h-10 text-gray-200 dark:text-gray-600" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 18">
+                              <path d="M18 0H2a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2Zm-5.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm4.376 10.481A1 1 0 0 1 16 15H4a1 1 0 0 1-.895-1.447l3.5-7A1 1 0 0 1 7.468 6a.965.965 0 0 1 .9.5l2.775 4.757 1.546-1.887a1 1 0 0 1 1.618.1l2.541 4a1 1 0 0 1 .028 1.011Z"/>
+                          </svg>
+                          <span class="sr-only">Loading...</span>
+                      </div>
+
+
+                     <% else %>
+                      <div>
+                          <img id={example_img.base64_encoded_url} src={example_img.base64_encoded_url} class="rounded-2xl object-cover">
+                          <h3 class="mt-1 text-lg leading-8 text-gray-900 text-center"><%= example_img.label %></h3>
+                      </div>
+                     <% end %>
+               <% end %>
+            </div>
+         </div>
+      </div>
+      <% end %>
+   </div>
+</div>
+```
+
+We've made two changes.
+- we've added some text to better introduce our application
+at the top of the page.
+- added a section to show the example images list.
+This section is only rendered if the
+**`display_list?`** socket assign is set to `true`.
+If so, we iterate over the 
+**`example_list`** socket assign list
+and show a [loading skeleton](https://www.freecodecamp.org/news/how-to-build-skeleton-screens-using-css-for-better-user-experience/)
+if the image is `:predicting`.
+If not, it means the image has already been predicted,
+and we show the base64-encoded image
+like we do with the image uploaded by the person.
+
+And that's it! 🎉
+
+
+## 8.4 See it running
+
+Now let's see our application in action!
+We are expecting the examples to be shown after
+**8 seconds** of inactivity.
+If the person is inactive for this time duration,
+we fetch a random image from Unsplash API 
+and feed it to our model!
+
+You should see different images every time you use the app.
+Isn't that cool? 😎
+
+<p align="center">
+  <img width=800 src="https://github.com/dwyl/image-classifier/assets/17494745/1f8d08d1-f6ca-46aa-8c89-4bab45ad1e54">
+</p>
 
 
 # _Please_ Star the repo! ⭐️
