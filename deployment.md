@@ -1175,7 +1175,7 @@ since a new folder is created with a new defined name
 in `cache_path`.
 
 All that's left to do is 
-*simplifying our `Dockerfile`.
+*simplify our `Dockerfile`*.
 Because we are setting the cache directory ourselves
 through our configuration files,
 we don't need to set the `BUMBLEBEE_CACHE_DIR` anymore.
@@ -1308,7 +1308,7 @@ The documentation pretty much explains it to us.
 
 This is what happens in `fly.io`.
 They don't have `Mix` on runtime,
-so we hae to do things **at compile time**.
+so we have to do things **at compile time**.
 
 Check https://community.fly.io/t/function-mix-env-0-is-undefined-module-mix-is-not-available/4181
 for more information.
@@ -1322,7 +1322,6 @@ If you've followed the previous guide,
 you'll already have a simple, 
 free-tier'd `fly.io` machine instance up and running.
 However, you may run into some memory problems.
-You run out of memory.
 You may have come across log messages from `fly.io`
 stating `Out of memory: Killed progress XXX`.
 

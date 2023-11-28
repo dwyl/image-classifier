@@ -40,6 +40,9 @@ within `Phoenix`!
   - [5.3 Show image preview](#53-show-image-preview)
 - [6. What about other models?](#6-what-about-other-models)
 - [7. How do I deploy this thing?](#7-how-do-i-deploy-this-thing)
+- [8. Showing example images](#8-showing-example-images)
+  - [8.1 Creating a hook in client](#81-creating-a-hook-in-client)
+  - [8.2 Handling the example images list event inside our liveview](#82-handling-the-example-images-list-event-inside-our-liveview)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -1428,6 +1431,178 @@ we've created a small document
 that will **guide you through deploying this app in `fly.io`**!
 
 Check the [`deployment.md`](./deployment.md) file for more information.
+
+
+# 8. Showing example images
+
+> [!WARNING]
+>
+> This section assumes you've made the changes made in the previous section.
+> Therefore, you should follow the instructions in
+> [`7. How do I deploy this thing?`](#7-how-do-i-deploy-this-thing)
+> and come back after you're done.
+
+We have a fully functioning application that predicts images.
+Now we can add some cool touches to show the person 
+some examples if they are inactive.
+
+For this, 
+we are going to need to make **three changes**.
+
+- create a hook in the **client** (`Javascript`)
+to send an event when there's inactivity after
+a given number of seconds.
+- change `page_live.ex` **liveview** to accommodate
+this new event.
+- change the **view** m `page_live.html.heex`
+to show these changes to the person.
+
+Let's go over each one!
+
+
+## 8.1 Creating a hook in client
+
+We are going to detect the inactivity of the person
+with some `Javascript` code.
+
+Head over to `assets/js/app.js`
+and change it to the following.
+
+```js
+// If you want to use Phoenix channels, run `mix help phx.gen.channel`
+// to get started and then uncomment the line below.
+// import "./user_socket.js"
+
+// You can include dependencies in two ways.
+//
+// The simplest option is to put them in assets/vendor and
+// import them using relative paths:
+//
+//     import "../vendor/some-package.js"
+//
+// Alternatively, you can `npm install some-package --prefix assets` and import
+// them using a path starting with the package name:
+//
+//     import "some-package"
+//
+
+// Include phoenix_html to handle method=PUT/DELETE in forms and buttons.
+import "phoenix_html";
+// Establish Phoenix Socket and LiveView configuration.
+import { Socket } from "phoenix";
+import { LiveSocket } from "phoenix_live_view";
+import topbar from "../vendor/topbar";
+
+// Hooks to track inactivity
+let Hooks = {};
+Hooks.ActivityTracker = {
+  mounted() {
+    // Set the inactivity duration in milliseconds
+    const inactivityDuration = 8000; // 8 seconds
+
+    // Set a variable to keep track of the timer and if the process to predict example image has already been sent
+    let inactivityTimer;
+    let processHasBeenSent = false;
+
+    let ctx = this
+
+    // Function to reset the timer
+    function resetInactivityTimer() {
+      // Clear the previous timer
+      clearTimeout(inactivityTimer);
+
+      // Start a new timer
+      inactivityTimer = setTimeout(() => {
+        // Perform the desired action after the inactivity duration
+        // For example, send a message to the Elixir process using Phoenix Socket
+        if (!processHasBeenSent) {
+          processHasBeenSent = true;
+          ctx.pushEvent("show_examples", {});
+        }
+      }, inactivityDuration);
+    }
+
+    // Call the function to start the timer initially
+    resetInactivityTimer();
+
+    // Reset the timer whenever there is user activity
+    document.addEventListener("mousemove", resetInactivityTimer);
+    document.addEventListener("keydown", resetInactivityTimer);
+  },
+};
+
+let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content");
+let liveSocket = new LiveSocket("/live", Socket, { hooks: Hooks, params: { _csrf_token: csrfToken } });
+
+// Show progress bar on live navigation and form submits
+topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });
+window.addEventListener("phx:page-loading-start", (_info) => topbar.show(300));
+window.addEventListener("phx:page-loading-stop", (_info) => topbar.hide());
+
+// connect if there are any LiveViews on the page
+liveSocket.connect();
+
+// expose liveSocket on window for web console debug logs and latency simulation:
+// >> liveSocket.enableDebug()
+// >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
+// >> liveSocket.disableLatencySim()
+window.liveSocket = liveSocket;
+```
+
+- we have added a `Hooks` variable,
+with a property **`ActivityTracker`**.
+This hook has the `mounted()` function
+that is executed when the component that is hooked with this hook is mounted.
+You can find more information in https://hexdocs.pm/phoenix_live_view/js-interop.html.
+- inside the `mounted()` function,
+we create a `resetInactivityTimer()` function 
+that is executed every time the
+**mouse moves** (`mousemove` event)
+and a **key is pressed**(`keydown`).
+This function resets the timer 
+that is run whilst there is lack of inactivity.
+- if the person is inactive for *8 seconds*,
+we create an event `"show_examples"`.
+We will create a handler in the liveview 
+to handle this event later.
+- we add the `Hooks` variable to the `hooks`
+property when initializing the `livesocket`.
+
+And that's it!
+
+For this hook to *actually be executed*,
+we need to create a component that uses it
+inside our view file.
+
+For this, we can simply create a hidden component
+on top of the `lib/app_web/live/page_live.html.heex` file.
+
+Add the following hidden component.
+
+```html
+<div class="hidden" id="tracker_el" phx-hook="ActivityTracker" />
+```
+
+We use the `phx-hook` attribute
+to bind the hook we've created in our `app.js` file
+to the component so it's executed.
+When this component is mounted,
+the `mounted()` function inside the hook
+is executed.
+
+And that's it! 👏
+
+Your app won't work yet because
+we haven't created a handler
+to handle the ``"show_examples"`` event.
+
+Let's do that right now!
+
+
+## 8.2 Handling the example images list event inside our liveview
+
+
+
 
 # _Please_ Star the repo! ⭐️
 
