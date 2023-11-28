@@ -44,7 +44,8 @@ within `Phoenix`!
   - [8.1 Creating a hook in client](#81-creating-a-hook-in-client)
   - [8.2 Handling the example images list event inside our LiveView](#82-handling-the-example-images-list-event-inside-our-liveview)
   - [8.3 Updating the view](#83-updating-the-view)
-  - [8.4 See it running](#84-see-it-running)
+  - [8.4 Using URL of image instead of base64-encoded](#84-using-url-of-image-instead-of-base64-encoded)
+  - [8.5 See it running](#85-see-it-running)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -2023,7 +2024,201 @@ like we do with the image uploaded by the person.
 And that's it! 🎉
 
 
-## 8.4 See it running
+## 8.4 Using URL of image instead of base64-encoded
+
+While our example list is being correctly rendered,
+we are using additional CPU 
+to base64 encode our images 
+so they can be shown to the person.
+
+Initially we did this because
+`https://source.unsplash.com/random/`
+resolves into a different URL every time it is called.
+This means that the image that was fed into the model
+would be different from the one shown in the example list
+if we were to use this URL in our view.
+
+To fix this, 
+**we need to follow the redirection when the URL is resolved**.
+
+> [!NOTE]
+> We can do this with 
+> [`Finch`](https://github.com/sneako/finch), 
+> if we wanted to.
+>
+> We could do something like
+> def rand_splash do
+> ```elixir
+> %{scheme: scheme, host: host, path: path} = 
+>     Finch.build(:get, "https://source.unsplash.com/random/")
+>     |> Finch.request!(MyFinch)
+>     |> Map.get(:headers)
+>     |> Enum.filter(fn {a, _b} -> a == "location" end)
+>     |> List.first()
+>     |> elem(1)
+>     |> URI.parse()
+> 
+>    scheme <> "://" <> host <> path
+> end
+> ```
+> 
+> And then call it, like so.
+> 
+> ```elixir
+> App.rand_splash()
+> # https://images.unsplash.com/photo-1694813646634-9558dc7960e3
+> ```
+
+Because we are already using 
+[`req`](https://github.com/wojtekmach/req),
+let's make use of it
+instead of adding additional dependencies.
+
+Let's first add a function that will do this
+in `lib/app_web/live/page_live.ex`.
+Add the following piece of code
+at the end of the file.
+
+```elixir
+  defp track_redirected(url) do
+    # Create request
+    req = Req.new(url: url)
+
+    # Add tracking properties to req object
+    req = req
+    |> Req.Request.register_options([:track_redirected])
+    |> Req.Request.prepend_response_steps(track_redirected: &track_redirected_uri/1)
+
+    # Make request
+    {:ok, response} = Req.request(req)
+
+    # Return the final URI
+    %{url: URI.to_string(response.private.final_uri), body: response.body}
+  end
+
+  defp track_redirected_uri({request, response}) do
+    {request, %{response | private: Map.put(response.private, :final_uri, request.url)}}
+  end
+```
+
+This function adds properties to the request object
+and tracks the redirection.
+It will add a [`URI`](https://hexdocs.pm/elixir/1.12/URI.html#summary)
+object inside `private.final_uri`.
+This function returns
+the `body` of the image
+and the final `url` 
+it is resolved to
+(the URL of the image).
+
+Now all we need to do is use this function!
+Head over to the `handle_event("show_examples"...` function
+and change the loop to the following.
+
+```elixir
+    tasks = for _ <- 1..2 do
+      %{url: url, body: body} = track_redirected(random_image)
+      predict_example_image(body, url)
+    end
+```
+
+We are making use of `track_redirected/1`,
+the function we've just created.
+We pass both `body` and `url` to `predict_example_image/1`,
+which we will now change.
+
+```elixir
+  def predict_example_image(body, url) do
+    with {:vix, {:ok, img_thumb}} <-
+           {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
+         {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
+
+      # Create an async task to classify the image from unsplash
+      Task.Supervisor.async(App.TaskSupervisor, fn ->
+        Nx.Serving.batched_run(ImageClassifier, t_img)
+      end)
+      |> Map.merge(%{url: url})
+
+    else
+      {stage, error} -> {stage, error}
+    end
+  end
+```
+
+Instead of using `base64_encoded_url`,
+we are now using the `url` we've acquired.
+
+The last step we need to do in our LiveView
+is to finally use this `url` 
+in `handle_info/3`.
+
+```elixir
+  def handle_info({ref, result}, %{assigns: assigns} = socket) do
+    Process.demonitor(ref, [:flush])
+
+    label =
+      case Application.get_env(:app, :use_test_models, false) do
+        true ->
+          App.Models.extract_test_label(result)
+
+        false ->
+          App.Models.extract_prod_label(result)
+      end
+
+    cond do
+
+      Map.get(assigns, :task_ref) == ref ->
+        {:noreply, assign(socket, label: label, running?: false)}
+
+      img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
+
+        updated_example_list = Map.get(assigns, :example_list)
+        |> Enum.map(fn obj ->
+          if obj.ref == img.ref do
+            obj
+            |> Map.put(:url, img.url) # change here
+            |> Map.put(:label, label)
+            |> Map.put(:predicting?, false)
+
+          else
+            obj
+          end end)
+
+        {:noreply,
+         assign(socket,
+           example_list: updated_example_list,
+           running?: false,
+           display_list?: true
+         )}
+    end
+  end
+```
+
+And that's it!
+ 
+That last thing we need to do is change our view
+so it uses the `:url` parameter
+instead of the obsolete `:base64_encoded_url`.
+
+Head over to `lib/app_web/live/page_live.html.heex`
+and change the `<img>` being shown in the example list
+so it uses the `:url` parameter.
+
+```html
+<img id={example_img.url} src={example_img.url} class="rounded-2xl object-cover">
+```
+
+And we're done! 🎉
+
+We are now rendering the image on the client
+through the URL the Unsplash API resolves into
+instead of having the LiveView server
+encoding the image.
+Therefore, we're saving some CPU 
+to the thing that matters the most:
+*running our model*.
+
+## 8.5 See it running
 
 Now let's see our application in action!
 We are expecting the examples to be shown after
