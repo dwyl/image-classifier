@@ -52,8 +52,8 @@ defmodule AppWeb.PageLive do
 
     # Spawns prediction tasks for example image from random Unsplash image
     tasks = for _ <- 1..2 do
-      {:req, body} = {:req, Req.get!(random_image).body}
-      predict_example_image(body)
+      %{url: url, body: body} = track_redirected(random_image)
+      predict_example_image(body, url)
     end
 
     # List to change `example_list` socket assign to show skeleton loading
@@ -140,7 +140,8 @@ defmodule AppWeb.PageLive do
         updated_example_list = Map.get(assigns, :example_list)
         |> Enum.map(fn obj ->
           if obj.ref == img.ref do
-            Map.put(obj, :base64_encoded_url, img.base64_encoded_url)
+            obj
+            |> Map.put(:url, img.url)
             |> Map.put(:label, label)
             |> Map.put(:predicting?, false)
 
@@ -166,7 +167,7 @@ defmodule AppWeb.PageLive do
   Returns the task object with the base64 encoded image to be displayed on the page.
   Returns an error if processing the image fails.
   """
-  def predict_example_image(body) do
+  def predict_example_image(body, url) do
     with {:vix, {:ok, img_thumb}} <-
            {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
          {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
@@ -175,7 +176,7 @@ defmodule AppWeb.PageLive do
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)
-      |> Map.merge(%{base64_encoded_url: "data:image/png;base64, " <> Base.encode64(body)})
+      |> Map.merge(%{url: url})
 
     else
       {stage, error} -> {stage, error}
@@ -210,5 +211,25 @@ defmodule AppWeb.PageLive do
       |> Nx.reshape(shape, names: format)
 
     {:ok, final_tensor}
+  end
+
+  defp track_redirected(url) do
+    # Create request
+    req = Req.new(url: url)
+
+    # Add tracking properties to req object
+    req = req
+    |> Req.Request.register_options([:track_redirected])
+    |> Req.Request.prepend_response_steps(track_redirected: &track_redirected_uri/1)
+
+    # Make request
+    {:ok, response} = Req.request(req)
+
+    # Return the final URI
+    %{url: URI.to_string(response.private.final_uri), body: response.body}
+  end
+
+  defp track_redirected_uri({request, response}) do
+    {request, %{response | private: Map.put(response.private, :final_uri, request.url)}}
   end
 end
