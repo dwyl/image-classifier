@@ -33,6 +33,7 @@ Hooks.ActivityTracker = {
     let inactivityTimer;
     let processHasBeenSent = false;
 
+    // We use the `mounted()` context to push the event. This is used in the `setTimeout` function below.
     let ctx = this
 
     // Function to reset the timer
