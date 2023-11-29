@@ -25,6 +25,8 @@ defmodule App.Application do
        name: ImageClassifier},
       # Adding a supervisor
       {Task.Supervisor, name: App.TaskSupervisor},
+      # Setup DB
+      App.Repo,
       # Start the Endpoint (http/https)
       AppWeb.Endpoint
       # Start a worker by calling: App.Worker.start_link(arg)

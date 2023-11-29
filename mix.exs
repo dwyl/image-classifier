@@ -54,6 +54,9 @@ defmodule App.MixProject do
       {:plug_cowboy, "~> 2.6.1"},
       {:req, "0.4.5"},
 
+      # DB
+      {:ecto_sqlite3, "~> 0.12.0"},
+
       # Bumblebee imports
       {:bumblebee, "~> 0.4.2"},
       {:exla, "~> 0.6.4"},

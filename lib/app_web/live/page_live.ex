@@ -1,5 +1,6 @@
 defmodule AppWeb.PageLive do
   use AppWeb, :live_view
+  alias App.Image, as: ImageRepo
   alias Vix.Vips.Image, as: Vimage
 
   @doc """

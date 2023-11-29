@@ -55,6 +55,15 @@ config :phoenix, :json_library, Jason
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
 
+# SQLite3 configuration
+config :app, App.Repo,
+  database: Path.expand("../app_dev.db", Path.dirname(__ENV__.file)),
+  pool_size: 5,
+  show_sensitive_data_on_connection_error: true
+
+config :app, ecto_repos: [App.Repo]
+
+
 # When deploying to `fly.io`, you can delete this or leave it in.
 # It only makes sense to set it to `true` if you're changing models
 # in deployment.

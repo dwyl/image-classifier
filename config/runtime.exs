@@ -36,6 +36,19 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
   port = String.to_integer(System.get_env("PORT") || "4000")
 
+
+  # SQLite3 configuration
+  database_path =
+    System.get_env("DATABASE_PATH") ||
+      raise """
+      environment variable DATABASE_PATH is missing.
+      For example: /data/name/name.db
+      """
+
+  config :name, App.Repo,
+    database: database_path,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "5")
+
   config :app, AppWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [

@@ -13,6 +13,12 @@ config :logger, level: :warning
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 
+# SQLite3 configuration
+config :app, App.Repo,
+  database: Path.expand("../app_test.db", Path.dirname(__ENV__.file)),
+  pool_size: 5,
+  pool: Ecto.Adapters.SQL.Sandbox
+
 # App configuration
 config :app,
   use_test_models: true
