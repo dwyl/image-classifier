@@ -52,17 +52,18 @@ defmodule App.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.6.1"},
+      {:req, "0.4.5"},
 
       # Bumblebee imports
       {:bumblebee, "~> 0.4.2"},
-      {:exla, "~> 0.6.1"},
-      {:nx, "~> 0.6.2"},
+      {:exla, "~> 0.6.4"},
+      {:nx, "~> 0.6.4 "},
 
       # Image
       {:vix, "~> 0.25.0"},
 
       # Testing
-      {:excoveralls, "~> 0.15", only: [:test, :dev]},
+      {:excoveralls, "~> 0.15", only: [:test, :dev]}
     ]
   end
 

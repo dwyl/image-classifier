@@ -13,7 +13,8 @@ defmodule App.Models do
   """
   require Logger
 
-  # IMPORTANT: This should be the same directory as defined in the `Dockerfile`.
+  # IMPORTANT: This should be the same directory as defined in the `Dockerfile`
+  # where the models will be downloaded into.
   @models_folder_path Application.compile_env!(:app, :models_cache_dir)
 
   # Test and prod models information

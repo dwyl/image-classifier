@@ -37,3 +37,4 @@ npm-debug.log
 
 # Bumblebee model directory
 .bumblebee/*
+.elixir_ls
