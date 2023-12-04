@@ -184,7 +184,7 @@ defmodule AppWeb.PageLive do
     end
   end
 
-  def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 10MB."
+  def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 5MB."
 
   defp pre_process_image(%Vimage{} = image) do
     # If the image has an alpha channel, flatten it:
