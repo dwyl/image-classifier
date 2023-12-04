@@ -4,7 +4,7 @@ defmodule App.Repo.Migrations.CreateImages do
   def change do
     create table(:images) do
       add :url, :string
-      add :info, :string
+      add :description, :string
       add :width, :integer
       add :height, :integer
 
