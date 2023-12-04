@@ -50,9 +50,18 @@ defmodule App.MixProject do
       {:tailwind, "~> 0.2.2", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},
-      {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.6.1"},
       {:req, "0.4.5"},
+
+      # Postgres database
+      {:ecto_sql, "~> 3.10"},
+      {:postgrex, "~> 0.17.3"},
+      {:jason, "~> 1.4"},
+
+      # Upload to a bucket
+      {:ex_aws_s3, "~> 2.0"},
+      {:sweet_xml, "~> 0.7"},
+      {:hackney, "~> 1.9"},
 
       # Bumblebee imports
       {:bumblebee, "~> 0.4.2"},

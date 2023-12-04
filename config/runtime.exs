@@ -1,5 +1,11 @@
 import Config
 
+config :ex_aws,
+  access_key_id: System.get_env("AWS_ACCESS_KEY_ID"),
+  secret_access_key: System.get_env("AWS_SECRET_ACCESS_KEY"),
+  region: "eu-west-3" || System.get_env("AWS_REGION"),
+  bucket: "dwyl-imgia"
+
 # config/runtime.exs is executed for all environments, including
 # during releases. It is executed after compilation and before the
 # system starts, so it is typically used to load production configuration

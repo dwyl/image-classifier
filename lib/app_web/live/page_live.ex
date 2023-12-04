@@ -1,6 +1,7 @@
 defmodule AppWeb.PageLive do
   use AppWeb, :live_view
   alias Vix.Vips.Image, as: Vimage
+  alias Vix.Vips.Operation, as: Vops
 
   @doc """
   Width of the image to be resized to.
@@ -8,14 +9,18 @@ defmodule AppWeb.PageLive do
   The aspect ratio is maintained.
   """
   @image_width 640
+  @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
 
   @impl true
   def mount(_params, _session, socket) do
+    File.mkdir_p!(@upload_dir)
+
     {:ok,
      socket
      |> assign(
        # Related to the file uploaded by the user
-       label: nil,
+       image: %{label: nil, filename: nil},
+       #  label: nil,
        running?: false,
        task_ref: nil,
        image_preview_base64: nil,
@@ -51,10 +56,11 @@ defmodule AppWeb.PageLive do
     random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
 
     # Spawns prediction tasks for example image from random Unsplash image
-    tasks = for _ <- 1..2 do
-      %{url: url, body: body} = track_redirected(random_image)
-      predict_example_image(body, url)
-    end
+    tasks =
+      for _ <- 1..2 do
+        %{url: url, body: body} = track_redirected(random_image)
+        predict_example_image(body, url)
+      end
 
     # List to change `example_list` socket assign to show skeleton loading
     display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
@@ -69,39 +75,58 @@ defmodule AppWeb.PageLive do
   It reads the file, processes it and sends it to the model for classification.
   It updates the socket assigns
   """
-  def handle_progress(:image_list, entry, socket) do
-    if entry.done? do
-      # Consume the entry and get the tensor to feed to classifier
-      %{tensor: tensor, file_binary: file_binary} =
-        consume_uploaded_entry(socket, entry, fn %{} = meta ->
-          file_binary = File.read!(meta.path)
+  def handle_progress(:image_list, entry, socket) when entry.done? do
+    File.ls!(@upload_dir) |> Enum.map(&File.rm!(Path.join([@upload_dir, &1])))
 
-          # Get image and resize
-          {:ok, thumbnail_vimage} =
-            Vix.Vips.Operation.thumbnail(meta.path, @image_width, size: :VIPS_SIZE_DOWN)
+    # Consume the entry and get the tensor to feed to classifier
+    %{tensor: tensor, upload_task: upload_task, filename: filename} =
+      consume_uploaded_entry(socket, entry, fn %{path: path} = _meta ->
+        # file_binary = File.read!(path)
+        type = entry.client_type
 
-          # Pre-process it
-          {:ok, tensor} = pre_process_image(thumbnail_vimage)
+        filename =
+          File.read!(path)
+          |> App.Utils.short_name(type)
 
-          # Return it
-          {:ok, %{tensor: tensor, file_binary: file_binary}}
-        end)
+        tmp_path =
+          App.Utils.copy_path_into(filename, path)
 
-      # Create an async task to classify the image
-      task =
-        Task.Supervisor.async(App.TaskSupervisor, fn ->
-          Nx.Serving.batched_run(ImageClassifier, tensor)
-        end)
+        upload_task =
+          App.Upload.run_task(tmp_path, filename, type)
 
-      # Encode the image to base64
-      base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
+        # Get image and resize
+        {:ok, thumbnail_vimage} =
+          Vops.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN)
 
-      # Update socket assigns to show spinner whilst task is running
-      {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64)}
-    else
-      {:noreply, socket}
-    end
+        # Pre-process it
+        {:ok, tensor} = pre_process_image(thumbnail_vimage)
+
+        # Return it
+        {:ok, %{tensor: tensor, upload_task: upload_task, filename: filename}}
+      end)
+
+    # Create an async task to classify the image
+    i2t_task =
+      Task.Supervisor.async(App.TaskSupervisor, fn ->
+        Nx.Serving.batched_run(ImageClassifier, tensor)
+      end)
+
+    # Encode the image to base64
+    # base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
+    image = %{filename: filename, label: nil}
+
+    # Update socket assigns to show spinner whilst task is running
+    {:noreply,
+     assign(socket,
+       running?: true,
+       i2t_ref: i2t_task.ref,
+       #  image_preview_base64: base64,
+       upload_ref: upload_task.ref,
+       image: image
+     )}
   end
+
+  def handle_progress(_, _, socket), do: {:noreply, socket}
 
   @doc """
   Every time an `async task` is created, this function is called.
@@ -110,6 +135,23 @@ defmodule AppWeb.PageLive do
   This function handles both the image that is uploaded by the user and the example images.
   """
   @impl true
+  def handle_info({ref, {:error, {:http_error, 400, msg}}}, %{assigns: assigns} = socket)
+      when assigns.upload_task.ref == ref do
+    Process.demonitor(ref, [:flush])
+    require Logger
+    Logger.warning("#{inspect(msg)}")
+    {:noreply, put_flash(socket, :error, "Upload error")}
+  end
+
+  # return from upload into bucket process
+  def handle_info({ref, {:ok, msg}}, %{assigns: assigns} = socket)
+      when assigns.upload_ref == ref do
+    %{body: %{location: location}} = msg
+
+    Process.demonitor(ref, [:flush])
+    {:noreply, update(socket, :image, fn img -> Map.merge(img, %{location: location}) end)}
+  end
+
   def handle_info({ref, result}, %{assigns: assigns} = socket) do
     # Flush async call
     Process.demonitor(ref, [:flush])
@@ -124,30 +166,32 @@ defmodule AppWeb.PageLive do
         # coveralls-ignore-start
         false ->
           App.Models.extract_prod_label(result)
-        # coveralls-ignore-stop
+          # coveralls-ignore-stop
       end
 
     cond do
-
-      # If the upload task has finished executing, we update the socket assigns.
-      Map.get(assigns, :task_ref) == ref ->
-        {:noreply, assign(socket, label: label, running?: false)}
+      # return from ML captioning process
+      Map.get(assigns, :i2t_ref) == ref ->
+        {:noreply,
+         socket
+         |> update(:running?, fn val -> !val end)
+         |> update(:image, fn img -> Map.merge(img, %{label: label}) end)}
 
       # If the example task has finished executing, we upload the socket assigns.
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
-
         # Update the element in the `example_list` enum to turn "predicting?" to `false`
-        updated_example_list = Map.get(assigns, :example_list)
-        |> Enum.map(fn obj ->
-          if obj.ref == img.ref do
-            obj
-            |> Map.put(:url, img.url)
-            |> Map.put(:label, label)
-            |> Map.put(:predicting?, false)
-
-          else
-            obj
-          end end)
+        updated_example_list =
+          Map.get(assigns, :example_list)
+          |> Enum.map(fn obj ->
+            if obj.ref == img.ref do
+              obj
+              |> Map.put(:url, img.url)
+              |> Map.put(:label, label)
+              |> Map.put(:predicting?, false)
+            else
+              obj
+            end
+          end)
 
         {:noreply,
          assign(socket,
@@ -171,13 +215,11 @@ defmodule AppWeb.PageLive do
     with {:vix, {:ok, img_thumb}} <-
            {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
          {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
-
       # Create an async task to classify the image from unsplash
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)
       |> Map.merge(%{url: url})
-
     else
       {stage, error} -> {stage, error}
     end
@@ -218,9 +260,10 @@ defmodule AppWeb.PageLive do
     req = Req.new(url: url)
 
     # Add tracking properties to req object
-    req = req
-    |> Req.Request.register_options([:track_redirected])
-    |> Req.Request.prepend_response_steps(track_redirected: &track_redirected_uri/1)
+    req =
+      req
+      |> Req.Request.register_options([:track_redirected])
+      |> Req.Request.prepend_response_steps(track_redirected: &track_redirected_uri/1)
 
     # Make request
     {:ok, response} = Req.request(req)

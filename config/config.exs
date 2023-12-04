@@ -9,8 +9,10 @@ import Config
 
 # Tells `NX` to use `EXLA` as backend
 # config :nx, default_backend: EXLA.Backend                  # default
-config :nx, :default_backend, {EXLA.Backend, client: :host}  # needed to run on `Fly.io`
+# needed to run on `Fly.io`
+config :nx, :default_backend, {EXLA.Backend, client: :host}
 
+config :app, ecto_repos: [App.Repo]
 # Configures the endpoint
 config :app, AppWeb.Endpoint,
   url: [host: "localhost"],

@@ -2,6 +2,14 @@ import Config
 
 # For development, we disable any cache and enable
 # debugging and code reloading.
+
+config :app, App.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "classify_dev",
+  stacktrace: true
+
 #
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we use it
@@ -46,7 +54,7 @@ config :app, AppWeb.Endpoint,
 config :app, AppWeb.Endpoint,
   live_reload: [
     patterns: [
-      ~r"priv/static/.*(js|css|png|jpeg|jpg|gif|svg)$",
+      ~r"priv/static/(^images|^uploads)/*.*(js|css|png|jpeg|jpg|gif|svg)$",
       ~r"lib/app_web/(controllers|live|components)/.*(ex|heex)$"
     ]
   ]
