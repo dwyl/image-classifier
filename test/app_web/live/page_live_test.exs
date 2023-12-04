@@ -87,7 +87,7 @@ defmodule AppWeb.PageLiveTest do
     AppWeb.SupervisorSupport.wait_for_completion()
 
     # Should show error
-    assert render(lv) =~ "Image too large. Upload a smaller image up to 10MB."
+    assert render(lv) =~ "Image too large. Upload a smaller image up to 5MB."
   end
 
   test "noop event handler", %{conn: _conn} do
