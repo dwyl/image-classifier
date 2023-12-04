@@ -52,7 +52,12 @@ defmodule App.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.6.1"},
+
+      # HTTP Request
+      {:httpoison, "~> 2.2"},
       {:req, "0.4.5"},
+      {:mime, "~> 2.0.5"},
+      {:ex_image_info, "~> 0.2.4"},
 
       # DB
       {:phoenix_ecto, "~> 4.4"},
