@@ -1651,21 +1651,30 @@ Add the following function to the file.
   @image_width 640
 
   def handle_event("show_examples", _data, socket) do
-    # Retrieves a random image from Unsplash with a given `image_width` dimension
-    random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
 
-    # Spawns prediction tasks for example image from random Unsplash image
-    tasks = for _ <- 1..2 do
-      {:req, body} = {:req, Req.get!(random_image).body}
-      predict_example_image(body)
+    # Only run if the user hasn't uploaded anything
+    if(is_nil(socket.assigns.task_ref)) do
+      # Retrieves a random image from Unsplash with a given `image_width` dimension
+      random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
+
+      # Spawns prediction tasks for example image from random Unsplash image
+      tasks = for _ <- 1..2 do
+        {:req, body} = {:req, Req.get!(random_image).body}
+        predict_example_image(body)
+      end
+
+
+      # List to change `example_list` socket assign to show skeleton loading
+      display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
+
+      # Updates the socket assigns
+      {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
+
+    else
+      {:noreply, socket}
     end
-
-    # List to change `example_list` socket assign to show skeleton loading
-    display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
-
-    # Updates the socket assigns
-    {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
   end
+
 ```
 
 > [!WARNING]

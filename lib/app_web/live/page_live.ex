@@ -1,6 +1,6 @@
 defmodule AppWeb.PageLive do
   use AppWeb, :live_view
-  alias App.Image, as: ImageRepo
+  alias App.Image
   alias Vix.Vips.Image, as: Vimage
 
   @doc """
@@ -48,20 +48,27 @@ defmodule AppWeb.PageLive do
   Should be invoked after some seconds when LiveView is mounted.
   """
   def handle_event("show_examples", _data, socket) do
-    # Retrieves a random image from Unsplash with a given `image_width` dimension
-    random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
 
-    # Spawns prediction tasks for example image from random Unsplash image
-    tasks = for _ <- 1..2 do
-      %{url: url, body: body} = track_redirected(random_image)
-      predict_example_image(body, url)
+    # Only run if the user hasn't uploaded anything
+    if(is_nil(socket.assigns.task_ref)) do
+      # Retrieves a random image from Unsplash with a given `image_width` dimension
+      random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
+
+      # Spawns prediction tasks for example image from random Unsplash image
+      tasks = for _ <- 1..2 do
+        %{url: url, body: body} = track_redirected(random_image)
+        predict_example_image(body, url)
+      end
+
+      # List to change `example_list` socket assign to show skeleton loading
+      display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
+
+      # Updates the socket assigns
+      {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
+
+    else
+      {:noreply, socket}
     end
-
-    # List to change `example_list` socket assign to show skeleton loading
-    display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
-
-    # Updates the socket assigns
-    {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
   end
 
   @doc """
@@ -76,6 +83,8 @@ defmodule AppWeb.PageLive do
       %{tensor: tensor, file_binary: file_binary} =
         consume_uploaded_entry(socket, entry, fn %{} = meta ->
           file_binary = File.read!(meta.path)
+
+          dbg(meta)
 
           # Get image and resize
           {:ok, thumbnail_vimage} =
