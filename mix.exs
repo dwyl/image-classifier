@@ -55,7 +55,9 @@ defmodule App.MixProject do
       {:req, "0.4.5"},
 
       # DB
-      {:ecto_sqlite3, "~> 0.12.0"},
+      {:phoenix_ecto, "~> 4.4"},
+      {:ecto_sql, "~> 3.10"},
+      {:postgrex, ">= 0.0.0"},
 
       # Bumblebee imports
       {:bumblebee, "~> 0.4.2"},

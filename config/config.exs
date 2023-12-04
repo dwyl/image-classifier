@@ -7,6 +7,11 @@
 # General application configuration
 import Config
 
+# DB configuration
+config :app,
+  ecto_repos: [App.Repo],
+  generators: [timestamp_type: :utc_datetime]
+
 # Tells `NX` to use `EXLA` as backend
 # config :nx, default_backend: EXLA.Backend                  # default
 config :nx, :default_backend, {EXLA.Backend, client: :host}  # needed to run on `Fly.io`
@@ -54,15 +59,6 @@ config :phoenix, :json_library, Jason
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
-
-# SQLite3 configuration
-config :app, App.Repo,
-  database: Path.expand("../app_dev.db", Path.dirname(__ENV__.file)),
-  pool_size: 5,
-  show_sensitive_data_on_connection_error: true
-
-config :app, ecto_repos: [App.Repo]
-
 
 # When deploying to `fly.io`, you can delete this or leave it in.
 # It only makes sense to set it to `true` if you're changing models

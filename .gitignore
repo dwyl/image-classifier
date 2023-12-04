@@ -38,7 +38,3 @@ npm-debug.log
 # Bumblebee model directory
 .bumblebee/*
 .elixir_ls
-
-# SQLite3
-*.db
-*.db-*

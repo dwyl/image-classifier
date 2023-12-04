@@ -1,4 +1,4 @@
-defmodule App.Repo.Migrations.CreateImagesTable do
+defmodule App.Repo.Migrations.CreateImages do
   use Ecto.Migration
 
   def change do
@@ -8,7 +8,7 @@ defmodule App.Repo.Migrations.CreateImagesTable do
       add :width, :integer
       add :height, :integer
 
-      timestamps()
+      timestamps(type: :utc_datetime)
     end
   end
 end
