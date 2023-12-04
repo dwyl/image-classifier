@@ -63,12 +63,13 @@
               <div class="text-center">
                 <!-- Show image preview -->
                 <%!-- <%= if @image_preview_base64 do %> --%>
-                <%= if @image.filename do %>
+                <%= if @image.location do %>
                   <form id="upload-form" phx-change="noop" phx-submit="noop">
                     <label class="cursor-pointer">
                       <.live_file_input upload={@uploads.image_list} class="hidden" />
                       <%!-- <img src={@image_preview_base64} /> --%>
-                      <img src={~p"/uploads/#{@image.filename}"} />
+                      <%!-- <img src={~p"/uploads/#{@image.filename}"} /> --%>
+                      <img src={@image.location} />
                     </label>
                   </form>
                 <% else %>

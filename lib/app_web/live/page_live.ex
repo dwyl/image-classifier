@@ -19,7 +19,7 @@ defmodule AppWeb.PageLive do
      socket
      |> assign(
        # Related to the file uploaded by the user
-       image: %{label: nil, filename: nil},
+       image: %{label: nil, filename: nil, location: nil},
        #  label: nil,
        running?: false,
        task_ref: nil,
@@ -76,7 +76,8 @@ defmodule AppWeb.PageLive do
   It updates the socket assigns
   """
   def handle_progress(:image_list, entry, socket) when entry.done? do
-    File.ls!(@upload_dir) |> Enum.map(&File.rm!(Path.join([@upload_dir, &1])))
+    # clean the previous uploaded file here in case we want to serve image from static assets.
+    # File.ls!(@upload_dir) |> Enum.map(&File.rm!(Path.join([@upload_dir, &1])))
 
     # Consume the entry and get the tensor to feed to classifier
     %{tensor: tensor, upload_task: upload_task, filename: filename} =
@@ -113,17 +114,17 @@ defmodule AppWeb.PageLive do
 
     # Encode the image to base64
     # base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
-    image = %{filename: filename, label: nil}
 
     # Update socket assigns to show spinner whilst task is running
     {:noreply,
-     assign(socket,
+     socket
+     |> assign(
        running?: true,
        i2t_ref: i2t_task.ref,
        #  image_preview_base64: base64,
-       upload_ref: upload_task.ref,
-       image: image
-     )}
+       upload_ref: upload_task.ref
+     )
+     |> update(:image, fn img -> Map.merge(img, %{filename: filename}) end)}
   end
 
   def handle_progress(_, _, socket), do: {:noreply, socket}
@@ -147,6 +148,8 @@ defmodule AppWeb.PageLive do
   def handle_info({ref, {:ok, msg}}, %{assigns: assigns} = socket)
       when assigns.upload_ref == ref do
     %{body: %{location: location}} = msg
+    # clean the file from the server since we provide a remote path
+    File.rm!(Path.join([@upload_dir, assigns.image.filename]))
 
     Process.demonitor(ref, [:flush])
     {:noreply, update(socket, :image, fn img -> Map.merge(img, %{location: location}) end)}
