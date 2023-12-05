@@ -51,6 +51,8 @@ within `Phoenix`!
   - [9.2 Adding `Postgres` configuration files](#92-adding-postgres-configuration-files)
   - [9.3 Creating `Image` schema](#93-creating-image-schema)
   - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
+  - [9.5 Showing feedback to the person in case of failure](#95-showing-feedback-to-the-person-in-case-of-failure)
+    - [9.5.1 Showing a toast component with error](#951-showing-a-toast-component-with-error)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -2683,6 +2685,220 @@ and the result of the classifying model
 (`:description`).
 
 🥳
+
+> [!NOTE]
+>
+> If you're curious and want to see the data in your database,
+> we recommend using [`DBeaver`](https://dbeaver.io/),
+> an open-source database manager.
+>
+> You can learn more about it in https://github.com/dwyl/learn-postgresql.
+
+
+## 9.5 Showing feedback to the person in case of failure
+
+Currently, we are not handling any errors 
+in case the upload of the image to `imgup` fails.
+Although this is not critical,
+it'd be better if we could show feedback to the person 
+in case the upload to `imgup` fails.
+This is good for us as well, 
+because we *can monitor and locate the error faster*
+if we log the errors.
+
+For this, let's head over to `lib/app/image.ex`
+and update the `upload_image_to_s3/2` function we've implemented.
+
+```elixir
+  def upload_image_to_s3(file_path, mimetype) do
+    extension = MIME.extensions(mimetype) |> Enum.at(0)
+
+    # Upload to Imgup - https://github.com/dwyl/imgup
+    upload_response =
+      HTTPoison.post(
+        "https://imgup.fly.dev/api/images",
+        {:multipart,
+         [
+           {
+             :file,
+             file_path,
+             {"form-data", [name: "image", filename: "#{Path.basename(file_path)}.#{extension}"]},
+             [{"Content-Type", mimetype}]
+           }
+         ]},
+        []
+      )
+
+    # Process the response and return error if there was a problem uploading the image
+    case upload_response do
+      # In case it's successful
+      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
+        %{"url" => url, "compressed_url" => _} = Jason.decode!(body)
+        {:ok, url}
+
+      # In case it returns HTTP 400 with specific reason it failed
+      {:ok, %HTTPoison.Response{status_code: 400, body: body}} ->
+        %{"errors" => %{"detail" => reason}} = Jason.decode!(body)
+        {:error, reason}
+
+      # In case the request fails for whatever other reason
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        {:error, reason}
+    end
+  end
+```
+
+As you can see,
+we are returning `{:error, reason}` if an error occurs,
+and providing feedback alongside it.
+If it's successful, we return `{:ok, url}`.
+
+Because we've just changed this function,
+we need to also update `def handle_progress(:image_list...`
+inside `lib/app_web/live/page_live.ex`
+to properly handle this new function output.
+
+```elixir
+  def handle_progress(:image_list, entry, socket) do
+    # We consume the entry only if the entry is done uploading from the image
+    # and if consuming the entry was successful.
+    with true <- entry.done?,
+         %{tensor: tensor, image_info: image_info} <-
+           consume_uploaded_entry(socket, entry, fn %{} = meta ->
+             file_binary = File.read!(meta.path)
+             {mimetype, width, height, _variant} = ExImageInfo.info(file_binary)
+
+             {:ok, thumbnail_vimage} =
+               Vix.Vips.Operation.thumbnail(meta.path, @image_width, size: :VIPS_SIZE_DOWN)
+
+             {:ok, tensor} = pre_process_image(thumbnail_vimage)
+
+             # Upload image to S3
+             case Image.upload_image_to_s3(meta.path, mimetype) do
+               {:ok, url} ->
+                 image_info = %ImageInfo{
+                   mimetype: mimetype,
+                   width: width,
+                   height: height,
+                   file_binary: file_binary,
+                   url: url
+                 }
+
+                 {:ok, %{tensor: tensor, image_info: image_info}}
+
+               # If S3 upload fails, we return error
+               {:error, reason} ->
+                 {:ok, %{error: reason}}
+             end
+           end) do
+
+      # If consuming the entry was successful, we spawn a task to classify the image
+      # and update the socket assigns
+      task =
+        Task.Supervisor.async(App.TaskSupervisor, fn ->
+          Nx.Serving.batched_run(ImageClassifier, tensor)
+        end)
+
+      # Encode the image to base64
+      base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
+
+      {:noreply,
+       assign(socket,
+         running?: true,
+         task_ref: task.ref,
+         image_preview_base64: base64,
+         image_info: image_info
+       )}
+
+      # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
+    else
+      %{error: reason} ->
+        Logger.info("Error uploading image. #{inspect(reason)}")
+        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+```
+
+Phew! That's a lot!
+Let's go through the changes we've made.
+
+- we are using the [`with` statement](https://www.openmymind.net/Elixirs-With-Statement/)
+to only feed the image to the model for classification
+in case the upload to `imgup` succeeds. 
+We've changed what `consume_uploaded_entry/3` returns
+in case the upload fails - we return `{:ok, %{error: reason}}`.
+- in case the upload fails, 
+we pattern match the `{:ok, %{error: reason}}` object 
+and push a `"toast"` event to the Javascript client 
+(we'll implement these changes shortly).
+
+Because we push an event in case the upload fails,
+we are going to make some changes to the Javascript client.
+We are going to **show a toast with the error when the upload fails**.
+
+
+### 9.5.1 Showing a toast component with error
+
+To show a [toast component](https://getbootstrap.com/docs/4.3/components/toasts/),
+we are going to use 
+[`toastify.js`](https://apvarun.github.io/toastify-js/).
+
+Navigate to `assets` folder
+and run:
+
+```sh
+  npm install toastify-js
+```
+
+With this installed, we need to import `toastify` styles
+in `assets/css/app.css`.
+
+```css
+@import "../node_modules/toastify-js/src/toastify.css";
+```
+
+All that's left is **handle the `"toast"` event in `assets/js/app.js`**.
+Add the following snippet of code to do so.
+
+```js
+// Hook to show message toast
+Hooks.MessageToaster = {
+  mounted() {
+    this.handleEvent('toast', (payload) => {
+      Toastify({
+        text: payload.message,
+        gravity: "bottom",
+        position: "right",
+        style: {
+          background: "linear-gradient(to right, #f27474, #ed87b5)",
+        },
+        duration: 4000
+        }).showToast();        
+    })
+  }
+}
+```
+
+With the `payload.message` we're receiving from the LiveView 
+(remember when we executed `push_event/3` in our LiveView?),
+we are using it to create a `Toastify` object
+that is shown in case the upload fails.
+
+And that's it!
+Quite easy, isn't it? 😉
+
+If `imgup` is down or the image that was sent was,
+for example, invalid,
+an error should be shown, 
+like so.
+
+<p align="center">
+  <img width="800" src="https://github.com/dwyl/image-classifier/assets/17494745/d730d10c-b45e-4dce-a37a-bb389c3cd548" />
+</p>
+
 
 # _Please_ Star the repo! ⭐️
 
