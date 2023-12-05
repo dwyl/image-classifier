@@ -1,8 +1,8 @@
 defmodule AppWeb.PageLive do
   use AppWeb, :live_view
+  require Logger
   alias App.Image
   alias Vix.Vips.Image, as: Vimage
-
 
   defmodule ImageInfo do
     @doc """
@@ -58,24 +58,23 @@ defmodule AppWeb.PageLive do
   Should be invoked after some seconds when LiveView is mounted.
   """
   def handle_event("show_examples", _data, socket) do
-
     # Only run if the user hasn't uploaded anything
     if(is_nil(socket.assigns.task_ref)) do
       # Retrieves a random image from Unsplash with a given `image_width` dimension
       random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
 
       # Spawns prediction tasks for example image from random Unsplash image
-      tasks = for _ <- 1..2 do
-        %{url: url, body: body} = track_redirected(random_image)
-        predict_example_image(body, url)
-      end
+      tasks =
+        for _ <- 1..2 do
+          %{url: url, body: body} = track_redirected(random_image)
+          predict_example_image(body, url)
+        end
 
       # List to change `example_list` socket assign to show skeleton loading
       display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
 
       # Updates the socket assigns
       {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
-
     else
       {:noreply, socket}
     end
@@ -88,31 +87,42 @@ defmodule AppWeb.PageLive do
   It updates the socket assigns
   """
   def handle_progress(:image_list, entry, socket) do
-    if entry.done? do
-      # Consume the entry and get the tensor to feed to classifier
-      %{tensor: tensor, image_info: image_info} =
-        consume_uploaded_entry(socket, entry, fn %{} = meta ->
-          file_binary = File.read!(meta.path)
+    # We consume the entry only if the entry is done uploading from the image
+    # and if consuming the entry was successful.
+    with true <- entry.done?,
+         %{tensor: tensor, image_info: image_info} <-
+           consume_uploaded_entry(socket, entry, fn %{} = meta ->
+             file_binary = File.read!(meta.path)
+             {mimetype, width, height, _variant} = ExImageInfo.info(file_binary)
 
-          {mimetype, width, height, _variant} = ExImageInfo.info(file_binary)
+             # Get image and resize
+             {:ok, thumbnail_vimage} =
+               Vix.Vips.Operation.thumbnail(meta.path, @image_width, size: :VIPS_SIZE_DOWN)
 
-          # Get image and resize
-          {:ok, thumbnail_vimage} =
-            Vix.Vips.Operation.thumbnail(meta.path, @image_width, size: :VIPS_SIZE_DOWN)
+             # Pre-process it
+             {:ok, tensor} = pre_process_image(thumbnail_vimage)
 
-          # Pre-process it
-          {:ok, tensor} = pre_process_image(thumbnail_vimage)
+             # Upload image to S3
+             case Image.upload_image_to_s3(meta.path, mimetype) do
+               {:ok, url} ->
+                 image_info = %ImageInfo{
+                   mimetype: mimetype,
+                   width: width,
+                   height: height,
+                   file_binary: file_binary,
+                   url: url
+                 }
 
-          # Upload image to S3
-          url = Image.upload_image_to_s3(meta.path, mimetype) |> Map.get("url")
+                 {:ok, %{tensor: tensor, image_info: image_info}}
 
-          image_info = %ImageInfo{mimetype: mimetype, width: width, height: height, file_binary: file_binary, url: url}
+               # If S3 upload fails, we return error
+               {:error, reason} ->
+                 {:ok, %{error: reason}}
+             end
+           end) do
 
-          # Return it
-          {:ok, %{tensor: tensor, image_info: image_info}}
-        end)
-
-      # Create an async task to classify the image
+      # If consuming the entry was successful, we spawn a task to classify the image
+      # and update the socket assigns
       task =
         Task.Supervisor.async(App.TaskSupervisor, fn ->
           Nx.Serving.batched_run(ImageClassifier, tensor)
@@ -121,10 +131,22 @@ defmodule AppWeb.PageLive do
       # Encode the image to base64
       base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
 
-      # Update socket assigns to show spinner whilst task is running
-      {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64, image_info: image_info)}
+      {:noreply,
+       assign(socket,
+         running?: true,
+         task_ref: task.ref,
+         image_preview_base64: base64,
+         image_info: image_info
+       )}
+
+      # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
     else
-      {:noreply, socket}
+      %{error: reason} ->
+        Logger.info("Error uploading image. #{inspect(reason)}")
+        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
+
+      _ ->
+        {:noreply, socket}
     end
   end
 
@@ -149,14 +171,12 @@ defmodule AppWeb.PageLive do
         # coveralls-ignore-start
         false ->
           App.Models.extract_prod_label(result)
-        # coveralls-ignore-stop
+          # coveralls-ignore-stop
       end
 
     cond do
-
       # If the upload task has finished executing, we update the socket assigns.
       Map.get(assigns, :task_ref) == ref ->
-
         # Insert image to database
         image = %{
           url: assigns.image_info.url,
@@ -164,6 +184,7 @@ defmodule AppWeb.PageLive do
           height: assigns.image_info.height,
           description: label
         }
+
         Image.insert(image)
 
         # Update socket assigns
@@ -171,19 +192,19 @@ defmodule AppWeb.PageLive do
 
       # If the example task has finished executing, we upload the socket assigns.
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
-
         # Update the element in the `example_list` enum to turn "predicting?" to `false`
-        updated_example_list = Map.get(assigns, :example_list)
-        |> Enum.map(fn obj ->
-          if obj.ref == img.ref do
-            obj
-            |> Map.put(:url, img.url)
-            |> Map.put(:label, label)
-            |> Map.put(:predicting?, false)
-
-          else
-            obj
-          end end)
+        updated_example_list =
+          Map.get(assigns, :example_list)
+          |> Enum.map(fn obj ->
+            if obj.ref == img.ref do
+              obj
+              |> Map.put(:url, img.url)
+              |> Map.put(:label, label)
+              |> Map.put(:predicting?, false)
+            else
+              obj
+            end
+          end)
 
         {:noreply,
          assign(socket,
@@ -207,13 +228,11 @@ defmodule AppWeb.PageLive do
     with {:vix, {:ok, img_thumb}} <-
            {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
          {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
-
       # Create an async task to classify the image from unsplash
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)
       |> Map.merge(%{url: url})
-
     else
       {stage, error} -> {stage, error}
     end
@@ -254,9 +273,10 @@ defmodule AppWeb.PageLive do
     req = Req.new(url: url)
 
     # Add tracking properties to req object
-    req = req
-    |> Req.Request.register_options([:track_redirected])
-    |> Req.Request.prepend_response_steps(track_redirected: &track_redirected_uri/1)
+    req =
+      req
+      |> Req.Request.register_options([:track_redirected])
+      |> Req.Request.prepend_response_steps(track_redirected: &track_redirected_uri/1)
 
     # Make request
     {:ok, response} = Req.request(req)

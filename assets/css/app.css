@@ -2,6 +2,8 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+@import "../node_modules/toastify-js/src/toastify.css";
+
 /* This file is for your main application CSS */
 /* override browser default */
 html,

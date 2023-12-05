@@ -30,13 +30,15 @@ defmodule App.Image do
 
   @doc """
   Uploads the given image to S3.
+  Returns {:ok, response} if the upload is successful.
+  Returns {:error, reason} if the upload fails.
   """
   def upload_image_to_s3(file_path, mimetype) do
     extension = MIME.extensions(mimetype) |> Enum.at(0)
 
     # Upload to Imgup - https://github.com/dwyl/imgup
     upload_response =
-      HTTPoison.post!(
+      HTTPoison.post(
         "https://imgup.fly.dev/api/images",
         {:multipart,
          [
@@ -50,7 +52,21 @@ defmodule App.Image do
         []
       )
 
-    # Return URL
-    Jason.decode!(upload_response.body)
+    # Process the response and return error if there was a problem uploading the image
+    case upload_response do
+      # In case it's successful
+      {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
+        %{"url" => url, "compressed_url" => _} = Jason.decode!(body)
+        {:ok, url}
+
+      # In case it returns HTTP 400 with specific reason it failed
+      {:ok, %HTTPoison.Response{status_code: 400, body: body}} ->
+        %{"errors" => %{"detail" => reason}} = Jason.decode!(body)
+        {:error, reason}
+
+      # In case the request fails for whatever other reason
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        {:error, reason}
+    end
   end
 end
