@@ -46,6 +46,11 @@ within `Phoenix`!
   - [8.3 Updating the view](#83-updating-the-view)
   - [8.4 Using URL of image instead of base64-encoded](#84-using-url-of-image-instead-of-base64-encoded)
   - [8.5 See it running](#85-see-it-running)
+- [9. Store metadata and classification info](#9-store-metadata-and-classification-info)
+  - [9.1 Installing dependencies](#91-installing-dependencies)
+  - [9.2 Adding `Postgres` configuration files](#92-adding-postgres-configuration-files)
+  - [9.3 Creating `Image` schema](#93-creating-image-schema)
+  - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -2243,6 +2248,441 @@ Isn't that cool? 😎
   <img width=800 src="https://github.com/dwyl/image-classifier/assets/17494745/1f8d08d1-f6ca-46aa-8c89-4bab45ad1e54">
 </p>
 
+
+# 9. Store metadata and classification info
+
+Our app is shaping up quite nicely!
+As it stands, it's an application that does inference on images.
+However, it doesn't save them.
+
+Let's expand our application so it has a **database**
+where image classification is saved/persisted!
+
+We'll use **`Postgres`** for this.
+Typically, when you create a new `Phoenix` project
+with `mix phx.new`, 
+[a `Postgres` database will be automatically created](https://hexdocs.pm/phoenix/installation.html#postgresql).
+Because we didn't do this,
+we'll have to configure this ourselves.
+
+Let's do it!
+
+
+## 9.1 Installing dependencies
+
+We'll install all the needed dependencies first.
+In `mix.exs`, add the following snippet
+to the `deps` section.
+
+```elixir
+      # HTTP Request
+      {:httpoison, "~> 2.2"},
+      {:mime, "~> 2.0.5"},
+      {:ex_image_info, "~> 0.2.4"},
+
+      # DB
+      {:phoenix_ecto, "~> 4.4"},
+      {:ecto_sql, "~> 3.10"},
+      {:postgrex, ">= 0.0.0"},
+```
+
+- [**`httpoison`**](https://github.com/edgurgel/httpoison), 
+[**`mime`**](https://hex.pm/packages/mime) and 
+[**`ex_image_info`**](https://hex.pm/packages/ex_image_info)
+are used to make HTTP requests, 
+get the content type and information from an image file,
+respectively. 
+These will be needed to upload a given image to 
+[`imgup`](https://github.com/dwyl/imgup),
+by making multipart requests.
+
+- [**`phoenix_ecto`**](https://github.com/phoenixframework/phoenix_ecto), 
+[**`ecto_sql`**](https://github.com/elixir-ecto/ecto_sql) and 
+[**`postgrex`**](https://github.com/elixir-ecto/postgrex)
+are needed to properly configure our driver in Elixir
+that will connect to a Postgres database,
+in which we will persist data.
+
+Run `mix deps.get` to install these dependencies.
+
+
+## 9.2 Adding `Postgres` configuration files
+
+Now let's create the needed files
+to properly connect to a Postgres relational database.
+Start by going to `lib/app` 
+and create `repo.ex`.
+
+```elixir
+defmodule App.Repo do
+  use Ecto.Repo,
+    otp_app: :app,
+    adapter: Ecto.Adapters.Postgres
+end
+```
+
+This module will be needed in our configuration files
+so our app knows where the database is.
+
+Next, in `lib/app/application.ex`,
+add the following line to the `children` array
+in the supervision tree.
+
+```elixir
+    children = [
+      AppWeb.Telemetry,
+      App.Repo, # add this line
+      {Phoenix.PubSub, name: App.PubSub},
+      ...
+    ]
+```
+
+Awesome! 🎉
+
+Now let's head over to the files inside the `config` folder.
+
+In `config/config.exs`, 
+add these lines.
+
+```elixir
+config :app,
+  ecto_repos: [App.Repo],
+  generators: [timestamp_type: :utc_datetime]
+```
+
+We are referring the module we've previously created (`App.Repo`)
+to `ecto_repos` so `ecto` knows where the configuration
+for the database is located.
+
+In `config/dev.exs`,
+add:
+
+```elixir
+config :app, App.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "app_dev",
+  stacktrace: true,
+  show_sensitive_data_on_connection_error: true,
+  pool_size: 10
+```
+
+We are defining the parameters of the database
+that is used during development.
+
+In `config/runtime.exs`, 
+add:
+
+```elixir
+if config_env() == :prod do
+  database_url =
+    System.get_env("DATABASE_URL") ||
+      raise """
+      environment variable DATABASE_URL is missing.
+      For example: ecto://USER:PASS@HOST/DATABASE
+      """
+
+  maybe_ipv6 = if System.get_env("ECTO_IPV6") in ~w(true 1), do: [:inet6], else: []
+
+  config :app, App.Repo,
+    # ssl: true,
+    url: database_url,
+    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10"),
+    socket_options: maybe_ipv6
+
+   # ...
+```
+
+We are configuring the runtime database configuration..
+
+In `config/test.exs`,
+add:
+
+```elixir
+config :app, App.Repo,
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost",
+  database: "app_test#{System.get_env("MIX_TEST_PARTITION")}",
+  pool: Ecto.Adapters.SQL.Sandbox,
+  pool_size: 10
+```
+
+Here we're defining the database used during testing.
+
+Now let's create a **migration file** to create our database table.
+In `priv/repo/migrations/`, create a file
+called `20231204092441_create_images.exs` 
+(or any other timestamp string)
+with the following piece of code.
+
+```elixir
+defmodule App.Repo.Migrations.CreateImages do
+  use Ecto.Migration
+
+  def change do
+    create table(:images) do
+      add :url, :string
+      add :description, :string
+      add :width, :integer
+      add :height, :integer
+
+      timestamps(type: :utc_datetime)
+    end
+  end
+end
+```
+
+And that's it!
+Those are the needed files that our application needs
+to properly connect and persist data into the Postgres database.
+
+You can now run `mix ecto.create` and `mix ecto.migrate`
+to create the database
+and the `"images"` table.
+
+
+## 9.3 Creating `Image` schema
+
+For now, let's create a simple table `"images"` 
+in our database
+that has the following properties:
+
+- **`description`**: the description of the image
+from the model.
+- **`width`**: width of the image.
+- **`height`**: height of the image.
+- **`url`**: public URL where the image is publicly hosted.
+
+With this in mind, let's create a new file!
+In `lib/app/`, create a file called `image.ex`.
+
+```elixir
+defmodule App.Image do
+  use Ecto.Schema
+  alias App.{Image, Repo}
+
+  @primary_key {:id, :id, autogenerate: true}
+  schema "images" do
+    field(:description, :string)
+    field(:width, :integer)
+    field(:url, :string)
+    field(:height, :integer)
+
+    timestamps(type: :utc_datetime)
+  end
+
+  def changeset(image, params \\ %{}) do
+    image
+    |> Ecto.Changeset.cast(params, [:url, :description, :width, :height])
+    |> Ecto.Changeset.validate_required([:url, :description, :width, :height])
+  end
+
+  @doc """
+  Uploads the given image to S3
+  and adds the image information to the database.
+  """
+  def insert(image) do
+    %Image{}
+    |> changeset(image)
+    |> Repo.insert!()
+  end
+end
+```
+
+We've just created the `App.Image` schema
+with the aforementioned fields.
+
+We've created `changeset/1`, which is used to cast
+and validate the properties of a given object
+before interacting with the database.
+
+`insert/1` receives an object,
+runs it through the changeset
+and inserts it in the database.
+
+
+## 9.4 Changing our LiveView to persist data
+
+Now that we have our database set up,
+let's change some of our code so we persist data into it!
+In this section, we'll be working in the `lib/app_web/live/page_live.ex` file.
+
+First, let's import `App.Image`
+and create an `ImageInfo` struct to hold the information
+of the image throughout the process of uploading 
+and classifying the image.
+
+```elixir
+defmodule AppWeb.PageLive do
+  use AppWeb, :live_view
+  alias App.Image        # add this import
+  alias Vix.Vips.Image, as: Vimage
+
+
+  defmodule ImageInfo do
+    @doc """
+    General information for the image that is being analysed.
+    This information is useful when persisting the image to the database.
+    """
+    defstruct [:mimetype, :width, :height, :url, :file_binary]
+  end
+
+  # ...
+```
+
+We are going to be using `ImageInfo` 
+in our socket assigns.
+Let's add to it when the LiveView is mounting!
+
+```elixir
+     |> assign(
+       label: nil,
+       running?: false,
+       task_ref: nil,
+       image_info: nil, # add this line
+       image_preview_base64: nil,
+       example_list_tasks: [],
+       example_list: [],
+       display_list?: false
+     )
+```
+
+When the person uploads an image,
+we want to retrieve its info (namely its *height*, *width*)
+and upload the image to an `S3` bucket (we're doing this through `imgup`)
+so we can populate the `:url` field of the schema in the database.
+
+We can retrieve this information *while consuming the entry*
+/uploading the image file.
+For this, go to `handle_progress(:image_list, entry, socket)`
+and change the function to the following.
+
+```elixir
+  def handle_progress(:image_list, entry, socket) do
+    if entry.done? do
+      # We've changed the object that is returned from `consume_uploaded_entry/3` to return an `image_info` object.
+      %{tensor: tensor, image_info: image_info} =
+        consume_uploaded_entry(socket, entry, fn %{} = meta ->
+          file_binary = File.read!(meta.path)
+
+          # Add this line. It uses `ExImageInfo` to retrieve the info from the file binary.
+          {mimetype, width, height, _variant} = ExImageInfo.info(file_binary)
+
+          {:ok, thumbnail_vimage} =
+            Vix.Vips.Operation.thumbnail(meta.path, @image_width, size: :VIPS_SIZE_DOWN)
+
+          {:ok, tensor} = pre_process_image(thumbnail_vimage)
+
+          # Add this line. Uploads the image to the S3, which returns the `url` and `compressed url`.
+          # (we'll implement this function next)
+          url = Image.upload_image_to_s3(meta.path, mimetype) |> Map.get("url")
+
+          # Add this line. We are constructing the image_info object to be returned.
+          image_info = %ImageInfo{mimetype: mimetype, width: width, height: height, file_binary: file_binary, url: url}
+
+          # Return it
+          {:ok, %{tensor: tensor, image_info: image_info}}
+        end)
+
+      task =
+        Task.Supervisor.async(App.TaskSupervisor, fn ->
+          Nx.Serving.batched_run(ImageClassifier, tensor)
+        end)
+
+      base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
+
+      # Change this line so `image_info` is defined when the image is uploaded
+      {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64, image_info: image_info)}
+    else
+      {:noreply, socket}
+    end
+  end
+```
+
+Check the comment lines for more explanation on the changes that have bee nmade.
+We are using `ExImageInfo` to fetch the information from the image
+and assigning it to the `image_info` socket we've defined earlier.
+
+We are also using `Image.upload_image_to_s3/2` to upload our image to `imgup`.
+Let's define this function in `lib/app/image.ex`.
+
+```elixir
+  def upload_image_to_s3(file_path, mimetype) do
+    extension = MIME.extensions(mimetype) |> Enum.at(0)
+
+    # Upload to Imgup - https://github.com/dwyl/imgup
+    upload_response =
+      HTTPoison.post!(
+        "https://imgup.fly.dev/api/images",
+        {:multipart,
+         [
+           {
+             :file,
+             file_path,
+             {"form-data", [name: "image", filename: "#{Path.basename(file_path)}.#{extension}"]},
+             [{"Content-Type", mimetype}]
+           }
+         ]},
+        []
+      )
+
+    # Return URL
+    Jason.decode!(upload_response.body)
+  end
+```
+
+We're using `HTTPoison` to make a multipart request to the `imgup` server,
+effectively uploading the image to the server.
+If the upload is successful, it returns the `url` of the uploaded image.
+
+Let's go back to `lib/app_web/live/page_live.ex`.
+Now that we have `image_info` in the socket assigns,
+we can use it to **insert a row in the `"images"` table in the database**.
+We only want to do this after the model is done running,
+so simply change `handle_info/2` function 
+(which is called after the model is done with classifying the image).
+
+```elixir
+    cond do
+
+      # If the upload task has finished executing, we update the socket assigns.
+      Map.get(assigns, :task_ref) == ref ->
+
+        # Insert image to database
+        image = %{
+          url: assigns.image_info.url,
+          width: assigns.image_info.width,
+          height: assigns.image_info.height,
+          description: label
+        }
+        Image.insert(image)
+
+        # Update socket assigns
+        {:noreply, assign(socket, label: label, running?: false)}
+
+
+    # ...
+```
+
+In the `cond do` statement,
+we want to change the one pertaining to the image that is uploaded,
+*not the example list* that is defined below.
+We simply create an `image` variable with information
+that is passed down to `Image.insert/1`, 
+effectively adding the row to the database.
+
+And that's it!
+
+Now every time a person uploads an image
+and the model is executed, 
+we are saving its location (`:url`), 
+information (`:width` and `:height`)
+and the result of the classifying model
+(`:description`).
+
+🥳
 
 # _Please_ Star the repo! ⭐️
 
