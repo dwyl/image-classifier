@@ -3,6 +3,15 @@ defmodule AppWeb.PageLive do
   alias App.Image
   alias Vix.Vips.Image, as: Vimage
 
+
+  defmodule ImageInfo do
+    @doc """
+    General information for the image that is being analysed.
+    This information is useful when persisting the image to the database.
+    """
+    defstruct [:mimetype, :width, :height, :url, :file_binary]
+  end
+
   @doc """
   Width of the image to be resized to.
   For better results, this should be the same value of the model's dataset.
@@ -19,6 +28,7 @@ defmodule AppWeb.PageLive do
        label: nil,
        running?: false,
        task_ref: nil,
+       image_info: nil,
        image_preview_base64: nil,
 
        # Related to the list of image examples
@@ -80,11 +90,11 @@ defmodule AppWeb.PageLive do
   def handle_progress(:image_list, entry, socket) do
     if entry.done? do
       # Consume the entry and get the tensor to feed to classifier
-      %{tensor: tensor, file_binary: file_binary} =
+      %{tensor: tensor, image_info: image_info} =
         consume_uploaded_entry(socket, entry, fn %{} = meta ->
           file_binary = File.read!(meta.path)
 
-          dbg(meta)
+          {mimetype, width, height, _variant} = ExImageInfo.info(file_binary)
 
           # Get image and resize
           {:ok, thumbnail_vimage} =
@@ -93,8 +103,13 @@ defmodule AppWeb.PageLive do
           # Pre-process it
           {:ok, tensor} = pre_process_image(thumbnail_vimage)
 
+          # Upload image to S3
+          url = Image.upload_image_to_s3(meta.path, mimetype) |> Map.get("url")
+
+          image_info = %ImageInfo{mimetype: mimetype, width: width, height: height, file_binary: file_binary, url: url}
+
           # Return it
-          {:ok, %{tensor: tensor, file_binary: file_binary}}
+          {:ok, %{tensor: tensor, image_info: image_info}}
         end)
 
       # Create an async task to classify the image
@@ -104,10 +119,10 @@ defmodule AppWeb.PageLive do
         end)
 
       # Encode the image to base64
-      base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
+      base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
 
       # Update socket assigns to show spinner whilst task is running
-      {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64)}
+      {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64, image_info: image_info)}
     else
       {:noreply, socket}
     end
@@ -141,6 +156,17 @@ defmodule AppWeb.PageLive do
 
       # If the upload task has finished executing, we update the socket assigns.
       Map.get(assigns, :task_ref) == ref ->
+
+        # Insert image to database
+        image = %{
+          url: assigns.image_info.url,
+          width: assigns.image_info.width,
+          height: assigns.image_info.height,
+          description: label
+        }
+        Image.insert(image)
+
+        # Update socket assigns
         {:noreply, assign(socket, label: label, running?: false)}
 
       # If the example task has finished executing, we upload the socket assigns.

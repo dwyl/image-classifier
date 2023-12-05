@@ -2,7 +2,7 @@ defmodule App.Image do
   use Ecto.Schema
   alias App.{Image, Repo}
 
-  @primary_key {:id, :id, autogenerate: true, source: :rowid}
+  @primary_key {:id, :id, autogenerate: true}
   schema "images" do
     field(:description, :string)
     field(:width, :integer)
@@ -18,33 +18,39 @@ defmodule App.Image do
     |> Ecto.Changeset.validate_required([:url, :description, :width, :height])
   end
 
-  def upload_image_to_s3(file_path, file_binary) do
-    # Get information of the file
-    {mimetype, _width, _height, _variant} = ExImageInfo.info(file_binary)
+  @doc """
+  Uploads the given image to S3
+  and adds the image information to the database.
+  """
+  def insert(image) do
+    %Image{}
+    |> changeset(image)
+    |> Repo.insert!()
+  end
+
+  @doc """
+  Uploads the given image to S3.
+  """
+  def upload_image_to_s3(file_path, mimetype) do
     extension = MIME.extensions(mimetype) |> Enum.at(0)
 
-    # Upload to Imgup
-    # https://github.com/dwyl/imgup
+    # Upload to Imgup - https://github.com/dwyl/imgup
     upload_response =
       HTTPoison.post!(
         "https://imgup.fly.dev/api/images",
         {:multipart,
          [
            {
-            :file, file_path,
-            {"form-data", [name: "image", filename: "#{Path.basename(file_path)}.#{extension}"]},
-            [{"Content-Type", mimetype}]
-          }
+             :file,
+             file_path,
+             {"form-data", [name: "image", filename: "#{Path.basename(file_path)}.#{extension}"]},
+             [{"Content-Type", mimetype}]
+           }
          ]},
         []
       )
 
+    # Return URL
     Jason.decode!(upload_response.body)
-  end
-
-  def insert(attrs) do
-    %Image{}
-    |> changeset(attrs)
-    |> Repo.insert!()
   end
 end
