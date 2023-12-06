@@ -11,6 +11,12 @@ Caption your images using
 machine learning models
 within `Phoenix`!
 
+
+<p align="center">
+  <img src="https://github.com/dwyl/image-classifier/assets/17494745/05d0b510-ef9a-4a51-8425-d27902b0f7ad">
+</p>
+
+
 </div>
 
 <br />
