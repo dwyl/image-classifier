@@ -73,7 +73,8 @@ defmodule App.MixProject do
       {:vix, "~> 0.25.0"},
 
       # Testing
-      {:excoveralls, "~> 0.15", only: [:test, :dev]}
+      {:excoveralls, "~> 0.15", only: [:test, :dev]},
+      {:mock, "~> 0.3.0", only: :test}
     ]
   end
 
