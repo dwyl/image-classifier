@@ -48,6 +48,8 @@ defmodule Benchmark do
     # Retrieve 50 images from COCO dataset
     #images = get_coco_images()
 
+    # Pre-process the images according to the best size
+
     # Run the images through the model and get the prediction for each one.
     # We measure the time to predict the image, get the prediction and save the prediction and execution time to file.
     #Enum.each(images, fn image ->
