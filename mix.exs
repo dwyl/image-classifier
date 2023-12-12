@@ -52,7 +52,7 @@ defmodule App.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.6.1"},
-      {:req, "0.4.5"},
+      {:req, "0.4.8"},
 
       # Bumblebee imports
       {:bumblebee, "~> 0.4.2"},
