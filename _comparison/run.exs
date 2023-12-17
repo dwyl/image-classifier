@@ -30,7 +30,7 @@ defmodule Benchmark do
 
   @image_width 640
 
-  # Models to be benchmarked -------
+  # Model to be benchmarked -------
   @models_folder_path Path.join(File.cwd!, "models")
 
   @model %ModelInfo{
@@ -49,23 +49,20 @@ defmodule Benchmark do
     # We first verify if the model exists and we download accordingly
     Comparison.Models.verify_and_download_model(@model)
 
-    #files = Path.wildcard(Path.join(File.cwd!, "cocodataset"))
-    #dbg(files)
-
     # Retrieve 50 images from COCO dataset
+    # and create a list of pre-processed VIPS images from them
+    coco_dataset_images_path = File.cwd! |> Path.join("coco_dataset") |> Path.join("*.jpg")
+    files = Path.wildcard(coco_dataset_images_path)
 
-    #{:ok, thumbnail_vimage} =
-    #  Vix.Vips.Operation.thumbnail(meta.path, @image_width, size: :VIPS_SIZE_DOWN)
-#
-    ## Pre-process it
-    #{:ok, tensor} = pre_process_image(thumbnail_vimage)
+    vips_images = Enum.map(files, fn path ->
+      {:ok, thumbnail_vimage} =
+        Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN)
+        {:ok, tensor} = pre_process_image(thumbnail_vimage)
+        tensor
+      end)
 
-    #images = get_coco_images()
-
-    # Pre-process the images according to the best size
 
     serving = Comparison.Models.serving(@model)
-
 
     # Run the images through the model and get the prediction for each one.
     # We measure the time to predict the image, get the prediction and save the prediction and execution time to file.
