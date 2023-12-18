@@ -76,11 +76,10 @@ defmodule Benchmark do
           Enum.filter(coco_dataset_captions, fn [id, caption] = x ->
             image_id == id
           end)
+          |> Enum.map(fn [_id, caption] -> caption end)
 
         %{id: image_id, captions: captions_of_image, tensor: tensor}
       end)
-
-    dbg(vips_images_with_captions)
 
     serving = Comparison.Models.serving(@model)
     # Nx.Serving.run(serving, tensor)
