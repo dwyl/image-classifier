@@ -20,45 +20,70 @@ defmodule ModelInfo do
   It holds the name of the model repository and the directory it will be saved into.
   It also has booleans to load each model parameter at will - this is because some models (like BLIP) require featurizer, tokenizations and generation configuration.
   """
-  defstruct [:name, :cache_path, :load_featurizer, :load_tokenizer, :load_generation_config]
+  defstruct [
+    :title,
+    :name,
+    :cache_path,
+    :load_featurizer,
+    :load_tokenizer,
+    :load_generation_config
+  ]
 end
 
 # Benchmark module that when executed, will create a file with the results of the benchmark.
 defmodule Benchmark do
   alias Vix.Vips.Image, as: Vimage
+  require Logger
   Code.require_file("manage_models.exs")
 
-  @image_width 640
-
-  # Model to be benchmarked -------
+  # Path to the models folder
   @models_folder_path Path.join(File.cwd!(), "models")
 
+  # CHANGE YOUR SETTINGS HERE -----------------------------------
+
+  # The width of the images the model was trained on.
+  @image_width 640
+
+  # Model information
   @model %ModelInfo{
+    # should not have "\" in the string, as this is used in the filename of the file when writing the results
+    title: "blip-image-captioning-base",
     name: "Salesforce/blip-image-captioning-base",
     cache_path: Path.join(@models_folder_path, "blip-image-captioning-base"),
     load_featurizer: true,
     load_tokenizer: true,
     load_generation_config: true
   }
+  # Function to extract the prediction from the model
   def extract_label(result) do
     %{results: [%{text: label}]} = result
     label
   end
 
+  # CHANGE YOUR SETTINGS HERE -----------------------------------
+
   # Run this to create a file to benchmark the models
+  @doc """
+  Main function that runs the benchmark.
+  It verifies if the models are cached. If not, they are downloaded.
+  It retrieves the images and the captions from the "coco_dataset" folder
+  and runs them through the model.
+  It creates a file with the results of the benchmark with the format "{model_name}_results.csv"
+  """
   def main() do
-    # We first verify if the model exists and we download accordingly
+    # We first verify if the model exists and we download accordingly ---------
     Comparison.Models.verify_and_download_model(@model)
+    serving = Comparison.Models.serving(@model)
 
     # Retrieve 50 images from COCO dataset
-    # and create a list of pre-processed VIPS images with the referring captions
+    # and create a list of pre-processed VIPS images with the referring captions ---------
     coco_dataset_images_path = File.cwd!() |> Path.join("coco_dataset") |> Path.join("*.jpg")
     files = Path.wildcard(coco_dataset_images_path)
 
-    coco_dataset_captions =
-      File.stream!(File.cwd!() |> Path.join("coco_dataset") |> Path.join("captions.csv"))
-      |> CSV.decode!()
-      |> Enum.map(& &1)
+    #coco_dataset_captions =
+    #  File.stream!(File.cwd!() |> Path.join("coco_dataset") |> Path.join("captions.csv"))
+    #  |> CSV.decode!()
+    #  |> Enum.map(& &1)
 
     vips_images_with_captions =
       Enum.map(files, fn path ->
@@ -72,23 +97,46 @@ defmodule Benchmark do
         image_id = Path.basename(path, ".jpg")
 
         # Getting captions of the image from the COCO Dataset
-        captions_of_image =
-          Enum.filter(coco_dataset_captions, fn [id, caption] = x ->
-            image_id == id
-          end)
-          |> Enum.map(fn [_id, caption] -> caption end)
+        # captions_of_image =
+        #  Enum.filter(coco_dataset_captions, fn [id, _caption] = _x ->
+        #    image_id == id
+        #  end)
+        #  |> Enum.map(fn [_id, caption] -> caption end)
 
-        %{id: image_id, captions: captions_of_image, tensor: tensor}
+        %{id: image_id, tensor: tensor}
       end)
 
-    serving = Comparison.Models.serving(@model)
-    # Nx.Serving.run(serving, tensor)
+    # Run the prediction on all the images ---------
 
-    # Run the images through the model and get the prediction for each one.
-    # We measure the time to predict the image, get the prediction and save the prediction and execution time to file.
-    # Enum.each(images, fn image ->
-    #  prediction = predict_example_image(image, model)
-    # end)
+    # Open the results file and adding header
+    results_file_path =
+      File.cwd!() |> Path.join("coco_dataset") |> Path.join("#{@model.title}_results.csv")
+
+    File.write!(
+      results_file_path,
+      "image_id,time_in_microseconds,prediction\r\n",
+      [:write, :utf8]
+    )
+
+    # Go over each image and make prediction
+    Enum.each(vips_images_with_captions, fn image ->
+      Logger.info("Benchmarking image #{image.id}...")
+
+      # Run the prediction
+      {time_in_microseconds, prediction} =
+        :timer.tc(fn ->
+          extract_label(Nx.Serving.run(serving, image.tensor))
+        end)
+
+      # Write the results to the file with "image_id, time_in_microseconds, prediction"
+      row_to_append =
+        [[image.id, time_in_microseconds, prediction]]
+        |> CSV.encode(headers: false)
+        |> Enum.take(3)
+        |> Enum.join()
+
+      File.write!(results_file_path, row_to_append, [:append, :write, :utf8])
+    end)
   end
 
   # Pre-processes a given Vix image so it's suitable for the model to consume.
@@ -121,5 +169,7 @@ defmodule Benchmark do
   end
 end
 
-# Run Benchmark module
+# Runs the benchmark module
+# To change the model you want to use,
+# check the `Benchmark` module above and change the variables inside the `CHANGE YOUR SETTINGS HERE` comment blocks.
 Benchmark.main()
