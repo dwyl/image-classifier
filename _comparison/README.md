@@ -181,6 +181,82 @@ since it has all the dependencies needed to run the notebook.
 > our `Jupyter Notebook` will work.
 
 
+# 2. Run `run.exs`
+
+The `run.exs` file is a standalone
+[`Elixir` script file ](https://thinkingelixir.com/2019-04-running-an-elixir-file-as-a-script/)
+that you can execute to make predictions 
+based on any `Bumblebee`-supported model you want.
+
+To run the file,
+simply execute the following command:
+
+```sh
+elixir run.exs
+```
+
+When you run this command, 
+a `.csv` file will be created inside `coco_dataset`
+with the results of the benchmark of a given model.
+This new file will have information of the
+**execution time** and the **predicted caption**,
+with the file name being `"{model_name}_results.csv"`.
+
+**Every time you run the script, the `.csv` results file is overriden**.
+
+To run this file with different models,
+you only have to change a few parameters.
+If you open `run.exs`,
+inside the `Benchmark` module,
+you will find a comment block encompassed with 
+`CHANGE YOUR SETTINGS HERE -----------------------------------`.
+Inside this code block, 
+you can change:
+
+- the **image_width** of the image before being fed into the model.
+You want this value to be the same 
+*as the same dimensions of the dataset the model was trained on*.
+The images will be redimensioned to this value 
+whilst maintaining aspect ratio.
+This step is important because
+it will **yield better results** 
+and **improve performance whilst running the script**,
+since we're optimizing unnecessary data that the model 
+would otherwise ignore.
+
+- the **model** being tested.
+If can change:
+  - the `title`, which is just a label for the image.
+  This title should not have the `/` character or any other that might 
+  make it look like a path.
+  This is because this `title` is used when creating the results file.
+  - the `name` of the model,
+  which should coincide with the name of the repo in `HuggingFace`.
+  (i.e. [`Salesforce/blip-image-captioning-large`](https://huggingface.co/Salesforce/blip-image-captioning-large)).
+  - the `cache_path`, pertaining to the location where the model is downloaded
+  and cached locally. 
+  You should only change the name of the folder
+  (don't change `@models_folder_path`).
+  - `load_featurizer`, `load_tokenizer` and `load_generation_config`
+  allow you to load these parameters if the model needs it.
+  We recommend checking [`Bumblebee's` documentation](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html)
+  to check if your model needs any of these.
+
+- the `extract_label` function.
+This function pattern-matches the output of the model.
+You should change it according to the output of the model
+so you can successfully retrieve the result.
+
+And these are all the changes you need!
+You can change these settings for each model you test
+and a new file with the results will be created for each one
+inside `coco_dataset`!
+
+
+
+
+
+
 
 
 
