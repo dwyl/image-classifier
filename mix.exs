@@ -55,7 +55,7 @@ defmodule App.MixProject do
 
       # HTTP Request
       {:httpoison, "~> 2.2"},
-      {:req, "0.4.5"},
+      {:req, "0.4.8"},
       {:mime, "~> 2.0.5"},
       {:ex_image_info, "~> 0.2.4"},
 
