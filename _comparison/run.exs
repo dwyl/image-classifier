@@ -7,6 +7,8 @@ Mix.install(
     {:nx, "~> 0.6.4 "},
     # Image
     {:vix, "~> 0.25.0"},
+    # CSV parsing
+    {:csv, "~> 3.2"}
   ],
   config: [nx: [default_backend: EXLA.Backend]]
 )
@@ -21,17 +23,15 @@ defmodule ModelInfo do
   defstruct [:name, :cache_path, :load_featurizer, :load_tokenizer, :load_generation_config]
 end
 
-
 # Benchmark module that when executed, will create a file with the results of the benchmark.
 defmodule Benchmark do
-
   alias Vix.Vips.Image, as: Vimage
   Code.require_file("manage_models.exs")
 
   @image_width 640
 
   # Model to be benchmarked -------
-  @models_folder_path Path.join(File.cwd!, "models")
+  @models_folder_path Path.join(File.cwd!(), "models")
 
   @model %ModelInfo{
     name: "Salesforce/blip-image-captioning-base",
@@ -40,36 +40,56 @@ defmodule Benchmark do
     load_tokenizer: true,
     load_generation_config: true
   }
-  def extract_label(result) do %{results: [%{text: label}]} = result; label end
-
+  def extract_label(result) do
+    %{results: [%{text: label}]} = result
+    label
+  end
 
   # Run this to create a file to benchmark the models
   def main() do
-
     # We first verify if the model exists and we download accordingly
     Comparison.Models.verify_and_download_model(@model)
 
     # Retrieve 50 images from COCO dataset
-    # and create a list of pre-processed VIPS images from them
-    coco_dataset_images_path = File.cwd! |> Path.join("coco_dataset") |> Path.join("*.jpg")
+    # and create a list of pre-processed VIPS images with the referring captions
+    coco_dataset_images_path = File.cwd!() |> Path.join("coco_dataset") |> Path.join("*.jpg")
     files = Path.wildcard(coco_dataset_images_path)
 
-    vips_images = Enum.map(files, fn path ->
-      {:ok, thumbnail_vimage} =
-        Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN)
+    coco_dataset_captions =
+      File.stream!(File.cwd!() |> Path.join("coco_dataset") |> Path.join("captions.csv"))
+      |> CSV.decode!()
+      |> Enum.map(& &1)
+
+    vips_images_with_captions =
+      Enum.map(files, fn path ->
+        # Processing image
+        {:ok, thumbnail_vimage} =
+          Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN)
+
         {:ok, tensor} = pre_process_image(thumbnail_vimage)
-        tensor
+
+        # Getting ID of image from path
+        image_id = Path.basename(path, ".jpg")
+
+        # Getting captions of the image from the COCO Dataset
+        captions_of_image =
+          Enum.filter(coco_dataset_captions, fn [id, caption] = x ->
+            image_id == id
+          end)
+
+        %{id: image_id, captions: captions_of_image, tensor: tensor}
       end)
 
+    dbg(vips_images_with_captions)
 
     serving = Comparison.Models.serving(@model)
+    # Nx.Serving.run(serving, tensor)
 
     # Run the images through the model and get the prediction for each one.
     # We measure the time to predict the image, get the prediction and save the prediction and execution time to file.
-    #Enum.each(images, fn image ->
+    # Enum.each(images, fn image ->
     #  prediction = predict_example_image(image, model)
-    #end)
-
+    # end)
   end
 
   # Pre-processes a given Vix image so it's suitable for the model to consume.
@@ -100,7 +120,6 @@ defmodule Benchmark do
 
     {:ok, final_tensor}
   end
-
 end
 
 # Run Benchmark module
