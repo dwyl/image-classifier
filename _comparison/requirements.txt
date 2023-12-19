@@ -10,8 +10,8 @@ brotli=1.0.9=h1a28f6b_7
 brotli-bin=1.0.9=h1a28f6b_7
 brotli-python=1.0.9=py312h313beb8_7
 bzip2=1.0.8=h620ffc9_4
-ca-certificates=2023.11.17=hf0a4a13_0
-certifi=2023.11.17=pyhd8ed1ab_0
+ca-certificates=2023.08.22=hca03da5_0
+certifi=2023.7.22=py312hca03da5_1
 cffi=1.16.0=py312h80987f9_0
 charset-normalizer=2.0.4=pyhd3eb1b0_0
 click=8.1.7=unix_pyh707e725_0
@@ -72,12 +72,12 @@ munkres=1.1.4=py_0
 ncurses=6.4=h313beb8_0
 nest-asyncio=1.5.8=pyhd8ed1ab_0
 networkx=3.2.1=pypi_0
-nltk=3.8.1=pyhd8ed1ab_0
+nltk=3.8.1=py312hca03da5_0
 numexpr=2.8.7=py312h0f3ea24_0
 numpy=1.26.2=py312h7f4fdc5_0
 numpy-base=1.26.2=py312he047099_0
 openjpeg=2.3.0=h7a6adac_2
-openssl=3.2.0=h0d3ecfb_1
+openssl=3.0.12=h1a28f6b_0
 packaging=23.2=pyhd8ed1ab_0
 pandas=2.1.1=py312hd77ebd4_0
 parso=0.8.3=pyhd8ed1ab_0
