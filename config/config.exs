@@ -7,6 +7,11 @@
 # General application configuration
 import Config
 
+# DB configuration
+config :app,
+  ecto_repos: [App.Repo],
+  generators: [timestamp_type: :utc_datetime]
+
 # Tells `NX` to use `EXLA` as backend
 # config :nx, default_backend: EXLA.Backend                  # default
 config :nx, :default_backend, {EXLA.Backend, client: :host}  # needed to run on `Fly.io`

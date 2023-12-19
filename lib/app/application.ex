@@ -12,6 +12,8 @@ defmodule App.Application do
     children = [
       # Start the Telemetry supervisor
       AppWeb.Telemetry,
+      # Setup DB
+      App.Repo,
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
       # Nx serving for image classifier

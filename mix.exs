@@ -52,7 +52,17 @@ defmodule App.MixProject do
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.6.1"},
+
+      # HTTP Request
+      {:httpoison, "~> 2.2"},
       {:req, "0.4.8"},
+      {:mime, "~> 2.0.5"},
+      {:ex_image_info, "~> 0.2.4"},
+
+      # DB
+      {:phoenix_ecto, "~> 4.4"},
+      {:ecto_sql, "~> 3.10"},
+      {:postgrex, ">= 0.0.0"},
 
       # Bumblebee imports
       {:bumblebee, "~> 0.4.2"},
@@ -60,10 +70,11 @@ defmodule App.MixProject do
       {:nx, "~> 0.6.4 "},
 
       # Image
-      {:vix, "~> 0.26.0"},
+      {:vix, "~> 0.25.0"},
 
       # Testing
-      {:excoveralls, "~> 0.15", only: [:test, :dev]}
+      {:excoveralls, "~> 0.15", only: [:test, :dev]},
+      {:mock, "~> 0.3.0", only: :test}
     ]
   end
 
@@ -79,7 +90,7 @@ defmodule App.MixProject do
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind default", "esbuild default"],
       "assets.deploy": ["tailwind default --minify", "esbuild default --minify", "phx.digest"],
-      test: ["test"],
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       t: ["test"],
       c: ["coveralls.html"],
       s: ["phx.server"]
