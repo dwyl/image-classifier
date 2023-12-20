@@ -14,7 +14,8 @@ config :app,
 
 # Tells `NX` to use `EXLA` as backend
 # config :nx, default_backend: EXLA.Backend                  # default
-config :nx, :default_backend, {EXLA.Backend, client: :host}  # needed to run on `Fly.io`
+# needed to run on `Fly.io`
+config :nx, :default_backend, {EXLA.Backend, client: :host}
 
 # Configures the endpoint
 config :app, AppWeb.Endpoint,
@@ -28,7 +29,7 @@ config :app, AppWeb.Endpoint,
 
 # Configure esbuild (the version is required)
 config :esbuild,
-  version: "0.14.41",
+  version: "0.18.6",
   default: [
     args:
       ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),

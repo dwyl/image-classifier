@@ -25,6 +25,7 @@ defmodule App.Application do
            App.Models.serving()
          end,
        name: ImageClassifier},
+      {GenMagic.Server, name: :gen_magic},
       # Adding a supervisor
       {Task.Supervisor, name: App.TaskSupervisor},
       # Start the Endpoint (http/https)

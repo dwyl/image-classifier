@@ -18,9 +18,12 @@ defmodule AppWeb.PageLive do
   The aspect ratio is maintained.
   """
   @image_width 640
+  @accepted_mime ~w(image/jpeg image/jpg image/png image/webp)
 
   @impl true
   def mount(_params, _session, socket) do
+    dbg(@accepted_mime)
+
     {:ok,
      socket
      |> assign(
@@ -80,47 +83,63 @@ defmodule AppWeb.PageLive do
     end
   end
 
+  def check_file(binary, path) do
+    with {mimetype, width, height, variant} <-
+           ExImageInfo.info(binary) |> dbg(),
+         {:ok, %{mime_type: mime}} <-
+           App.Image.gen_magic_eval(path, @accepted_mime) |> dbg() do
+      if mimetype == mime,
+        do: {:ok, {mimetype, width, height, variant}},
+        else: {:error, "mime types do not correspond"}
+    else
+      nil -> {:error, "bad file"}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   @doc """
   This function is called whenever an image is uploaded by the user.
 
   It reads the file, processes it and sends it to the model for classification.
   It updates the socket assigns
   """
-  def handle_progress(:image_list, entry, socket) do
+  def handle_progress(:image_list, entry, socket) when entry.done? do
     # We consume the entry only if the entry is done uploading from the image
     # and if consuming the entry was successful.
-    with true <- entry.done?,
-         %{tensor: tensor, image_info: image_info} <-
-           consume_uploaded_entry(socket, entry, fn %{} = meta ->
-             file_binary = File.read!(meta.path)
-             {mimetype, width, height, _variant} = ExImageInfo.info(file_binary)
+    with %{tensor: tensor, image_info: image_info} <-
+           consume_uploaded_entry(socket, entry, fn %{path: path} ->
+             with file_binary <-
+                    File.read!(path),
+                  {:ok, {mimetype, width, height, _variant}} <-
+                    check_file(file_binary, path),
+                  # Get image and resize
+                  {:ok, thumbnail_vimage} <-
+                    Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
+                  # Pre-process it
+                  {:ok, tensor} <-
+                    pre_process_image(thumbnail_vimage) do
+               # Upload image to S3
+               Image.upload_image_to_s3(path, mimetype)
+               |> case do
+                 {:ok, url} ->
+                   image_info = %ImageInfo{
+                     mimetype: mimetype,
+                     width: width,
+                     height: height,
+                     file_binary: file_binary,
+                     url: url
+                   }
 
-             # Get image and resize
-             {:ok, thumbnail_vimage} =
-               Vix.Vips.Operation.thumbnail(meta.path, @image_width, size: :VIPS_SIZE_DOWN)
+                   {:ok, %{tensor: tensor, image_info: image_info}}
 
-             # Pre-process it
-             {:ok, tensor} = pre_process_image(thumbnail_vimage)
-
-             # Upload image to S3
-             case Image.upload_image_to_s3(meta.path, mimetype) do
-               {:ok, url} ->
-                 image_info = %ImageInfo{
-                   mimetype: mimetype,
-                   width: width,
-                   height: height,
-                   file_binary: file_binary,
-                   url: url
-                 }
-
-                 {:ok, %{tensor: tensor, image_info: image_info}}
-
-               # If S3 upload fails, we return error
-               {:error, reason} ->
-                 {:ok, %{error: reason}}
+                 # If S3 upload fails, we return error
+                 {:error, reason} ->
+                   {:ok, %{error: reason}}
+               end
+             else
+               {:error, reason} -> {:postpone, {:error, reason}}
              end
            end) do
-
       # If consuming the entry was successful, we spawn a task to classify the image
       # and update the socket assigns
       task =
@@ -141,14 +160,25 @@ defmodule AppWeb.PageLive do
 
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
     else
+      {:error, reason} ->
+        Logger.warning("Error uploading image. #{inspect(reason)}")
+
+        {:noreply,
+         push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
+
       %{error: reason} ->
         Logger.info("Error uploading image. #{inspect(reason)}")
-        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
 
-      _ ->
-        {:noreply, socket}
+        {:noreply,
+         push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
+
+        # _ ->
+        #   {:noreply, socket}
     end
   end
+
+  # remove one level depth
+  def handle_progress(:image_list, _, socket), do: {:noreply, socket}
 
   @doc """
   Every time an `async task` is created, this function is called.

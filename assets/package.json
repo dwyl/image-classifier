@@ -1,5 +1,5 @@
 {
-  "dependencies": {
-    "toastify-js": "^1.12.0"
-  }
+	"dependencies": {
+		"toastify-js": "^1.12.0"
+	}
 }
