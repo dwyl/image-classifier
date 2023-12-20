@@ -1,11 +1,25 @@
 # Benchmark comparison between `Bumblebee` models 
 
-| model_name                  |   rouge1_median |   rouge2_median |   rougeL_median |   BLEU_score_median |   METEOR_score_median |   Word_error_rate_median |   time_in_seconds_median |
-|:----------------------------|----------------:|----------------:|----------------:|--------------------:|----------------------:|-------------------------:|-------------------------:|
-| blip-image-captioning-base  |         0.6     |         0.36364 |         0.57983 |             20.0762 |               0.45953 |                  0.58333 |                  4.16365 |
-| blip-image-captioning-large |         0.59167 |         0.33333 |         0.55844 |             19.0449 |               0.53777 |                  0.72381 |                 11.878   |
-| resnet-50                   |         0       |         0       |         0       |              0      |               0.03953 |                  1       |                  0.32517 |
+| Model                       |   ROUGE-1 |   ROUGE-2 |   ROUGE-L |    BLEU |   METEOR |   Word Error Rate |   Time (s) |
+|:----------------------------|----------:|----------:|----------:|--------:|---------:|------------------:|-----------:|
+| blip-image-captioning-base  |   0.6     |   0.36364 |   0.57983 | 20.0762 |  0.45953 |           0.58333 |    4.16365 |
+| blip-image-captioning-large |   0.59167 |   0.33333 |   0.55844 | 19.0449 |  0.53777 |           0.72381 |   11.878   |
+| resnet-50                   |   0       |   0       |   0       |  0      |  0.03953 |           1       |    0.32517 |
 
+> [!NOTE]
+>
+> All the values in the table above are the median values of 
+> [**50 COCO Dataset images**](https://cocodataset.org/#home)
+> with the models being run
+> on an Apple M1 Pro with 16GB of memory.
+
+<br>
+<br>
+
+----
+
+<br>
+<br>
 
 In this guide, 
 we will walk you through on benchmarking
