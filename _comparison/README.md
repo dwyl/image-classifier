@@ -1,5 +1,12 @@
 # Benchmark comparison between `Bumblebee` models 
 
+| model_name                  |   rouge1_median |   rouge2_median |   rougeL_median |   BLEU_score_median |   METEOR_score_median |   Word_error_rate_median |   time_in_seconds_median |
+|:----------------------------|----------------:|----------------:|----------------:|--------------------:|----------------------:|-------------------------:|-------------------------:|
+| blip-image-captioning-base  |         0.6     |         0.36364 |         0.57983 |             20.0762 |               0.45953 |                  0.58333 |                  4.16365 |
+| blip-image-captioning-large |         0.59167 |         0.33333 |         0.55844 |             19.0449 |               0.53777 |                  0.72381 |                 11.878   |
+| resnet-50                   |         0       |         0       |         0       |              0      |               0.03953 |                  1       |                  0.32517 |
+
+
 In this guide, 
 we will walk you through on benchmarking
 some image captioning models 
@@ -247,33 +254,76 @@ This function pattern-matches the output of the model.
 You should change it according to the output of the model
 so you can successfully retrieve the result.
 
-> [!WARNING]
->
-> This assumes you are using the 
-> [`Bumblebee.Vision.image_to_text/5`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_to_text/5)
-> function to create the serving.
->
-> For example, if you want to test the `resnet-50` model,
-> you also have to change the `serving/0` function 
-> inside `manage_models.exs`
-> so it uses [`Bumblebee.Vision.image_classification/3`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_classification/3)
-> instead (the only way to correctly build the `resnet-50` model serving with `Bumblebee`).
->
-> ```elixir
->     Bumblebee.Vision.image_classification(
->     model.model_info,
->     model.featurizer,
->     top_k: 1,
->     compile: [batch_size: 10],
->     defn_options: [compiler: EXLA],
->     preallocate_params: true
->   )
-> ```
-
 And these are all the changes you need!
 You can change these settings for each model you test
 and a new file with the results will be created for each one
 inside `coco_dataset`!
+
+
+## 2.1 Benchmarking different models (important!)
+
+When you make the above changes, 
+we are assuming that
+you are using the 
+[`Bumblebee.Vision.image_to_text/5`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_to_text/5)
+function to create the serving.
+
+The default code for the script pertains to 
+[`Salesforce/blip-image-captioning-base`](https://huggingface.co/Salesforce/blip-image-captioning-base).
+However, there are other models that `Bumblebee` might support
+from the Hugging Face repositories in https://huggingface.co/models?pipeline_tag=image-to-text&sort=downloads.
+
+Some models are not served from 
+[`Bumblebee.Vision.image_to_text/5`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_to_text/5).
+If you want to benchmark others 
+(as long as they are supported from `Bumblebee`),
+you'll have to make additional changes.
+
+
+### 2.1.1 `ResNet-50`
+
+For example, if you want to test the `resnet-50` model,
+you also have to change the `serving/0` function 
+inside `manage_models.exs`
+so it uses [`Bumblebee.Vision.image_classification/3`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_classification/3)
+instead (the only way to correctly build the `resnet-50` model serving with `Bumblebee`).
+
+```elixir
+    Bumblebee.Vision.image_classification(
+    model.model_info,
+    model.featurizer,
+    top_k: 1,
+    compile: [batch_size: 10],
+    defn_options: [compiler: EXLA],
+    preallocate_params: true
+  )
+```
+
+### 2.1.2 `Salesforce/blip-image-captioning-large`
+
+Normally, for `BLIP` models, 
+you would only have to change the settings that were mentioned
+in the previous section.
+
+However, **at the time of writing**,
+this would result in an error if you wanted to
+use [`Salesforce/blip-image-captioning-large`](https://huggingface.co/Salesforce/blip-image-captioning-large).
+The bug, although fixed, has not yet been released.
+
+Therefore, for this model,
+you'd have to update the imports in `run.exs`.
+
+```elixir
+  {:bumblebee, git: "https://github.com/elixir-nx/bumblebee", branch: "main", override: true},
+  {:nx, git: "https://github.com/elixir-nx/nx.git", sparse: "nx", override: true},
+  {:exla, git: "https://github.com/elixir-nx/nx.git", sparse: "exla", override: true},
+```
+
+
+For more information on this,
+check https://github.com/elixir-nx/bumblebee/issues/269#issuecomment-1865198005.
+
+
 
 
 # 3. Run `metrics.ipynb` 
