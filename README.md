@@ -55,8 +55,7 @@ within `Phoenix`!
   - [9.2 Adding `Postgres` configuration files](#92-adding-postgres-configuration-files)
   - [9.3 Creating `Image` schema](#93-creating-image-schema)
   - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
-  - [9.5 Showing feedback to the person in case of failure](#95-showing-feedback-to-the-person-in-case-of-failure)
-    - [9.5.0 Using `GenMagic`](#950-using-genmagic)
+  - [9.5 Adding double MIME type check and Showing feedback to the person in case of failure](#95-adding-double-mime-type-check-and-showing-feedback-to-the-person-in-case-of-failure)
     - [9.5.1 Showing a toast component with error](#951-showing-a-toast-component-with-error)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
@@ -491,15 +490,17 @@ defmodule AppWeb.PageLive do
   end
 
   defp handle_progress(:image_list, entry, socket) do
-    if entry.done? do
+    #if entry.done? do
       uploaded_file =
-        consume_uploaded_entry(socket, entry, fn %{} = _meta ->
+        consume_uploaded_entry(socket, entry, fn %{path: _path} = _meta ->
           {:ok, entry}
         end)
     end
 
     {:noreply, socket}
   end
+
+  defp handle_progress(:iamge_list, _, socket), do: {:noreply, socket}
 end
 ```
 
@@ -517,8 +518,12 @@ end
   **it is processed immediately and consumed**.
 
 - the `progress` field is handled by the `handle_progress/3` function.
+  It receives chunks from the client with a build-in `UploadWriter` function
+  (as explained in the [docs](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.UploadWriter.html)).
+  When the chunks are all consummed, we get the boolean `entry.done? == true`.
   We consume the file in this function by using
   [`consume_uploaded_entry/3`](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html#consume_uploaded_entry/3).
+  The anonymous function to return `{:ok, data}` or `{:postpone, message}`.
   Whilst consuming the entry/file,
   we can access its path and then use its content.
   _For now_, we don't need to use it.
@@ -526,7 +531,7 @@ end
   After the callback function is executed,
   this function "consumes the entry",
   essentially deleting the image from the temporary folder
-  and removing it from the uploaded files list.
+  and removing it from the uploaded files list.()
 
 - the `"validate"`, `"remove-selected"`, `"save"` event handlers
   are called whenever the person uploads the image,
@@ -654,9 +659,7 @@ Go to `lib/app_web/live/page_live.ex`
 and change the following code.
 
 ```elixir
-def handle_progress(:image_list, entry, socket) do
-  if entry.done? do
-
+def handle_progress(:image_list, entry, socket) when entry.done? do
     # Consume the entry and get the tensor to feed to classifier
     tensor = consume_uploaded_entry(socket, entry, fn %{} = meta ->
       {:ok, vimage} = Vix.Vips.Image.new_from_file(meta.path)
@@ -668,9 +671,6 @@ def handle_progress(:image_list, entry, socket) do
 
     # Update socket assigns to show spinner whilst task is running
     {:noreply, assign(socket, running: true, task_ref: task.ref)}
-  else
-    {:noreply, socket}
-  end
 end
 
 @impl true
@@ -1277,9 +1277,7 @@ In the same file,
 change the `handle_progress/3` function to the following.
 
 ```elixir
-  def handle_progress(:image_list, entry, socket) do
-    if entry.done? do
-
+  def handle_progress(:image_list, entry, socket) when entry.done? do
       # Consume the entry and get the tensor to feed to classifier
       %{tensor: tensor, file_binary: file_binary} = consume_uploaded_entry(socket, entry, fn %{} = meta ->
         file_binary = File.read!(meta.path)
@@ -1297,9 +1295,6 @@ change the `handle_progress/3` function to the following.
 
       # Update socket assigns to show spinner whilst task is running
       {:noreply, assign(socket, running: true, task_ref: task.ref, image_preview_base64: base64)}
-    else
-      {:noreply, socket}
-    end
   end
 ```
 
@@ -2684,8 +2679,7 @@ For this, go to `handle_progress(:image_list, entry, socket)`
 and change the function to the following.
 
 ```elixir
-  def handle_progress(:image_list, entry, socket) do
-    if entry.done? do
+  def handle_progress(:image_list, entry, socket) when entry.done? do
       # We've changed the object that is returned from `consume_uploaded_entry/3` to return an `image_info` object.
       %{tensor: tensor, image_info: image_info} =
         consume_uploaded_entry(socket, entry, fn %{} = meta ->
@@ -2719,9 +2713,9 @@ and change the function to the following.
 
       # Change this line so `image_info` is defined when the image is uploaded
       {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64, image_info: image_info)}
-    else
-      {:noreply, socket}
-    end
+    #else
+    #  {:noreply, socket}
+    #end
   end
 ```
 
@@ -2816,7 +2810,7 @@ and the result of the classifying model
 >
 > You can learn more about it in https://github.com/dwyl/learn-postgresql.
 
-## 9.5 Showing feedback to the person in case of failure
+## 9.5 Adding double MIME type check and Showing feedback to the person in case of failure
 
 Currently, we are not handling any errors
 in case the upload of the image to `imgup` fails.
@@ -2879,68 +2873,130 @@ we need to also update `def handle_progress(:image_list...`
 inside `lib/app_web/live/page_live.ex`
 to properly handle this new function output.
 
+We are also introducing a double MIME type check to ensure that only
+image files are uploaded and processed.
+We use [GenMagic](https://hexdocs.pm/gen_magic/readme.html) provides supervised and customisable access to `libmagic` using a supervised external process.
+[This gist](https://gist.github.com/leommoore/f9e57ba2aa4bf197ebc5) explains that Magic numbers are the first bits of a file
+which uniquely identify the type of file.
+
+We use the GenMagic server as a daemon; it is started in the Application module.
+It is referenced by its name.
+When we run `perform`, we obtain a map and compare the mime type with the one
+read by ExImageInfo.
+If they correspond, we continue, else we stop the process.
+
+On your computer, you should install the package `libmagic-dev`.
+In the Application module, you should add the GenMagic daemon (the C lib is loaded once for all and referenced by its name).
+
 ```elixir
-  def handle_progress(:image_list, entry, socket) do
-    # We consume the entry only if the entry is done uploading from the image
-    # and if consuming the entry was successful.
-    with true <- entry.done?,
-         %{tensor: tensor, image_info: image_info} <-
-           consume_uploaded_entry(socket, entry, fn %{} = meta ->
-             file_binary = File.read!(meta.path)
-             {mimetype, width, height, _variant} = ExImageInfo.info(file_binary)
+#application.ex
+children = [
+  ...,
+  {GenMagic.Server, name: :gen_magic},
+]
+```
 
-             {:ok, thumbnail_vimage} =
-               Vix.Vips.Operation.thumbnail(meta.path, @image_width, size: :VIPS_SIZE_DOWN)
+In the Dockerfile (needed to deploy this app), we will add the dependency:
 
-             {:ok, tensor} = pre_process_image(thumbnail_vimage)
+```Dockerfile
+RUN apt-get update -y && \
+  apt-get install -y libstdc++6 openssl libncurses5 locales ca-certificates libmagic-dev\
+  && apt-get clean && rm -f /var/lib/apt/lists/*_*
+```
 
-             # Upload image to S3
-             case Image.upload_image_to_s3(meta.path, mimetype) do
-               {:ok, url} ->
-                 image_info = %ImageInfo{
-                   mimetype: mimetype,
-                   width: width,
-                   height: height,
-                   file_binary: file_binary,
-                   url: url
-                 }
+In the "page_live.ex" module, add the function:
 
-                 {:ok, %{tensor: tensor, image_info: image_info}}
-
-               # If S3 upload fails, we return error
-               {:error, reason} ->
-                 {:ok, %{error: reason}}
-             end
-           end) do
-
-      # If consuming the entry was successful, we spawn a task to classify the image
-      # and update the socket assigns
-      task =
-        Task.Supervisor.async(App.TaskSupervisor, fn ->
-          Nx.Serving.batched_run(ImageClassifier, tensor)
-        end)
-
-      # Encode the image to base64
-      base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
-
-      {:noreply,
-       assign(socket,
-         running?: true,
-         task_ref: task.ref,
-         image_preview_base64: base64,
-         image_info: image_info
-       )}
-
-      # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
-    else
-      %{error: reason} ->
-        Logger.info("Error uploading image. #{inspect(reason)}")
-        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
-
-      _ ->
-        {:noreply, socket}
-    end
+```elixir
+@doc """
+Double-checks the MIME type of uploaded file to ensure that the file
+is an image and is not corrupted.
+"""
+def check_file(binary, path) do
+  with {:image_info, {mimetype, width, height, variant}} <-
+          {:image_info, ExImageInfo.info(binary)},
+        {:gen_magic, {:ok, %{mime_type: mime}}} <-
+          {:gen_magic, App.Image.gen_magic_eval(path, @accepted_mime)} do
+    if mimetype == mime,
+      do: {:ok, {mimetype, width, height, variant}},
+      else: {:error, "MIME types do not correspond"}
+  else
+    {:image_info, nil} -> {:error, "bad file"}
+    {:gen_magic, {:error, reason}} -> {:error, reason}
   end
+end
+```
+
+We are now ready to double-check the file input with `ExImageInfo` and `GenMagic` to ensure
+the safety of the uploads.
+
+```elixir
+def handle_progress(:image_list, entry, socket) when entry.done? do
+  # We consume the entry only if the entry is done uploading from the image
+  # and if consuming the entry was successful.
+
+  with %{tensor: tensor, image_info: image_info} <-
+          consume_uploaded_entry(socket, entry, fn %{} = meta ->
+            with file_binary <-
+                  File.read!(path),
+                {:ok, {mimetype, width, height, _variant}} <-
+                  check_file(file_binary, path),
+                # Get image and resize
+                {:ok, thumbnail_vimage} <-
+                  Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
+                # Pre-process it
+                {:ok, tensor} <-
+                  pre_process_image(thumbnail_vimage) do
+              # Upload image to S3
+              Image.upload_image_to_s3(path, mimetype)
+              |> case do
+                {:ok, url} ->
+                  image_info = %ImageInfo{
+                    mimetype: mimetype,
+                    width: width,
+                    height: height,
+                    file_binary: file_binary,
+                    url: url
+                  }
+
+                  {:ok, %{tensor: tensor, image_info: image_info}}
+
+                # If S3 upload fails, we return error
+                {:error, reason} ->
+                  {:ok, %{error: reason}}
+              end
+            else
+              {:error, reason} -> {:postpone, %{error: reason}}
+            end
+          end) do
+
+    # If consuming the entry was successful, we spawn a task to classify the image
+    # and update the socket assigns
+    task =
+      Task.Supervisor.async(App.TaskSupervisor, fn ->
+        Nx.Serving.batched_run(ImageClassifier, tensor)
+      end)
+
+    # Encode the image to base64
+    base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
+
+    {:noreply,
+      assign(socket,
+        running?: true,
+        task_ref: task.ref,
+        image_preview_base64: base64,
+        image_info: image_info
+      )}
+
+    # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
+  else
+    %{error: reason} ->
+      Logger.info("Error uploading image. #{inspect(reason)}")
+      {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
+
+    _ ->
+      {:noreply, socket}
+  end
+end
 ```
 
 Phew! That's a lot!
@@ -2960,18 +3016,6 @@ Because we push an event in case the upload fails,
 we are going to make some changes to the Javascript client.
 We are going to **show a toast with the error when the upload fails**.
 
-### 9.5.0 Using `GenMagic`
-
-[GenMagic](https://hexdocs.pm/gen_magic/readme.html) provides supervised and customisable access to `libmagic`` using a supervised external process.
-[This gist](https://gist.github.com/leommoore/f9e57ba2aa4bf197ebc5) explains that Magic numbers are the first bits of a file
-which uniquely identify the type of file.
-
-We use the GenMagic server as a daemon; it is started in the Application.Ex module.
-It is referenced by its name.
-When we run `perform`, we obtain a map and compare the mime type with the one
-read by ExImageInfo.
-If they correspond, wre continue, else we stop the process.
-
 ### 9.5.1 Showing a toast component with error
 
 To show a [toast component](https://getbootstrap.com/docs/4.3/components/toasts/),
@@ -2982,7 +3026,7 @@ Navigate to `assets` folder
 and run:
 
 ```sh
-  npm install toastify-js
+  pnpm install toastify-js
 ```
 
 With this installed, we need to import `toastify` styles

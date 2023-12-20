@@ -22,8 +22,6 @@ defmodule AppWeb.PageLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    dbg(@accepted_mime)
-
     {:ok,
      socket
      |> assign(
@@ -83,17 +81,21 @@ defmodule AppWeb.PageLive do
     end
   end
 
+  @doc """
+  Double-checks the MIME type of uploaded file to ensure that the file
+  is an image and is not corrupted.
+  """
   def check_file(binary, path) do
-    with {mimetype, width, height, variant} <-
-           ExImageInfo.info(binary) |> dbg(),
-         {:ok, %{mime_type: mime}} <-
-           App.Image.gen_magic_eval(path, @accepted_mime) |> dbg() do
+    with {:image_info, {mimetype, width, height, variant}} <-
+           {:image_info, ExImageInfo.info(binary)},
+         {:gen_magic, {:ok, %{mime_type: mime}}} <-
+           {:gen_magic, App.Image.gen_magic_eval(path, @accepted_mime)} do
       if mimetype == mime,
         do: {:ok, {mimetype, width, height, variant}},
-        else: {:error, "mime types do not correspond"}
+        else: {:error, "MIME types do not correspond"}
     else
-      nil -> {:error, "bad file"}
-      {:error, reason} -> {:error, reason}
+      {:image_info, nil} -> {:error, "bad file"} |> dbg()
+      {:gen_magic, {:error, reason}} -> {:error, reason} |> dbg()
     end
   end
 
@@ -110,6 +112,7 @@ defmodule AppWeb.PageLive do
            consume_uploaded_entry(socket, entry, fn %{path: path} ->
              with file_binary <-
                     File.read!(path),
+                  # run MIME type checking
                   {:ok, {mimetype, width, height, _variant}} <-
                     check_file(file_binary, path),
                   # Get image and resize
@@ -137,7 +140,7 @@ defmodule AppWeb.PageLive do
                    {:ok, %{error: reason}}
                end
              else
-               {:error, reason} -> {:postpone, {:error, reason}}
+               {:error, reason} -> {:postpone, %{error: reason}}
              end
            end) do
       # If consuming the entry was successful, we spawn a task to classify the image
@@ -160,24 +163,18 @@ defmodule AppWeb.PageLive do
 
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
     else
-      {:error, reason} ->
-        Logger.warning("Error uploading image. #{inspect(reason)}")
-
-        {:noreply,
-         push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
-
       %{error: reason} ->
         Logger.info("Error uploading image. #{inspect(reason)}")
 
         {:noreply,
          push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
 
-        # _ ->
-        #   {:noreply, socket}
+      _ ->
+        {:noreply, socket}
     end
   end
 
-  # remove one level depth
+  # intermediate chunk consumption
   def handle_progress(:image_list, _, socket), do: {:noreply, socket}
 
   @doc """

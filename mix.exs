@@ -62,7 +62,7 @@ defmodule App.MixProject do
 
       # DB
       {:phoenix_ecto, "~> 4.4"},
-      {:ecto_sql, "~> 3.10"},
+      {:ecto_sql, "~> 3.11"},
       {:postgrex, ">= 0.0.0"},
 
       # Bumblebee imports
@@ -71,7 +71,7 @@ defmodule App.MixProject do
       {:nx, "~> 0.6.4 "},
 
       # Image
-      {:vix, "~> 0.25.0"},
+      {:vix, "~> 0.26.0"},
 
       # Testing
       {:excoveralls, "~> 0.15", only: [:test, :dev]},
