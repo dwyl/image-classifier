@@ -247,6 +247,29 @@ This function pattern-matches the output of the model.
 You should change it according to the output of the model
 so you can successfully retrieve the result.
 
+> [!WARNING]
+>
+> This assumes you are using the 
+> [`Bumblebee.Vision.image_to_text/5`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_to_text/5)
+> function to create the serving.
+>
+> For example, if you want to test the `resnet-50` model,
+> you also have to change the `serving/0` function 
+> inside `manage_models.exs`
+> so it uses [`Bumblebee.Vision.image_classification/3`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_classification/3)
+> instead (the only way to correctly build the `resnet-50` model serving with `Bumblebee`).
+>
+> ```elixir
+>     Bumblebee.Vision.image_classification(
+>     model.model_info,
+>     model.featurizer,
+>     top_k: 1,
+>     compile: [batch_size: 10],
+>     defn_options: [compiler: EXLA],
+>     preallocate_params: true
+>   )
+> ```
+
 And these are all the changes you need!
 You can change these settings for each model you test
 and a new file with the results will be created for each one
