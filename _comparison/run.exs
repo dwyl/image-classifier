@@ -2,9 +2,9 @@
 Mix.install(
   [
     # Models
-{:bumblebee, git: "https://github.com/elixir-nx/bumblebee", branch: "main", override: true},
-{:nx, git: "https://github.com/elixir-nx/nx.git", sparse: "nx", override: true},
-{:exla, git: "https://github.com/elixir-nx/nx.git", sparse: "exla", override: true},
+    {:bumblebee, "~> 0.4.2"},
+    {:exla, "~> 0.6.4"},
+    {:nx, "~> 0.6.4 "},
     # Image
     {:vix, "~> 0.25.0"},
     # CSV parsing
@@ -47,9 +47,9 @@ defmodule Benchmark do
   # Model information
   @model %ModelInfo{
     # should not have "\" in the string, as this is used in the filename of the file when writing the results
-    title: "blip-image-captioning-large",
-    name: "Salesforce/blip-image-captioning-large",
-    cache_path: Path.join(@models_folder_path, "blip-image-captioning-large"),
+    title: "blip-image-captioning-base",
+    name: "Salesforce/blip-image-captioning-base",
+    cache_path: Path.join(@models_folder_path, "blip-image-captioning-base"),
     load_featurizer: true,
     load_tokenizer: true,
     load_generation_config: true
