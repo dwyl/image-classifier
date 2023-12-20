@@ -91,6 +91,17 @@ defmodule AppWeb.PageLiveTest do
     assert render(lv) =~ "Image too large. Upload a smaller image up to 5MB."
   end
 
+  test "check MIME type", %{conn: _conn} do
+    path = [:code.priv_dir(:app), "static", "images", "test.png"] |> Path.join()
+    file = build_upload(path, "image/xyz")
+
+    assert AppWeb.PageLive.check_file(file, path) == {:error, "bad file"}
+
+    accepted_mime = ~w(image/jpeg image/jpg image/png image/webp)
+    assert App.Image.gen_magic_eval(path, accepted_mime) == {:error, "not acceptable"}
+    assert App.Image.gen_magic_eval("", accepted_mime) == {:error, "invalid command"}
+  end
+
   test "uploading an invalid image", %{conn: conn} do
     {:ok, lv, html} = live(conn, ~p"/")
     assert html =~ "Caption your image!"
@@ -147,6 +158,11 @@ defmodule AppWeb.PageLiveTest do
       # No prediction occured because API is down.
       assert render(lv) =~ "Waiting for image input."
     end
+  end
+
+  test "handle_intermediate_progress", %{conn: _conn} do
+    ret = AppWeb.PageLive.handle_progress(:image_list, %{}, %{})
+    assert ret == {:noreply, %{}}
   end
 
   test "noop event handler", %{conn: _conn} do

@@ -94,8 +94,8 @@ defmodule AppWeb.PageLive do
         do: {:ok, {mimetype, width, height, variant}},
         else: {:error, "MIME types do not correspond"}
     else
-      {:image_info, nil} -> {:error, "bad file"} |> dbg()
-      {:gen_magic, {:error, reason}} -> {:error, reason} |> dbg()
+      {:image_info, nil} -> {:error, "bad file"}
+      {:gen_magic, {:error, reason}} -> {:error, reason}
     end
   end
 
@@ -175,7 +175,7 @@ defmodule AppWeb.PageLive do
   end
 
   # intermediate chunk consumption
-  def handle_progress(:image_list, _, socket), do: {:noreply, socket}
+  def handle_progress(_, _, socket), do: {:noreply, socket}
 
   @doc """
   Every time an `async task` is created, this function is called.
