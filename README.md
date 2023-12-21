@@ -2904,25 +2904,61 @@ RUN apt-get update -y && \
   && apt-get clean && rm -f /var/lib/apt/lists/*_*
 ```
 
-In the "page_live.ex" module, add the function:
+Add the follwing function in the module App.Image:
 
 ```elixir
+ @doc """
+  Check file type via magic number. It uses a GenServer running the `C` lib "libmagic".
+  """
+  def gen_magic_eval(path, accepted_mime) do
+    GenMagic.Server.perform(:gen_magic, path)
+    |> case do
+      {:error, reason} ->
+        {:error, reason}
+
+      {:ok,
+       %GenMagic.Result{
+         mime_type: mime,
+         encoding: "binary",
+         content: _content
+       }} ->
+        if Enum.member?(accepted_mime, mime),
+          do: {:ok, %{mime_type: mime}},
+          else: {:error, "not accepted mime type"}
+
+      {:ok, %GenMagic.Result{} = res} ->
+        require Logger
+        Logger.warning(%{gen_magic_response: res})
+        {:error, "not acceptable"}
+    end
+  end
+end
+```
+
+In the "page_live.ex" module, add the functions:
+
+```elixir
+@doc"""
+Use the previous function and eturn the GenMagic reponse from the previous function
+"""
+
+def magic_check(path) do
+  App.Image.gen_magic_eval(path, @accepted_mime)
+  |> case do
+    {:ok, %{mime_type: mime}} ->
+      {:ok, %{mime_type: mime}}
+
+    {:error, msg} ->
+      {:error, msg}
+  end
+end
+
 @doc """
 Double-checks the MIME type of uploaded file to ensure that the file
 is an image and is not corrupted.
 """
-def check_file(binary, path) do
-  with {:image_info, {mimetype, width, height, variant}} <-
-          {:image_info, ExImageInfo.info(binary)},
-        {:gen_magic, {:ok, %{mime_type: mime}}} <-
-          {:gen_magic, App.Image.gen_magic_eval(path, @accepted_mime)} do
-    if mimetype == mime,
-      do: {:ok, {mimetype, width, height, variant}},
-      else: {:error, "MIME types do not correspond"}
-  else
-    {:image_info, nil} -> {:error, "bad file"}
-    {:gen_magic, {:error, reason}} -> {:error, reason}
-  end
+def check_mime(magic_mime, info_mime) do
+  if magic_mime == info_mime, do: :ok, else: :error
 end
 ```
 
@@ -2936,10 +2972,13 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
 
   with %{tensor: tensor, image_info: image_info} <-
           consume_uploaded_entry(socket, entry, fn %{} = meta ->
-            with file_binary <-
-                  File.read!(path),
-                {:ok, {mimetype, width, height, _variant}} <-
-                  check_file(file_binary, path),
+             with {:magic, {:ok, %{mime_type: mime}}} <-
+                    {:magic, magic_check(path)} |> dbg(),
+                  file_binary <- File.read!(path),
+                  {:image_info, {mimetype, width, height, _variant}} <-
+                    {:image_info, ExImageInfo.info(file_binary)},
+                  {:check_mime, :ok} <-
+                    {:check_mime, check_mime(mime, mimetype)},
                 # Get image and resize
                 {:ok, thumbnail_vimage} <-
                   Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
