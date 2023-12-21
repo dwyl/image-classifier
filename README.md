@@ -25,34 +25,35 @@ within `Phoenix`!
   - [1. Installing initial dependencies](#1-installing-initial-dependencies)
   - [2. Adding `LiveView` capabilities to our project](#2-adding-liveview-capabilities-to-our-project)
   - [3. Receiving image files](#3-receiving-image-files)
-- [4. Integrating `Bumblebee` 🐝](#4-integrating-bumblebee-)
-  - [4.1 `Nx` configuration ⚙️](#41-nx-configuration-️)
-  - [4.2 `Async` processing the image for classification](#42-async-processing-the-image-for-classification)
-    - [4.2.1 Considerations regarding `async` processes](#421-considerations-regarding-async-processes)
-    - [4.2.2 Alternative for better testing](#422-alternative-for-better-testing)
-  - [4.3 Image pre-processing](#43-image-pre-processing)
-  - [4.4 Updating the view](#44-updating-the-view)
-  - [4.5 Check it out!](#45-check-it-out)
-  - [4.6 Considerations on user images](#46-considerations-on-user-images)
-- [5. Final Touches](#5-final-touches)
-  - [5.1 Setting max file size](#51-setting-max-file-size)
-  - [5.2 Show errors](#52-show-errors)
-  - [5.3 Show image preview](#53-show-image-preview)
-- [6. What about other models?](#6-what-about-other-models)
-- [7. How do I deploy this thing?](#7-how-do-i-deploy-this-thing)
-- [8. Showing example images](#8-showing-example-images)
-  - [8.1 Creating a hook in client](#81-creating-a-hook-in-client)
-  - [8.2 Handling the example images list event inside our LiveView](#82-handling-the-example-images-list-event-inside-our-liveview)
-  - [8.3 Updating the view](#83-updating-the-view)
-  - [8.4 Using URL of image instead of base64-encoded](#84-using-url-of-image-instead-of-base64-encoded)
-  - [8.5 See it running](#85-see-it-running)
-- [9. Store metadata and classification info](#9-store-metadata-and-classification-info)
-  - [9.1 Installing dependencies](#91-installing-dependencies)
-  - [9.2 Adding `Postgres` configuration files](#92-adding-postgres-configuration-files)
-  - [9.3 Creating `Image` schema](#93-creating-image-schema)
-  - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
-  - [9.5 Showing feedback to the person in case of failure](#95-showing-feedback-to-the-person-in-case-of-failure)
-    - [9.5.1 Showing a toast component with error](#951-showing-a-toast-component-with-error)
+  - [4. Integrating `Bumblebee` 🐝](#4-integrating-bumblebee-)
+    - [4.1 `Nx` configuration ⚙️](#41-nx-configuration-️)
+    - [4.2 `Async` processing the image for classification](#42-async-processing-the-image-for-classification)
+      - [4.2.1 Considerations regarding `async` processes](#421-considerations-regarding-async-processes)
+      - [4.2.2 Alternative for better testing](#422-alternative-for-better-testing)
+    - [4.3 Image pre-processing](#43-image-pre-processing)
+    - [4.4 Updating the view](#44-updating-the-view)
+    - [4.5 Check it out!](#45-check-it-out)
+    - [4.6 Considerations on user images](#46-considerations-on-user-images)
+  - [5. Final Touches](#5-final-touches)
+    - [5.1 Setting max file size](#51-setting-max-file-size)
+    - [5.2 Show errors](#52-show-errors)
+    - [5.3 Show image preview](#53-show-image-preview)
+  - [6. What about other models?](#6-what-about-other-models)
+  - [7. How do I deploy this thing?](#7-how-do-i-deploy-this-thing)
+  - [8. Showing example images](#8-showing-example-images)
+    - [8.1 Creating a hook in client](#81-creating-a-hook-in-client)
+    - [8.2 Handling the example images list event inside our LiveView](#82-handling-the-example-images-list-event-inside-our-liveview)
+    - [8.3 Updating the view](#83-updating-the-view)
+    - [8.4 Using URL of image instead of base64-encoded](#84-using-url-of-image-instead-of-base64-encoded)
+    - [8.5 See it running](#85-see-it-running)
+  - [9. Store metadata and classification info](#9-store-metadata-and-classification-info)
+    - [9.1 Installing dependencies](#91-installing-dependencies)
+    - [9.2 Adding `Postgres` configuration files](#92-adding-postgres-configuration-files)
+    - [9.3 Creating `Image` schema](#93-creating-image-schema)
+    - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
+    - [9.5 Showing feedback to the person in case of failure](#95-showing-feedback-to-the-person-in-case-of-failure)
+      - [9.5.1 Showing a toast component with error](#951-showing-a-toast-component-with-error)
+- [Benchmarks between models](#benchmarks-between-models)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -490,13 +491,13 @@ If you run `mix phx.server`,
 nothing will change.
 
 
-# 4. Integrating `Bumblebee` 🐝
+## 4. Integrating `Bumblebee` 🐝
 
 Now here comes the fun part!
 It's time to do some image captioning! 🎉
 
 
-## 4.1 `Nx` configuration ⚙️
+### 4.1 `Nx` configuration ⚙️
 
 We first need to add some initial setup in the 
 `lib/app/application.ex` file.
@@ -584,7 +585,7 @@ where we can define our compiler and task batch size.
 We've given our serving function the name `ImageClassifier`.
 
 
-## 4.2 `Async` processing the image for classification
+### 4.2 `Async` processing the image for classification
 
 Now we're ready to send the image to the model
 and get a prediction of it!
@@ -696,7 +697,7 @@ meaning no resources are spent
 on a process for which nobody expects a result anymore. 
 
 
-### 4.2.1 Considerations regarding `async` processes
+#### 4.2.1 Considerations regarding `async` processes
 
 When a task is spawned using `Task.async/2`, 
 **it is linked to the caller**.
@@ -721,7 +722,7 @@ like a report that has to be generated even if the person closes the browser tab
 this is not the right solution.
 
 
-### 4.2.2 Alternative for better testing
+#### 4.2.2 Alternative for better testing
 
 We are spawning async tasks by calling `Task.async/1`.
 This is creating an **_unsupervised_ task**.
@@ -807,7 +808,7 @@ In our case,
 we do that until the *prediction is made*.
 
 
-## 4.3 Image pre-processing
+### 4.3 Image pre-processing
 
 As we've noted before,
 we need to **pre-process the image before passing it to the model**.
@@ -883,7 +884,7 @@ This function returns the processed tensor,
 that is then used as input to the model.
 
 
-## 4.4 Updating the view
+### 4.4 Updating the view
 
 All that's left is updating the view
 to reflect these changes we've made to the `LiveView`.
@@ -981,7 +982,7 @@ Replace them with this handler:
 ```
 
 
-## 4.5 Check it out!
+### 4.5 Check it out!
 
 And that's it!
 Our app is now *functional* 🎉.
@@ -1002,7 +1003,7 @@ You can and **should** try other models.
 You can see the supported models in https://github.com/elixir-nx/bumblebee#model-support.
 
 
-## 4.6 Considerations on user images
+### 4.6 Considerations on user images
 
 To keep the app as simple as possible,
 we are receiving the image from the person as is.
@@ -1069,12 +1070,12 @@ so you may want to resize the image to this width.
 > https://github.com/libvips/libvips/wiki/HOWTO----Image-shrinking
 > to know why.
 
-# 5. Final Touches
+## 5. Final Touches
 
 Although our app is functional,
 we can make it **better**. 🎨
 
-## 5.1 Setting max file size
+### 5.1 Setting max file size
 
 In order to better control user input,
 we should add a limit to the size of the image that is being uploaded.
@@ -1107,7 +1108,7 @@ The number is in `bytes`,
 hence why we set it as `5_000_000`.
 
 
-## 5.2 Show errors
+### 5.2 Show errors
 
 In case a person uploads an image that is too large,
 we should show this feedback to the person!
@@ -1177,7 +1178,7 @@ Awesome! 🎉
 </p>
 
 
-## 5.3 Show image preview
+### 5.3 Show image preview
 
 As of now, even though our app predicts the given images,
 it is not showing a preview of the image the person submitted.
@@ -1292,7 +1293,7 @@ it is previewed and shown to the person!
 </p>
 
 
-# 6. What about other models?
+## 6. What about other models?
 
 Maybe you weren't happy with the results from this model.
 
@@ -1432,7 +1433,7 @@ Awesome! 🎉
 > For this, check the [`deployment guide`](./deployment.md#5-a-better-model-management).
 
 
-# 7. How do I deploy this thing?
+## 7. How do I deploy this thing?
 
 There are a few considerations you may want to have
 before considering deploying this.
@@ -1443,7 +1444,7 @@ that will **guide you through deploying this app in `fly.io`**!
 Check the [`deployment.md`](./deployment.md) file for more information.
 
 
-# 8. Showing example images
+## 8. Showing example images
 
 > [!WARNING]
 >
@@ -1470,7 +1471,7 @@ to show these changes to the person.
 Let's go over each one!
 
 
-## 8.1 Creating a hook in client
+### 8.1 Creating a hook in client
 
 We are going to detect the inactivity of the person
 with some `Javascript` code.
@@ -1609,7 +1610,7 @@ to handle the ``"show_examples"`` event.
 Let's do that right now!
 
 
-## 8.2 Handling the example images list event inside our LiveView
+### 8.2 Handling the example images list event inside our LiveView
 
 Now that we have our client sorted,
 let's head over to our LiveView
@@ -1836,7 +1837,7 @@ And that's it!
 Great job! 🥳
 
 
-## 8.3 Updating the view 
+### 8.3 Updating the view 
 
 Now that we've made all the necessary changes to our LiveView,
 we need to update our view so it reflects them!
@@ -2040,7 +2041,7 @@ like we do with the image uploaded by the person.
 And that's it! 🎉
 
 
-## 8.4 Using URL of image instead of base64-encoded
+### 8.4 Using URL of image instead of base64-encoded
 
 While our example list is being correctly rendered,
 we are using additional CPU 
@@ -2234,7 +2235,7 @@ Therefore, we're saving some CPU
 to the thing that matters the most:
 *running our model*.
 
-## 8.5 See it running
+### 8.5 See it running
 
 Now let's see our application in action!
 We are expecting the examples to be shown after
@@ -2251,7 +2252,7 @@ Isn't that cool? 😎
 </p>
 
 
-# 9. Store metadata and classification info
+## 9. Store metadata and classification info
 
 Our app is shaping up quite nicely!
 As it stands, it's an application that does inference on images.
@@ -2270,7 +2271,7 @@ we'll have to configure this ourselves.
 Let's do it!
 
 
-## 9.1 Installing dependencies
+### 9.1 Installing dependencies
 
 We'll install all the needed dependencies first.
 In `mix.exs`, add the following snippet
@@ -2308,7 +2309,7 @@ in which we will persist data.
 Run `mix deps.get` to install these dependencies.
 
 
-## 9.2 Adding `Postgres` configuration files
+### 9.2 Adding `Postgres` configuration files
 
 Now let's create the needed files
 to properly connect to a Postgres relational database.
@@ -2445,7 +2446,7 @@ to create the database
 and the `"images"` table.
 
 
-## 9.3 Creating `Image` schema
+### 9.3 Creating `Image` schema
 
 For now, let's create a simple table `"images"` 
 in our database
@@ -2505,7 +2506,7 @@ runs it through the changeset
 and inserts it in the database.
 
 
-## 9.4 Changing our LiveView to persist data
+### 9.4 Changing our LiveView to persist data
 
 Now that we have our database set up,
 let's change some of our code so we persist data into it!
@@ -2695,7 +2696,7 @@ and the result of the classifying model
 > You can learn more about it in https://github.com/dwyl/learn-postgresql.
 
 
-## 9.5 Showing feedback to the person in case of failure
+### 9.5 Showing feedback to the person in case of failure
 
 Currently, we are not handling any errors 
 in case the upload of the image to `imgup` fails.
@@ -2840,7 +2841,7 @@ we are going to make some changes to the Javascript client.
 We are going to **show a toast with the error when the upload fails**.
 
 
-### 9.5.1 Showing a toast component with error
+#### 9.5.1 Showing a toast component with error
 
 To show a [toast component](https://getbootstrap.com/docs/4.3/components/toasts/),
 we are going to use 
@@ -2898,6 +2899,31 @@ like so.
 <p align="center">
   <img width="800" src="https://github.com/dwyl/image-classifier/assets/17494745/d730d10c-b45e-4dce-a37a-bb389c3cd548" />
 </p>
+
+
+
+
+# Benchmarks between models
+
+You may be wondering which model is best suitable for me?
+Depending on the use case,
+`Bumblebee` supports different models
+for different scenarios.
+
+To help you make up your mind,
+we've created a guide 
+that benchmarks some of `Bumblebee`-supported models
+for image captioning.
+
+Although few models are supported,
+as they add more models,
+this comparison table will grow.
+So any contribution is more than welcome! 🎉
+
+You may check the guide
+and all of the code 
+inside the 
+[`_comparison`](./_comparison/) folder.
 
 
 # _Please_ Star the repo! ⭐️
