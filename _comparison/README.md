@@ -29,6 +29,7 @@ So any contribution is welcome! 🙏
 >
 > All the values in the table above are the median values of 
 > [**50 COCO Dataset images**](https://cocodataset.org/#home)
+> (for statistical relevance),
 > with the models being run
 > on an Apple M1 Pro with 16GB of memory.
 
@@ -45,7 +46,7 @@ we will walk you through on benchmarking
 some image captioning models 
 that `Bumblebee` offers.
 
-If you've followed the repo's guide, 
+If you've followed the repo's main [`README.md`](../README.md), 
 you'll probably have an idea that some models work better than others.
 In this guide, we'll provide a more *heuristic* representation of this,
 and help you create performance metrics on some of these models.
@@ -89,6 +90,12 @@ you need the `annotations` folder.
 This folder simply stores information of the captions
 of the images from the dataset,
 so you don't need to worry about it 🙂.
+- the `metrics.ipynb` file is also a `Jupyter Notebook` file
+that will process the results and create a table
+comparing each model.
+The notebook is documented with the metrics being used,
+so you can refer to it if you're confused
+on what each metric means!
 
 
 ## 0. Prerequisites 
@@ -293,7 +300,7 @@ and a new file with the results will be created for each one
 inside `coco_dataset`!
 
 
-## 2.1 Benchmarking different models (important!)
+## 2.1 (Important!) Benchmarking different models 
 
 When you make the above changes, 
 we are assuming that

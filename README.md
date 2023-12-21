@@ -53,7 +53,7 @@ within `Phoenix`!
     - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
     - [9.5 Showing feedback to the person in case of failure](#95-showing-feedback-to-the-person-in-case-of-failure)
       - [9.5.1 Showing a toast component with error](#951-showing-a-toast-component-with-error)
-- [Benchmarks between models](#benchmarks-between-models)
+- [Benchmarking models](#benchmarking-models)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 
@@ -2903,7 +2903,7 @@ like so.
 
 
 
-# Benchmarks between models
+# Benchmarking models
 
 You may be wondering which model is best suitable for me?
 Depending on the use case,
