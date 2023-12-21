@@ -95,7 +95,7 @@ defmodule AppWeb.PageLiveTest do
     path = [:code.priv_dir(:app), "static", "images", "test.png"] |> Path.join()
     file = build_upload(path, "image/xyz")
 
-    assert AppWeb.PageLive.check_file(file, path) == {:error, "bad file"}
+    assert AppWeb.PageLive.magic_check(path) == {:error, "not acceptable"}
 
     accepted_mime = ~w(image/jpeg image/jpg image/png image/webp)
     assert App.Image.gen_magic_eval(path, accepted_mime) == {:error, "not acceptable"}

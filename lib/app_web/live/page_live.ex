@@ -85,18 +85,34 @@ defmodule AppWeb.PageLive do
   Double-checks the MIME type of uploaded file to ensure that the file
   is an image and is not corrupted.
   """
-  def check_file(binary, path) do
-    with {:image_info, {mimetype, width, height, variant}} <-
-           {:image_info, ExImageInfo.info(binary)},
-         {:gen_magic, {:ok, %{mime_type: mime}}} <-
-           {:gen_magic, App.Image.gen_magic_eval(path, @accepted_mime)} do
-      if mimetype == mime,
-        do: {:ok, {mimetype, width, height, variant}},
-        else: {:error, "MIME types do not correspond"}
-    else
-      {:image_info, nil} -> {:error, "bad file"}
-      {:gen_magic, {:error, reason}} -> {:error, reason}
+
+  # def check_file(binary, path) do
+  #   with {:image_info, {mimetype, width, height, variant}} <-
+  #          {:image_info, ExImageInfo.info(binary)},
+  #        {:gen_magic, {:ok, %{mime_type: mime}}} <-
+  #          {:gen_magic, App.Image.gen_magic_eval(path, @accepted_mime)} do
+  #     if mimetype == mime,
+  #       do: {:ok, {mimetype, width, height, variant}},
+  #       else: {:error, "MIME types do not correspond"}
+  #   else
+  #     {:image_info, nil} -> {:error, "bad file"}
+  #     {:gen_magic, {:error, reason}} -> {:error, reason}
+  #   end
+  # end
+
+  def magic_check(path) do
+    App.Image.gen_magic_eval(path, @accepted_mime)
+    |> case do
+      {:ok, %{mime_type: mime}} ->
+        {:ok, %{mime_type: mime}}
+
+      {:error, msg} ->
+        {:error, msg}
     end
+  end
+
+  def check_mime(magic_mime, info_mime) do
+    if magic_mime == info_mime, do: :ok, else: :error
   end
 
   @doc """
@@ -110,11 +126,13 @@ defmodule AppWeb.PageLive do
     # and if consuming the entry was successful.
     with %{tensor: tensor, image_info: image_info} <-
            consume_uploaded_entry(socket, entry, fn %{path: path} ->
-             with file_binary <-
-                    File.read!(path),
-                  # run MIME type checking
-                  {:ok, {mimetype, width, height, _variant}} <-
-                    check_file(file_binary, path),
+             with {:magic, {:ok, %{mime_type: mime}}} <-
+                    {:magic, magic_check(path)} |> dbg(),
+                  file_binary <- File.read!(path),
+                  {:image_info, {mimetype, width, height, _variant}} <-
+                    {:image_info, ExImageInfo.info(file_binary)},
+                  {:check_mime, :ok} <-
+                    {:check_mime, check_mime(mime, mimetype)},
                   # Get image and resize
                   {:ok, thumbnail_vimage} <-
                     Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
@@ -140,6 +158,9 @@ defmodule AppWeb.PageLive do
                    {:ok, %{error: reason}}
                end
              else
+               {:magic, {:error, msg}} -> {:postpone, %{error: msg}}
+               {:check_mime, :error} -> {:postpone, %{error: "bad check"}}
+               {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
                {:error, reason} -> {:postpone, %{error: reason}}
              end
            end) do
