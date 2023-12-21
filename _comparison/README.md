@@ -1,5 +1,23 @@
 # Benchmark comparison between `Bumblebee` models 
 
+The following table compares `Bumblebee's` image captioning models
+that are supported.
+
+Feel free to run `Bumblebee`-supported models
+and add them to this table!
+At the time of writing,
+`Bumblebee` doesn't support a lot of 
+image captioning models. 
+So any contribution is welcome! 🙏
+
+> [!NOTE]
+>
+> While `ResNet-5` leans more into image classification
+> (it returns a list of prediction keywords/tokens),
+> we're adding it to the table for simplicity sake.
+
+
+
 | Model                       |   ROUGE-1 |   ROUGE-2 |   ROUGE-L |    BLEU |   METEOR |   Word Error Rate |   Time (s) |   Size (in Mb) |
 |:----------------------------|----------:|----------:|----------:|--------:|---------:|------------------:|-----------:|---------------:|
 | blip-image-captioning-base  |   0.6     |   0.36364 |   0.57983 | 20.0762 |  0.45953 |           0.58333 |    4.16365 |          990.6 |
