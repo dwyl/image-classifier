@@ -21,7 +21,7 @@ ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
 FROM ${BUILDER_IMAGE} as builder
 
 # install build dependencies (and curl for EXLA)
-RUN apt-get update -y && apt-get install -y build-essential git curl libmagic-dev\
+RUN apt-get update -y && apt-get install -y build-essential git curl libmagic-dev nodejs npm\
   && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
 # prepare build dir
@@ -52,6 +52,9 @@ COPY lib lib
 COPY assets assets
 
 RUN mkdir -p /app/.bumblebee
+
+# Install dependencies for assets folder
+RUN npm install --prefix assets
 
 # compile assets
 RUN mix assets.deploy
