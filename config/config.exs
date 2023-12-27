@@ -13,7 +13,7 @@ config :app,
   generators: [timestamp_type: :utc_datetime]
 
 # Tells `NX` to use `EXLA` as backend
-# config :nx, default_backend: EXLA.Backend                  # default
+# config :nx, default_backend: EXLA.Backend 
 # needed to run on `Fly.io`
 config :nx, :default_backend, {EXLA.Backend, client: :host}
 

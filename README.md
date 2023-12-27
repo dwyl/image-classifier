@@ -55,7 +55,7 @@ within `Phoenix`!
   - [9.2 Adding `Postgres` configuration files](#92-adding-postgres-configuration-files)
   - [9.3 Creating `Image` schema](#93-creating-image-schema)
   - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
-  - [9.5 Adding double MIME type check and Showing feedback to the person in case of failure](#95-adding-double-mime-type-check-and-showing-feedback-to-the-person-in-case-of-failure)
+  - [9.5 Adding double MIME type check and showing feedback to the person in case of failure](#95-adding-double-mime-type-check-and-showing-feedback-to-the-person-in-case-of-failure)
     - [9.5.1 Showing a toast component with error](#951-showing-a-toast-component-with-error)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
@@ -2810,7 +2810,7 @@ and the result of the classifying model
 >
 > You can learn more about it in https://github.com/dwyl/learn-postgresql.
 
-## 9.5 Adding double MIME type check and Showing feedback to the person in case of failure
+## 9.5 Adding double MIME type check and showing feedback to the person in case of failure
 
 Currently, we are not handling any errors
 in case the upload of the image to `imgup` fails.
@@ -2882,11 +2882,15 @@ which uniquely identify the type of file.
 We use the GenMagic server as a daemon; it is started in the Application module.
 It is referenced by its name.
 When we run `perform`, we obtain a map and compare the mime type with the one
-read by ExImageInfo.
-If they correspond, we continue, else we stop the process.
+read by `ExImageInfo`.
+If they correspond with each other, 
+we continue, else we stop the process.
 
-On your computer, you should install the package `libmagic-dev`.
-In the Application module, you should add the GenMagic daemon (the C lib is loaded once for all and referenced by its name).
+On your computer, 
+in order for this to work locally
+you should install the package `libmagic-dev`.
+In the `Application` module, you should add the `GenMagic` daemon 
+(the C lib is loaded once for all and referenced by its name).
 
 ```elixir
 #application.ex
