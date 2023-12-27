@@ -69,4 +69,32 @@ defmodule App.Image do
         {:error, reason}
     end
   end
+
+  @doc """
+  Check file type via magic number. It uses a GenServer running the `C` lib "libmagic".
+  Returns {:ok, %{mime_type: mime_type}} if the file type is accepted.
+  Otherwise, {:error, reason}.
+  """
+  def gen_magic_eval(path, accepted_mime) do
+    GenMagic.Server.perform(:gen_magic, path)
+    |> case do
+      {:error, reason} ->
+        {:error, reason}
+
+      {:ok,
+       %GenMagic.Result{
+         mime_type: mime,
+         encoding: "binary",
+         content: _content
+       }} ->
+        if Enum.member?(accepted_mime, mime),
+          do: {:ok, %{mime_type: mime}},
+          else: {:error, "Not accepted mime type."}
+
+      {:ok, %GenMagic.Result{} = res} ->
+        require Logger
+        Logger.warning(%{gen_magic_response: res})
+        {:error, "Not acceptable."}
+    end
+  end
 end

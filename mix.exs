@@ -58,10 +58,11 @@ defmodule App.MixProject do
       {:req, "0.4.8"},
       {:mime, "~> 2.0.5"},
       {:ex_image_info, "~> 0.2.4"},
+      {:gen_magic, "~> 1.1.1"},
 
       # DB
       {:phoenix_ecto, "~> 4.4"},
-      {:ecto_sql, "~> 3.10"},
+      {:ecto_sql, "~> 3.11"},
       {:postgrex, ">= 0.0.0"},
 
       # Bumblebee imports
