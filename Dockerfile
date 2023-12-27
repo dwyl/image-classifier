@@ -21,7 +21,7 @@ ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
 FROM ${BUILDER_IMAGE} as builder
 
 # install build dependencies (and curl for EXLA)
-RUN apt-get update -y && apt-get install -y build-essential git curl libmagic-dev nodejs\
+RUN apt-get update -y && apt-get install -y build-essential git curl libmagic-dev nodejs npm\
   && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
 # prepare build dir
