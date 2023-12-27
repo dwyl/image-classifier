@@ -53,6 +53,9 @@ COPY assets assets
 
 RUN mkdir -p /app/.bumblebee
 
+# Install dependencies for assets folder
+RUN npm install --prefix assets
+
 # compile assets
 RUN mix assets.deploy
 
