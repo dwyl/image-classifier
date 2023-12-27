@@ -127,7 +127,7 @@ defmodule AppWeb.PageLive do
     with %{tensor: tensor, image_info: image_info} <-
            consume_uploaded_entry(socket, entry, fn %{path: path} ->
              with {:magic, {:ok, %{mime_type: mime}}} <-
-                    {:magic, magic_check(path)} |> dbg(),
+                    {:magic, magic_check(path)},
                   file_binary <- File.read!(path),
                   {:image_info, {mimetype, width, height, _variant}} <-
                     {:image_info, ExImageInfo.info(file_binary)},

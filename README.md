@@ -2921,6 +2921,22 @@ you should install the package `libmagic-dev`.
 > - Mac: https://gist.github.com/eparreno/1845561
 > - Windows: https://github.com/nscaife/file-windows
 > - Linux: https://zoomadmin.com/HowToInstall/UbuntuPackage/libmagic-dev
+>
+> **Definitely read `gen_magic`'s installation section in https://github.com/evadne/gen_magic#installation**. 
+> You may need to perform additional steps.
+
+You'll need to add [`gen_magic`](https://github.com/evadne/gen_magic)
+to `mix.exs`.
+This dependency will allow us to access `libmagic` 
+through `Elixir`.
+
+```elixir
+def deps do
+  [
+    {:gen_magic, "~> 1.1.1"}
+  ]
+end
+```
 
 In the `Application` module, you should add the `GenMagic` daemon 
 (the C lib is loaded once for all and referenced by its name).
@@ -3011,7 +3027,7 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
   with %{tensor: tensor, image_info: image_info} <-
           consume_uploaded_entry(socket, entry, fn %{} = meta ->
              with {:magic, {:ok, %{mime_type: mime}}} <-
-                    {:magic, magic_check(path)} |> dbg(),
+                    {:magic, magic_check(path)},
                   file_binary <- File.read!(path),
                   {:image_info, {mimetype, width, height, _variant}} <-
                     {:image_info, ExImageInfo.info(file_binary)},
