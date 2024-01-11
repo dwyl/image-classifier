@@ -1,3 +1,8 @@
+Let's use `Elixir` machine learning capabilities to build an application with the following features:
+
+1. upload an image to a bucket and automatically caption it with machine learning
+2. provide a semantic search on the image captions via an audio.
+
 <div align="center">
 
 # Image Captioning in `Elixir`
@@ -58,6 +63,9 @@ within `Phoenix`!
   - [10. Adding double MIME type check and showing feedback to the person in case of failure](#10-adding-double-mime-type-check-and-showing-feedback-to-the-person-in-case-of-failure)
     - [10.1 Showing a toast component with error](#101-showing-a-toast-component-with-error)
 - [Benchmarking models](#benchmarking-models)
+- [Audio transciption and semantic search](#audio-transciption-and-semantic-search)
+  - [Transcribe an audio recording](#transcribe-an-audio-recording)
+  - [Embeddings and semantic search](#embeddings-and-semantic-search)
 - [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -547,12 +555,10 @@ And that's it!
 If you run `mix phx.server`,
 nothing will change.
 
-
 ## 4. Integrating `Bumblebee` 🐝
 
 Now here comes the fun part!
 It's time to do some image captioning! 🎉
-
 
 ### 4.1 `Nx` configuration ⚙️
 
@@ -640,7 +646,6 @@ a builds serving for image classification
 by calling [`image_classification/3`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_classification/3),
 where we can define our compiler and task batch size.
 We've given our serving function the name `ImageClassifier`.
-
 
 ### 4.2 `Async` processing the image for classification
 
@@ -771,7 +776,6 @@ and we **want to stop the task if `LiveView` is closed/crashes**.
 However, if you are building something
 like a report that has to be generated even if the person closes the browser tab,
 this is not the right solution.
-
 
 #### 4.2.2 Alternative for better testing
 
@@ -933,7 +937,6 @@ the tensor according to the format that was previously mentioned.
 This function returns the processed tensor,
 that is then used as input to the model.
 
-
 ### 4.4 Updating the view
 
 All that's left is updating the view
@@ -1064,7 +1067,6 @@ Replace them with this handler:
   end
 ```
 
-
 ### 4.5 Check it out!
 
 And that's it!
@@ -1084,7 +1086,6 @@ Once a prediction is made, display it!
 You can and **should** try other models.
 `ResNet-50` is just one of the many that are supported by `Bumblebee`.
 You can see the supported models in https://github.com/elixir-nx/bumblebee#model-support.
-
 
 ### 4.6 Considerations on user images
 
@@ -1191,7 +1192,6 @@ And that's it!
 The number is in `bytes`,
 hence why we set it as `5_000_000`.
 
-
 ### 5.2 Show errors
 
 In case a person uploads an image that is too large,
@@ -1259,7 +1259,6 @@ Awesome! 🎉
 <p align="center">
   <img width=800 src="https://github.com/dwyl/aws-sdk-mock/assets/17494745/1bf903eb-31d5-48a4-9da9-1f5f64932b6e" />
 </p>
-
 
 ### 5.3 Show image preview
 
@@ -1380,7 +1379,6 @@ it is previewed and shown to the person!
 <p align="center">
   <img width=800 src="https://github.com/dwyl/image-classifier/assets/17494745/2835c24f-f4ba-48bc-aab0-6b39830156ce" />
 </p>
-
 
 ## 6. What about other models?
 
@@ -1519,7 +1517,6 @@ Awesome! 🎉
 >
 > For this, check the [`deployment guide`](./deployment.md#5-a-better-model-management).
 
-
 ## 7. How do I deploy this thing?
 
 There are a few considerations you may want to have
@@ -1529,7 +1526,6 @@ we've created a small document
 that will **guide you through deploying this app in `fly.io`**!
 
 Check the [`deployment.md`](./deployment.md) file for more information.
-
 
 ## 8. Showing example images
 
@@ -1556,7 +1552,6 @@ we are going to need to make **three changes**.
   to show these changes to the person.
 
 Let's go over each one!
-
 
 ### 8.1 Creating a hook in client
 
@@ -1700,7 +1695,6 @@ we haven't created a handler
 to handle the `"show_examples"` event.
 
 Let's do that right now!
-
 
 ### 8.2 Handling the example images list event inside our LiveView
 
@@ -1926,8 +1920,7 @@ and setting the `:predicting` property to `false`.
 And that's it!
 Great job! 🥳
 
-
-### 8.3 Updating the view 
+### 8.3 Updating the view
 
 Now that we've made all the necessary changes to our LiveView,
 we need to update our view so it reflects them!
@@ -2173,7 +2166,6 @@ We've made two changes.
 
 And that's it! 🎉
 
-
 ### 8.4 Using URL of image instead of base64-encoded
 
 While our example list is being correctly rendered,
@@ -2389,7 +2381,6 @@ Isn't that cool? 😎
   <img width=800 src="https://github.com/dwyl/image-classifier/assets/17494745/1f8d08d1-f6ca-46aa-8c89-4bab45ad1e54">
 </p>
 
-
 ## 9. Store metadata and classification info
 
 Our app is shaping up quite nicely!
@@ -2407,7 +2398,6 @@ Because we didn't do this,
 we'll have to configure this ourselves.
 
 Let's do it!
-
 
 ### 9.1 Installing dependencies
 
@@ -2445,7 +2435,6 @@ to the `deps` section.
   in which we will persist data.
 
 Run `mix deps.get` to install these dependencies.
-
 
 ### 9.2 Adding `Postgres` configuration files
 
@@ -2583,7 +2572,6 @@ You can now run `mix ecto.create` and `mix ecto.migrate`
 to create the database
 and the `"images"` table.
 
-
 ### 9.3 Creating `Image` schema
 
 For now, let's create a simple table `"images"`
@@ -2642,7 +2630,6 @@ before interacting with the database.
 `insert/1` receives an object,
 runs it through the changeset
 and inserts it in the database.
-
 
 ### 9.4 Changing our LiveView to persist data
 
@@ -2834,7 +2821,7 @@ and the result of the classifying model
 
 ## 10. Adding double MIME type check and showing feedback to the person in case of failure
 
-Currently, we are not handling any errors 
+Currently, we are not handling any errors
 in case the upload of the image to `imgup` fails.
 Although this is not critical,
 it'd be better if we could show feedback to the person
@@ -2905,10 +2892,10 @@ We use the GenMagic server as a daemon; it is started in the Application module.
 It is referenced by its name.
 When we run `perform`, we obtain a map and compare the mime type with the one
 read by `ExImageInfo`.
-If they correspond with each other, 
+If they correspond with each other,
 we continue, else we stop the process.
 
-On your computer, 
+On your computer,
 in order for this to work locally
 you should install the package `libmagic-dev`.
 
@@ -2922,12 +2909,12 @@ you should install the package `libmagic-dev`.
 > - Windows: https://github.com/nscaife/file-windows
 > - Linux: https://zoomadmin.com/HowToInstall/UbuntuPackage/libmagic-dev
 >
-> **Definitely read `gen_magic`'s installation section in https://github.com/evadne/gen_magic#installation**. 
+> **Definitely read `gen_magic`'s installation section in https://github.com/evadne/gen_magic#installation**.
 > You may need to perform additional steps.
 
 You'll need to add [`gen_magic`](https://github.com/evadne/gen_magic)
 to `mix.exs`.
-This dependency will allow us to access `libmagic` 
+This dependency will allow us to access `libmagic`
 through `Elixir`.
 
 ```elixir
@@ -2938,7 +2925,7 @@ def deps do
 end
 ```
 
-In the `Application` module, you should add the `GenMagic` daemon 
+In the `Application` module, you should add the `GenMagic` daemon
 (the C lib is loaded once for all and referenced by its name).
 
 ```elixir
@@ -2949,7 +2936,7 @@ children = [
 ]
 ```
 
-In the Dockerfile (needed to deploy this app), 
+In the Dockerfile (needed to deploy this app),
 we will install the `libmagic-dev` as well:
 
 ```Dockerfile
@@ -3016,7 +3003,7 @@ def check_mime(magic_mime, info_mime) do
 end
 ```
 
-We are now ready to double-check the file input 
+We are now ready to double-check the file input
 with `ExImageInfo` and `GenMagic` to ensure the safety of the uploads.
 
 ```elixir
@@ -3109,7 +3096,6 @@ Because we push an event in case the upload fails,
 we are going to make some changes to the Javascript client.
 We are going to **show a toast with the error when the upload fails**.
 
-
 ### 10.1 Showing a toast component with error
 
 To show a [toast component](https://getbootstrap.com/docs/4.3/components/toasts/),
@@ -3169,8 +3155,6 @@ like so.
   <img width="800" src="https://github.com/dwyl/image-classifier/assets/17494745/d730d10c-b45e-4dce-a37a-bb389c3cd548" />
 </p>
 
-
-
 # Benchmarking models
 
 You may be wondering which model is best suitable for me?
@@ -3179,7 +3163,7 @@ Depending on the use case,
 for different scenarios.
 
 To help you make up your mind,
-we've created a guide 
+we've created a guide
 that benchmarks some of `Bumblebee`-supported models
 for image captioning.
 
@@ -3189,10 +3173,246 @@ this comparison table will grow.
 So any contribution is more than welcome! 🎉
 
 You may check the guide
-and all of the code 
-inside the 
+and all of the code
+inside the
 [`_comparison`](./_comparison/) folder.
 
+# Audio transciption and semantic search
+
+Suppose you have a bunch of images and you want to find a specific image on a certain thema.
+One way to solve this problem is to describe each image with a caption and perform a full-text search query for specific words among these captions.
+
+With Machine Learning and models, you can greatly improve the search with semantic search: you search for images whose captions are close in terms of _meaning_ to your search.
+
+It remains to express what "close" means and how to do this. Theses notes describes how this can be done with pre-trained models powered by `Bumblebee`.
+
+The program is:
+
+- you upload images into a bucket. You analyse the image with a model to produce a caption - a short descriptive textdescription. This is an **Image-To-Text** process. We used the model "Salesforce/blip-image-captioning-base" with [Bumblebee.Vision.image_to_text](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_to_text/5).You then save the URL and the caption into a DB.
+- you record an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API. and run a **Speech-To-Text** process to produce a text transcription from the audio. We used the model "openai/whisper-small" and [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5).
+
+This transcription is the "target text": we want to find the captions that approximates this text in terms of meaning. This is **semantic search** where **embeddings** come into play: we transcript a text into a well-thought _vector space_ and then use an approximation algorithm to find the closest neighbours.
+
+- to transform a text into a vector (a so-called embedding), we used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" and [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3). You compute the embeddings for each image caption.
+
+- to run a "knn_neighbour", you can use the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. You build incrementally an Index struct from your captions, and then run a "knn_search" on this index with the audio transcription as an input. This process is dependant on the metric used. It returns the position(s) (indices) among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s).
+
+## Transcribe an audio recording
+
+We firstly capture the audio and upload it to the server.
+
+We use a form to capture the audio and use the MediaRecorder API. The Javascript code is triggered by an attached hook _Audio_ declared in the HTML. We use a `live_file_input` and will append the code server side.
+
+```html
+# page_live.html.heex
+<form phx-change="noop" class="hidden">
+  <.live_file_input upload={@uploads.speech} class="hidden" />
+</form>
+<p>
+  <button
+    id="record"
+    class="bg-blue-500 hover:bg-blue-700 text-white font-bold px-4 rounded"
+    type="button"
+    phx-hook="Audio"
+    disabled="{@micro_off}"
+  >
+    <Heroicons.microphone
+      outline
+      class="w-6 h-6 text-white font-bold group-active:animate-pulse"
+    />
+    <span>Record</span>
+  </button>
+</p>
+<audio id="audio" controls></audio>
+<%= if @speech_spin do %>
+<div role="status">
+  <div
+    class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 "
+  >
+    <div
+      class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white"
+    ></div>
+  </div>
+</div>
+<% end %>
+```
+
+We define the new JS file below in the "assets/js" folder. The important part is the `Phoenix.js` function `upload` to which we pass an identifier "speech" and a list that contains the audio as a `Blob`. We use an action button in the HTML, and attach Javascript listeners to it on the "click", "dataavailable" and "stop" events. We also play with the CSS classes to modify the appearance of the recording action button.
+
+```js
+// /assets/js/micro.js
+export default {
+  mounted() {
+    let mediaRecorder;
+    let audioChunks = [];
+    const recordButton = document.getElementById("record");
+    const audioElement = document.getElementById("audio");
+
+    _this = this;
+
+    recordButton.addEventListener("click", () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        recordButton.textContent = "Record";
+      } else {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder.start();
+          recordButton.classList.remove("bg-blue-500", "hover:bg-blue-700");
+          recordButton.classList.add(
+            "bg-green-500",
+            "hover:bg-green-700",
+            "animate-pulse"
+          );
+          recordButton.textContent = "Stop";
+
+          mediaRecorder.addEventListener("dataavailable", (event) => {
+            audioChunks.push(event.data);
+          });
+
+          mediaRecorder.addEventListener("stop", () => {
+            const audioBlob = new Blob(audioChunks);
+            audioElement.src = URL.createObjectURL(audioBlob);
+
+            _this.upload("speech", [audioBlob]);
+            audioChunks = [];
+            recordButton.classList.remove(
+              "bg-green-500",
+              "hover:bg-green-700",
+              "animate-pulse"
+            );
+            recordButton.classList.add("bg-blue-500", "hover:bg-blue-700");
+          });
+        });
+      }
+    });
+  },
+};
+
+// /assets/js/app.js
+...
+import Audio from "./micro.js";
+...
+let liveSocket = new LiveSocket("/live", Socket, {
+  params: { _csrf_token: csrfToken },
+  hooks: { Audio },
+});
+```
+
+We also modify the code server-side. The audio file will be saved on disk as a temporary file on the "/priv/static/uploads" folder. We declare this folder in the "/lib/app_web.ex" file and append the list of static files served by Phoenix as so:
+
+```elixir
+  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt uploads)
+```
+
+We then update the socket to be returned by the LiveView `mount/3` function. We pass extra arguments needed as well as another `allow_upload/3`.
+
+```elixir
+#page_live.ex
+@upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
+@tmp_wav Path.expand("priv/static/uploads/tmp.wav")
+
+def mount(_,_,socket) do
+  File.mkdir_p!(@upload_dir)
+
+  socket
+  |> assign(
+    transcription: nil,
+    micro_off: false,
+    speech_spin: false,
+  )
+  |> allow_upload(:speech,
+    accept: :any,
+    auto_upload: true,
+    progress: &handle_progress/3,
+    max_entries: 1
+  )
+end
+```
+
+We `handle_progress` the `:speech` event as we did with the `:image_list` event. We will run the Whisper model this time:
+
+```elixir
+def handle_progress(:speech, entry, socket) when entry.done? do
+  socket
+  |> consume_uploaded_entry(entry, fn %{path: path} ->
+    :ok = File.cp!(path, @tmp_wav)
+    {:ok, @tmp_wav}
+  end)
+
+  audio_task =
+    Task.Supervisor.async(
+      App.TaskSupervisor,
+      fn ->
+        Nx.Serving.batched_run(Whisper, {:file, @tmp_wav})
+      end
+    )
+
+  {:noreply, assign(socket, audio_ref: audio_task.ref, micro_off: true, speech_spin: true)}
+end
+```
+
+We then need to create the serving for this model. Create a new file "App.Whisper":
+
+```elixir
+defmodule App.Whisper do
+  def serving do
+    model = "openai/whisper-small"
+    {:ok, whisper} = Bumblebee.load_model({:hf, model})
+    {:ok, featurizer} = Bumblebee.load_featurizer({:hf, model})
+    {:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, model})
+    {:ok, generation_config} = Bumblebee.load_generation_config({:hf, model})
+
+    Bumblebee.Audio.speech_to_text_whisper(
+      whisper,
+      featurizer,
+      tokenizer,
+      generation_config,
+      chunk_num_seconds: 30,
+      task: :transcribe,
+      # stream: true,
+      defn_options: [compiler: EXLA]
+    )
+  end
+end
+```
+
+We finally need to handle the response from this task which is in the form of:
+
+```elixir
+%{
+  chunks:
+  [%{
+      text: "Hi there",
+      start_timestamp_seconds: nil,
+      end_timestamp_seconds: nil
+  }]
+}
+```
+
+```elixir
+def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
+      when assigns.audio_ref == ref do
+    Process.demonitor(ref, [:flush])
+    File.rm!(@tmp_wav)
+
+  {:noreply,
+    assign(socket,
+      transcription: String.trim(text),
+      micro_off: false,
+      speech_spin: false,
+      #  search_result: result,
+      audio_ref: nil
+    )}
+end
+```
+
+## Embeddings and semantic search
+
+To transform a text into a vector (a so-called embedding), we used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" and `Bumblebee.Text.TextEmbedding.text_embedding`.
+You compute the embeddings for each image caption.
+We instantiate the HNSWLib index with a GenServer and also the tokenizing (which produces embeddings). The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance.
+TBC
 
 # _Please_ Star the repo! ⭐️
 

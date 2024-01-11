@@ -19,9 +19,14 @@ defmodule AppWeb.PageLive do
   """
   @image_width 640
   @accepted_mime ~w(image/jpeg image/jpg image/png image/webp)
+  @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
+  @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
   @impl true
   def mount(_params, _session, socket) do
+    File.mkdir_p!(@upload_dir)
+    # {_serving, index} = App.TextEmbedding.serve()
+
     {:ok,
      socket
      |> assign(
@@ -35,7 +40,13 @@ defmodule AppWeb.PageLive do
        # Related to the list of image examples
        example_list_tasks: [],
        example_list: [],
-       display_list?: false
+       display_list?: false,
+
+       # Related to the Audio
+       transcription: nil,
+       micro_off: false,
+       speech_spin: false
+       #  search_result: nil
      )
      |> allow_upload(:image_list,
        accept: ~w(image/*),
@@ -44,6 +55,12 @@ defmodule AppWeb.PageLive do
        max_entries: 1,
        chunk_size: 64_000,
        max_file_size: 5_000_000
+     )
+     |> allow_upload(:speech,
+       accept: :any,
+       auto_upload: true,
+       progress: &handle_progress/3,
+       max_entries: 1
      )}
   end
 
@@ -195,6 +212,24 @@ defmodule AppWeb.PageLive do
     end
   end
 
+  def handle_progress(:speech, entry, socket) when entry.done? do
+    socket
+    |> consume_uploaded_entry(entry, fn %{path: path} ->
+      :ok = File.cp!(path, @tmp_wav)
+      {:ok, @tmp_wav}
+    end)
+
+    audio_task =
+      Task.Supervisor.async(
+        App.TaskSupervisor,
+        fn ->
+          Nx.Serving.batched_run(Whisper, {:file, @tmp_wav})
+        end
+      )
+
+    {:noreply, assign(socket, audio_ref: audio_task.ref, micro_off: true, speech_spin: true)}
+  end
+
   # intermediate chunk consumption
   def handle_progress(_, _, socket), do: {:noreply, socket}
 
@@ -205,6 +240,49 @@ defmodule AppWeb.PageLive do
   This function handles both the image that is uploaded by the user and the example images.
   """
   @impl true
+  def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
+      when assigns.audio_ref == ref do
+    Process.demonitor(ref, [:flush])
+    File.rm!(@tmp_wav)
+
+    # %{serve_embedding: serving, index: index} = assigns
+    # compute an normed embedding (cosine case only) on the text result
+    # and returns an App.Image{} as the result of a "knn_search"
+    # with %{embedding: data} <- Nx.Serving.run(serving, text),
+    #  normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
+    #  %App.Image{} = result <- handle_knn(normed_data, index) do
+    {:noreply,
+     assign(socket,
+       transcription: String.trim(text),
+       micro_off: false,
+       speech_spin: false,
+       #  search_result: result,
+       audio_ref: nil
+     )}
+
+    # else
+    #   # record without entries
+    #   {:error, "no entries in index"} ->
+    #     {:noreply,
+    #      assign(socket,
+    #        micro_off: false,
+    #        search_result: nil,
+    #        speech_spin: false,
+    #        audio_ref: nil
+    #      )}
+
+    #   nil ->
+    #     {:noreply,
+    #      assign(socket,
+    #        transcription: String.trim(text),
+    #        micro_off: false,
+    #        search_result: nil,
+    #        speech_spin: false,
+    #        audio_ref: nil
+    #      )}
+    # end
+  end
+
   def handle_info({ref, result}, %{assigns: assigns} = socket) do
     # Flush async call
     Process.demonitor(ref, [:flush])
