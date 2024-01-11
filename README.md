@@ -1,7 +1,7 @@
 Let's use `Elixir` machine learning capabilities to build an application with the following features:
 
-1. upload an image to a bucket and automatically caption it with machine learning
-2. provide a [symmetric semantic search](https://sbert.net/examples/applications/semantic-search/README.html) for relevant images given an audio input.
+1. you can upload an image to a bucket and automatically caption it with machine learning
+2. you can provide a [symmetric semantic search](https://sbert.net/examples/applications/semantic-search/README.html) to find your relevant images given an audio input.
 
 <div align="center">
 
@@ -66,7 +66,7 @@ within `Phoenix`!
 - [Audio transciption and semantic search](#audio-transciption-and-semantic-search)
   - [Transcribe an audio recording](#transcribe-an-audio-recording)
   - [Embeddings and semantic search](#embeddings-and-semantic-search)
-- [_Please_ Star the repo! ⭐️](#please-star-the-repo-️)
+- [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
 
@@ -175,7 +175,7 @@ to the `deps` section.
   a framework that will allows us to integrate
   [`Transformer Models`](https://huggingface.co/docs/transformers/index) in `Phoenix`.
   `Transformers` (from [Hugging Face](https://huggingface.co/))
-  are APIs that allow us to easily download and train
+  are APIs that allow us to easily download and ~~train~~ use
   [pretrained models](https://blogs.nvidia.com/blog/2022/12/08/what-is-a-pretrained-ai-model).
   `Bumblebee` aims to support all Transformer Models,
   however some are lacking.
@@ -199,8 +199,7 @@ to the `deps` section.
   [`Numerical Elixir`](https://github.com/elixir-nx/),
   Elixir's way of doing [numerical computing](https://www.hilarispublisher.com/open-access/introduction-to-numerical-computing-2168-9679-1000423.pdf).
 
-- [**`Vix`**](https://hexdocs.pm/vix/readme.html),
-  an image processing library.
+- [**`Vix`**](https://hexdocs.pm/vix/readme.html), an Elixir extension for [libvips](https://www.libvips.org/) image processing library.
 
 In `config/config.exs`,
 let's add our `:nx` configuration
@@ -3179,23 +3178,24 @@ inside the
 
 # Audio transciption and semantic search
 
-Suppose you have a bunch of images and you want to find a specific image on a certain thema.
-One way to solve this problem is to describe each image with a caption and perform a full-text search query for specific words among these captions.
+Suppose you want to find a specific image on a certain thema.
+One way to solve this problem is to perform a full-text search query on specific words among these captions.
 
-With Machine Learning and models, you can greatly improve the search with semantic search: you search for images whose captions are close in terms of _meaning_ to your search.
+With Machine Learning and models, you can greatly improve the search with _semantic search_: you search for images whose captions are close in terms of _meaning_ to your search.
 
-It remains to express what "close" means and how to do this. We describe how this can be done with pre-trained models with the help of the Elixir `Bumblebee` package.
+It remains to express what "close" means and how to do this.
 
-The program is:
+Once your images are uploaded and captionned, we save the URL and the caption into a database.
+The next steps are:
 
-- you upload images into a bucket. You analyse the image with a model to produce a caption - a short descriptive textdescription. This is an **Image-To-Text** process. We used the model "Salesforce/blip-image-captioning-base" with [Bumblebee.Vision.image_to_text](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_to_text/5).You then save the URL and the caption into a DB.
-- you record an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API. and run a **Speech-To-Text** process to produce a text transcription from the audio. We used the model "openai/whisper-small" and [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5).
+- you record an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API.
+- you run a **Speech-To-Text** process to produce a text transcription from the audio. We load the model "openai/whisper-small" and use it with the help of the [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5) function.
 
-This transcription is the "target text". We want to find images whose captionsapproximates this text in terms of meaning. This is **semantic search** where **embeddings** come into play: we encode each text as a vector and then use an approximation algorithm to find the closest neighbours.
+This transcription is the "target text" in the sense that we want to find images whose captions approximates this text in terms of meaning. This is where **embeddings** come into play: we encode each text as a vector and then use an approximation algorithm to find the closest neighbours.
 
 - you transform a text into a vector (a so-called embedding). We used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function. This encoding is done for each image caption.
 
-- you run a **knn_neighbour** search. You can use the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. You build incrementally an Index struct from your captions, and then run a "knn_search" on this index with the audio transcription as an input. This process is dependant on the metric used. It returns the most relevant position(s) - indices - among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s).
+- you run a **knn_neighbour** search. We used the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. You build incrementally an Index struct from your captions, and then run a "knn_search" on this index with the audio transcription as an input. This process is dependant on the metric used. It returns the most relevant position(s) - indices - among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s).
 
 ## Transcribe an audio recording
 
@@ -3299,13 +3299,13 @@ let liveSocket = new LiveSocket("/live", Socket, {
 });
 ```
 
-We also modify the code server-side. The audio file will be saved on disk as a temporary file on the "/priv/static/uploads" folder. We declare this folder in the "/lib/app_web.ex" file and append the list of static files served by Phoenix as so:
+We now need to add some code server-side. The uploaded audio file will be saved on disk as a temporary file on the "/priv/static/uploads" folder. We declare this folder in the "/lib/app_web.ex" file and append the list of static files served by Phoenix as so:
 
 ```elixir
   def static_paths, do: ~w(assets fonts images favicon.ico robots.txt uploads)
 ```
 
-We then update the socket to be returned by the LiveView `mount/3` function. We pass extra arguments needed as well as another `allow_upload/3`.
+We then update the socket to be returned by the LiveView `mount/3` function. We pass extra arguments - typically booleans for the UI such as the button disabling and the spinner - as well as another `allow_upload/3` to handle the upload process.
 
 ```elixir
 #page_live.ex
@@ -3317,6 +3317,7 @@ def mount(_,_,socket) do
 
   socket
   |> assign(
+    ...,
     transcription: nil,
     micro_off: false,
     speech_spin: false,
@@ -3327,10 +3328,11 @@ def mount(_,_,socket) do
     progress: &handle_progress/3,
     max_entries: 1
   )
+  |> allow_upload(:image_list, ...)
 end
 ```
 
-We `handle_progress` the `:speech` event as we did with the `:image_list` event. We will run the Whisper model this time:
+We `handle_progress` the `:speech` event as we did with the `:image_list` event. We will launch a task to run the Whisper model on this audio file:
 
 ```elixir
 def handle_progress(:speech, entry, socket) when entry.done? do
@@ -3355,6 +3357,7 @@ end
 We then need to create the serving for this model. Create a new file "App.Whisper":
 
 ```elixir
+# /lib/app/sppech_to_text.ex
 defmodule App.Whisper do
   def serving do
     model = "openai/whisper-small"
@@ -3384,11 +3387,14 @@ We finally need to handle the response from this task which is in the form of:
   chunks:
   [%{
       text: "Hi there",
+              ^^^the text of our audio
       start_timestamp_seconds: nil,
       end_timestamp_seconds: nil
   }]
 }
 ```
+
+In this function, we simply update the socket state with the result and update the booleans used for our UI (the spinner, the button availability, reset of the task once done).
 
 ```elixir
 def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
@@ -3401,7 +3407,6 @@ def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns}
       transcription: String.trim(text),
       micro_off: false,
       speech_spin: false,
-      #  search_result: result,
       audio_ref: nil
     )}
 end
@@ -3409,13 +3414,13 @@ end
 
 ## Embeddings and semantic search
 
-We use a transformer-based pre-trained model [SBERT](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) to compute an embedding (a representation of the text as a vector) for each caption: we picked-up the transformer [sentence-transformers/paraphrase-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) model.
+We use a transformer-based pre-trained model [SBERT](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) to compute an embedding - a representation of the text as a vector - for each caption: we picked-up the transformer [sentence-transformers/paraphrase-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) model.
 The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function once we load the model.
 For simplicity, we did not use the multi-lingual model.
 We instantiate the HNSWLib index with a GenServer and also the tokenizing (which produces embeddings). The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use cosine_similarity.
 TBC
 
-# _Please_ Star the repo! ⭐️
+# _Please_ star the repo! ⭐️
 
 If you find this package/repo useful,
 please star on GitHub, so that we know! ⭐
