@@ -1,7 +1,7 @@
 Let's use `Elixir` machine learning capabilities to build an application with the following features:
 
 1. upload an image to a bucket and automatically caption it with machine learning
-2. provide a semantic search on the image captions via an audio.
+2. provide a [symmetric semantic search](https://sbert.net/examples/applications/semantic-search/README.html) for relevant images given an audio input.
 
 <div align="center">
 
@@ -3184,18 +3184,18 @@ One way to solve this problem is to describe each image with a caption and perfo
 
 With Machine Learning and models, you can greatly improve the search with semantic search: you search for images whose captions are close in terms of _meaning_ to your search.
 
-It remains to express what "close" means and how to do this. Theses notes describes how this can be done with pre-trained models powered by `Bumblebee`.
+It remains to express what "close" means and how to do this. We describe how this can be done with pre-trained models with the help of the Elixir `Bumblebee` package.
 
 The program is:
 
 - you upload images into a bucket. You analyse the image with a model to produce a caption - a short descriptive textdescription. This is an **Image-To-Text** process. We used the model "Salesforce/blip-image-captioning-base" with [Bumblebee.Vision.image_to_text](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_to_text/5).You then save the URL and the caption into a DB.
 - you record an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API. and run a **Speech-To-Text** process to produce a text transcription from the audio. We used the model "openai/whisper-small" and [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5).
 
-This transcription is the "target text": we want to find the captions that approximates this text in terms of meaning. This is **semantic search** where **embeddings** come into play: we transcript a text into a well-thought _vector space_ and then use an approximation algorithm to find the closest neighbours.
+This transcription is the "target text". We want to find images whose captionsapproximates this text in terms of meaning. This is **semantic search** where **embeddings** come into play: we encode each text as a vector and then use an approximation algorithm to find the closest neighbours.
 
-- to transform a text into a vector (a so-called embedding), we used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" and [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3). You compute the embeddings for each image caption.
+- you transform a text into a vector (a so-called embedding). We used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function. This encoding is done for each image caption.
 
-- to run a "knn_neighbour", you can use the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. You build incrementally an Index struct from your captions, and then run a "knn_search" on this index with the audio transcription as an input. This process is dependant on the metric used. It returns the position(s) (indices) among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s).
+- you run a **knn_neighbour** search. You can use the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. You build incrementally an Index struct from your captions, and then run a "knn_search" on this index with the audio transcription as an input. This process is dependant on the metric used. It returns the most relevant position(s) - indices - among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s).
 
 ## Transcribe an audio recording
 
@@ -3409,9 +3409,10 @@ end
 
 ## Embeddings and semantic search
 
-To transform a text into a vector (a so-called embedding), we used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" and `Bumblebee.Text.TextEmbedding.text_embedding`.
-You compute the embeddings for each image caption.
-We instantiate the HNSWLib index with a GenServer and also the tokenizing (which produces embeddings). The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance.
+We use a transformer-based pre-trained model [SBERT](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) to compute an embedding (a representation of the text as a vector) for each caption: we picked-up the transformer [sentence-transformers/paraphrase-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) model.
+The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function once we load the model.
+For simplicity, we did not use the multi-lingual model.
+We instantiate the HNSWLib index with a GenServer and also the tokenizing (which produces embeddings). The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use cosine_similarity.
 TBC
 
 # _Please_ Star the repo! ⭐️
