@@ -1,7 +1,7 @@
 Let's use `Elixir` machine learning capabilities to build an application with the following features:
 
-1. you can upload an image to a bucket and automatically caption it with machine learning
-2. you can provide a [symmetric semantic search](https://sbert.net/examples/applications/semantic-search/README.html) to find your relevant images given an audio input.
+1. Image captioning: you can upload an image to a bucket and automatically caption it with machine learning
+2. Semantic search: you provide an audio input and the app runs a [symmetric semantic search](https://sbert.net/examples/applications/semantic-search/README.html) to find your relevant images.
 
 <div align="center">
 
@@ -63,7 +63,7 @@ within `Phoenix`!
   - [10. Adding double MIME type check and showing feedback to the person in case of failure](#10-adding-double-mime-type-check-and-showing-feedback-to-the-person-in-case-of-failure)
     - [10.1 Showing a toast component with error](#101-showing-a-toast-component-with-error)
 - [Benchmarking models](#benchmarking-models)
-- [Audio transciption and semantic search](#audio-transciption-and-semantic-search)
+- [Semantic search](#semantic-search)
   - [Transcribe an audio recording](#transcribe-an-audio-recording)
   - [Embeddings and semantic search](#embeddings-and-semantic-search)
 - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
@@ -3176,12 +3176,12 @@ and all of the code
 inside the
 [`_comparison`](./_comparison/) folder.
 
-# Audio transciption and semantic search
+# Semantic search
 
 Suppose you want to find a specific image on a certain thema.
 One way to solve this problem is to perform a full-text search query on specific words among these captions.
 
-With Machine Learning and models, you can greatly improve the search with _semantic search_: you search for images whose captions are close in terms of _meaning_ to your search.
+With Machine Learning and models, you can greatly improve the search with _semantic search_: you look for images whose captions are close in terms of _meaning_ to your search.
 
 It remains to express what "close" means and how to do this.
 
@@ -3189,13 +3189,13 @@ Once your images are uploaded and captionned, we save the URL and the caption in
 The next steps are:
 
 - you record an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API.
-- you run a **Speech-To-Text** process to produce a text transcription from the audio. We load the model "openai/whisper-small" and use it with the help of the [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5) function.
+- you run a **Speech-To-Text** process to produce a text transcription from the audio. We need to load the _pre-trained_ model [openai/whisper-small](https://huggingface.co/openai/whisper-small) from <https://huggingface.co> and use it with the help of the [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5) function to run this model against our input.
 
-This transcription is the "target text" in the sense that we want to find images whose captions approximates this text in terms of meaning. This is where **embeddings** come into play: we encode each text as a vector and then use an approximation algorithm to find the closest neighbours.
+We then want to find images whose captions approximates this text in terms of meaning. This transcription is the "target text". This is where **embeddings** come into play: we encode each transcription as a _vector_ - aka embedding - and then use an approximation algorithm to find the closest neighbours.
 
-- you transform a text into a vector (a so-called embedding). We used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function. This encoding is done for each image caption.
+- you transform a text into a vector. We used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function. This encoding is done for each image caption.
 
-- you run a **knn_neighbour** search. We used the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. You build incrementally an Index struct from your captions, and then run a "knn_search" on this index with the audio transcription as an input. This process is dependant on the metric used. It returns the most relevant position(s) - indices - among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s).
+- you then run a **knn_neighbour** search. The idea is to work in the embeddings vector space and find the image vectors that are close to the target vector. We used the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. It works with an Index struct. You append incrementally the Index struct - saved into a file - from your captions, and then run a "knn\*search" algorithm on this index with the audio transcription as an input. It returns the most relevant position(s) - indices - among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s). Note that this process is dependant on the metric used; we will use _cosine_similarity_ since the model is trained with it.
 
 ## Transcribe an audio recording
 
@@ -3394,7 +3394,7 @@ We finally need to handle the response from this task which is in the form of:
 }
 ```
 
-In this function, we simply update the socket state with the result and update the booleans used for our UI (the spinner, the button availability, reset of the task once done).
+This response is received in a handle_info callback where : we simply update the socket state with the result and update the booleans used for our UI (the spinner, the button availability, reset of the task once done).
 
 ```elixir
 def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
