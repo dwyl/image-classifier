@@ -1,11 +1,117 @@
+# Using Elixir machine learning tools for semantic search
+
 Let's use `Elixir` machine learning capabilities to build an application with the following features:
 
-1. Image captioning: you can upload an image to a bucket and automatically caption it with machine learning
+1. Image captioning: you can upload an image to a bucket and automatically caption it,
 2. Semantic search: you provide an audio input and the app runs a [symmetric semantic search](https://sbert.net/examples/applications/semantic-search/README.html) to find your relevant images.
+
+<br />
+
+- [Using Elixir machine learning tools for semantic search](#using-elixir-machine-learning-tools-for-semantic-search)
+  - [Why? 🤷](#why-)
+  - [What? 💭](#what-)
+  - [Who? 👤](#who-)
+  - [How? 💻](#how-)
+  - [Prerequisites](#prerequisites)
+  - [Image Captioning in `Elixir`](#image-captioning-in-elixir)
+    - [0. Creating a fresh `Phoenix` project](#0-creating-a-fresh-phoenix-project)
+    - [1. Installing initial dependencies](#1-installing-initial-dependencies)
+    - [2. Adding `LiveView` capabilities to our project](#2-adding-liveview-capabilities-to-our-project)
+    - [3. Receiving image files](#3-receiving-image-files)
+    - [4. Integrating `Bumblebee` 🐝](#4-integrating-bumblebee-)
+      - [4.1 `Nx` configuration ⚙️](#41-nx-configuration-️)
+      - [4.2 `Async` processing the image for classification](#42-async-processing-the-image-for-classification)
+        - [4.2.1 Considerations regarding `async` processes](#421-considerations-regarding-async-processes)
+        - [4.2.2 Alternative for better testing](#422-alternative-for-better-testing)
+      - [4.3 Image pre-processing](#43-image-pre-processing)
+    - [4.4 Updating the view](#44-updating-the-view)
+      - [4.5 Check it out!](#45-check-it-out)
+      - [4.6 Considerations on user images](#46-considerations-on-user-images)
+    - [5. Final Touches](#5-final-touches)
+      - [5.1 Setting max file size](#51-setting-max-file-size)
+      - [5.2 Show errors](#52-show-errors)
+      - [5.3 Show image preview](#53-show-image-preview)
+    - [6. What about other models?](#6-what-about-other-models)
+    - [7. How do I deploy this thing?](#7-how-do-i-deploy-this-thing)
+    - [8. Showing example images](#8-showing-example-images)
+      - [8.1 Creating a hook in client](#81-creating-a-hook-in-client)
+    - [8.2 Handling the example images list event inside our LiveView](#82-handling-the-example-images-list-event-inside-our-liveview)
+      - [8.3 Updating the view](#83-updating-the-view)
+      - [8.4 Using URL of image instead of base64-encoded](#84-using-url-of-image-instead-of-base64-encoded)
+      - [8.5 See it running](#85-see-it-running)
+    - [9. Store metadata and classification info](#9-store-metadata-and-classification-info)
+      - [9.1 Installing dependencies](#91-installing-dependencies)
+      - [9.2 Adding `Postgres` configuration files](#92-adding-postgres-configuration-files)
+      - [9.3 Creating `Image` schema](#93-creating-image-schema)
+      - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
+    - [10. Adding double MIME type check and showing feedback to the person in case of failure](#10-adding-double-mime-type-check-and-showing-feedback-to-the-person-in-case-of-failure)
+      - [10.1 Showing a toast component with error](#101-showing-a-toast-component-with-error)
+  - [Benchmarking models](#benchmarking-models)
+  - [Semantic search](#semantic-search)
+    - [Overview of the process](#overview-of-the-process)
+    - [Transcribe an audio recording](#transcribe-an-audio-recording)
+    - [Embeddings and semantic search](#embeddings-and-semantic-search)
+    - [New dependencies](#new-dependencies)
+  - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
+
+<br />
+
+## Why? 🤷
+
+Building our
+[app](https://github.com/dwyl/app),
+we consider `images` an _essential_
+medium of communication.
+
+By adding a way of captioning images,
+we make it _easy_ for people
+to suggest meta tags to describe images
+so they become **searchable**.
+
+## What? 💭
+
+This run-through will create a simple
+`Phoenix` web application
+that will allow you to choose/drag an image
+and automatically caption the image.
+
+Furthermore, the app will allow the user to record an audio which describes the image(s) you want to find.
+
+## Who? 👤
+
+This tutorial is aimed at `Phoenix` beginners
+that want to grasp how to ~~do image captioning~~ start to use machine learning capabilities of the Elixir langugage within a `Phoenix` application.
+
+If you are completely new to `Phoenix` and `LiveView`,
+we recommend you follow the **`LiveView` _Counter_ Tutorial**:
+
+[dwyl/phoenix-liveview-counter-tutorial](https://github.com/dwyl/phoenix-liveview-counter-tutorial)
+
+## How? 💻
+
+In these chapters, we'll go over the development process of this small application.
+You'll learn how to do this _yourself_, so grab some coffee and let's get cracking!
+
+## Prerequisites
+
+This tutorial requires you have `Elixir` and `Phoenix` installed.
+
+If you you don't, please see [how to install Elixir](https://github.com/dwyl/learn-elixir#installation) and [Phoenix](https://hexdocs.pm/phoenix/installation.html#phoenix).
+
+This guide assumes you know the basics of `Phoenix` and have _some_ knowledge of how it works.
+If you don't, we _highly suggest_ you follow our other tutorials first.
+e.g: [github.com/dwyl/**phoenix-chat-example**](https://github.com/dwyl/phoenix-chat-example)
+
+In addition to this, **_some_ knowledge of `AWS`** - what it is, what an `S3` bucket is/does - **is assumed**.
+
+> [!NOTE]
+> if you have questions or get stuck,
+> please open an issue!
+> [/dwyl/image-classifier/issues](https://github.com/dwyl/image-classifier/issues)
 
 <div align="center">
 
-# Image Captioning in `Elixir`
+## Image Captioning in `Elixir`
 
 ![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/dwyl/image-classifier/ci.yml?label=build&style=flat-square&branch=main)
 [![codecov.io](https://img.shields.io/codecov/c/github/dwyl/image-classifier/main.svg?style=flat-square)](https://codecov.io/github/dwyl/image-classifier?branch=main)
@@ -22,116 +128,7 @@ within `Phoenix`!
 
 </div>
 
-<br />
-
-- [Image Captioning in `Elixir`](#image-captioning-in-elixir)
-- [Why? 🤷](#why-)
-- [What? 💭](#what-)
-- [Who? 👤](#who-)
-- [How? 💻](#how-)
-  - [Prerequisites](#prerequisites)
-  - [0. Creating a fresh `Phoenix` project](#0-creating-a-fresh-phoenix-project)
-  - [1. Installing initial dependencies](#1-installing-initial-dependencies)
-  - [2. Adding `LiveView` capabilities to our project](#2-adding-liveview-capabilities-to-our-project)
-  - [3. Receiving image files](#3-receiving-image-files)
-  - [4. Integrating `Bumblebee` 🐝](#4-integrating-bumblebee-)
-    - [4.1 `Nx` configuration ⚙️](#41-nx-configuration-️)
-    - [4.2 `Async` processing the image for classification](#42-async-processing-the-image-for-classification)
-      - [4.2.1 Considerations regarding `async` processes](#421-considerations-regarding-async-processes)
-      - [4.2.2 Alternative for better testing](#422-alternative-for-better-testing)
-    - [4.3 Image pre-processing](#43-image-pre-processing)
-    - [4.4 Updating the view](#44-updating-the-view)
-    - [4.5 Check it out!](#45-check-it-out)
-    - [4.6 Considerations on user images](#46-considerations-on-user-images)
-  - [5. Final Touches](#5-final-touches)
-    - [5.1 Setting max file size](#51-setting-max-file-size)
-    - [5.2 Show errors](#52-show-errors)
-    - [5.3 Show image preview](#53-show-image-preview)
-  - [6. What about other models?](#6-what-about-other-models)
-  - [7. How do I deploy this thing?](#7-how-do-i-deploy-this-thing)
-  - [8. Showing example images](#8-showing-example-images)
-    - [8.1 Creating a hook in client](#81-creating-a-hook-in-client)
-    - [8.2 Handling the example images list event inside our LiveView](#82-handling-the-example-images-list-event-inside-our-liveview)
-    - [8.3 Updating the view](#83-updating-the-view)
-    - [8.4 Using URL of image instead of base64-encoded](#84-using-url-of-image-instead-of-base64-encoded)
-    - [8.5 See it running](#85-see-it-running)
-  - [9. Store metadata and classification info](#9-store-metadata-and-classification-info)
-    - [9.1 Installing dependencies](#91-installing-dependencies)
-    - [9.2 Adding `Postgres` configuration files](#92-adding-postgres-configuration-files)
-    - [9.3 Creating `Image` schema](#93-creating-image-schema)
-    - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
-  - [10. Adding double MIME type check and showing feedback to the person in case of failure](#10-adding-double-mime-type-check-and-showing-feedback-to-the-person-in-case-of-failure)
-    - [10.1 Showing a toast component with error](#101-showing-a-toast-component-with-error)
-- [Benchmarking models](#benchmarking-models)
-- [Semantic search](#semantic-search)
-  - [Transcribe an audio recording](#transcribe-an-audio-recording)
-  - [Embeddings and semantic search](#embeddings-and-semantic-search)
-- [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
-
-<br />
-
-# Why? 🤷
-
-Building our
-[app](https://github.com/dwyl/app),
-we consider `images` an _essential_
-medium of communication.
-
-By adding a way of captioning images,
-we make it _easy_ for people
-to suggest meta tags to describe images
-so they become **searchable**.
-
-# What? 💭
-
-This run-through will create a simple
-`Phoenix` web application
-that will allow you to choose/drag an image
-and caption the image.
-
-# Who? 👤
-
-This tutorial is aimed at `Phoenix` beginners
-that want to grasp how to do image captioning
-within a `Phoenix` application.
-
-If you are completely new to `Phoenix` and `LiveView`,
-we recommend you follow the **`LiveView` _Counter_ Tutorial**:
-[dwyl/phoenix-liveview-counter-tutorial](https://github.com/dwyl/phoenix-liveview-counter-tutorial)
-
-# How? 💻
-
-In this chapter, we'll go over the development process
-of this small application.
-You'll learn how to do this _yourself_,
-so grab some coffee and let's get cracking!
-
-## Prerequisites
-
-This tutorial requires you have `Elixir` and `Phoenix` installed. <br />
-If you you don't, please see
-[how to install Elixir](https://github.com/dwyl/learn-elixir#installation)
-and
-[Phoenix](https://hexdocs.pm/phoenix/installation.html#phoenix).
-
-This guide assumes you know the basics of `Phoenix`
-and have _some_ knowledge of how it works.
-If you don't,
-we _highly suggest_ you follow our other tutorials first.
-e.g:
-[github.com/dwyl/**phoenix-chat-example**](https://github.com/dwyl/phoenix-chat-example)
-
-In addition to this,
-**_some_ knowledge of `AWS`** -
-what it is, what an `S3` bucket is/does -
-**is assumed**.
-
-> [!NOTE]
-> if you have questions or get stuck,
-> please open an issue!
-> [/dwyl/image-classifier/issues](https://github.com/dwyl/image-classifier/issues)
-
-## 0. Creating a fresh `Phoenix` project
+### 0. Creating a fresh `Phoenix` project
 
 Let's create a fresh `Phoenix` project.
 Run the following command in a given folder:
@@ -155,7 +152,7 @@ you should be able to see the following page.
 
 We're ready to start building.
 
-## 1. Installing initial dependencies
+### 1. Installing initial dependencies
 
 Now that we're ready to go,
 let's start by adding some dependencies.
@@ -209,7 +206,7 @@ to use `EXLA`.
 config :nx, default_backend: EXLA.Backend
 ```
 
-## 2. Adding `LiveView` capabilities to our project
+### 2. Adding `LiveView` capabilities to our project
 
 As it stands,
 our project is not using `LiveView`.
@@ -350,7 +347,7 @@ you should see the following screen:
 This means we've successfully added `LiveView`
 and changed our view!
 
-## 3. Receiving image files
+### 3. Receiving image files
 
 Now, let's start by receiving some image files.
 In order to classify them, we need to have access to begin with,
@@ -554,12 +551,12 @@ And that's it!
 If you run `mix phx.server`,
 nothing will change.
 
-## 4. Integrating `Bumblebee` 🐝
+### 4. Integrating `Bumblebee` 🐝
 
 Now here comes the fun part!
 It's time to do some image captioning! 🎉
 
-### 4.1 `Nx` configuration ⚙️
+#### 4.1 `Nx` configuration ⚙️
 
 We first need to add some initial setup in the
 `lib/app/application.ex` file.
@@ -646,7 +643,7 @@ by calling [`image_classification/3`](https://hexdocs.pm/bumblebee/Bumblebee.Vis
 where we can define our compiler and task batch size.
 We've given our serving function the name `ImageClassifier`.
 
-### 4.2 `Async` processing the image for classification
+#### 4.2 `Async` processing the image for classification
 
 Now we're ready to send the image to the model
 and get a prediction of it!
@@ -752,7 +749,7 @@ and the work is automatically cancelled,
 meaning no resources are spent
 on a process for which nobody expects a result anymore.
 
-#### 4.2.1 Considerations regarding `async` processes
+##### 4.2.1 Considerations regarding `async` processes
 
 When a task is spawned using `Task.async/2`,
 **it is linked to the caller**.
@@ -776,7 +773,7 @@ However, if you are building something
 like a report that has to be generated even if the person closes the browser tab,
 this is not the right solution.
 
-#### 4.2.2 Alternative for better testing
+##### 4.2.2 Alternative for better testing
 
 We are spawning async tasks by calling `Task.async/1`.
 This is creating an **_unsupervised_ task**.
@@ -861,7 +858,7 @@ in unit tests so they wait for the tasks to complete.
 In our case,
 we do that until the _prediction is made_.
 
-### 4.3 Image pre-processing
+#### 4.3 Image pre-processing
 
 As we've noted before,
 we need to **pre-process the image before passing it to the model**.
@@ -1066,7 +1063,7 @@ Replace them with this handler:
   end
 ```
 
-### 4.5 Check it out!
+#### 4.5 Check it out!
 
 And that's it!
 Our app is now _functional_ 🎉.
@@ -1086,7 +1083,7 @@ You can and **should** try other models.
 `ResNet-50` is just one of the many that are supported by `Bumblebee`.
 You can see the supported models in https://github.com/elixir-nx/bumblebee#model-support.
 
-### 4.6 Considerations on user images
+#### 4.6 Considerations on user images
 
 To keep the app as simple as possible,
 we are receiving the image from the person as is.
@@ -1154,12 +1151,12 @@ so you may want to resize the image to this width.
 > https://github.com/libvips/libvips/wiki/HOWTO----Image-shrinking
 > to know why.
 
-## 5. Final Touches
+### 5. Final Touches
 
 Although our app is functional,
 we can make it **better**. 🎨
 
-### 5.1 Setting max file size
+#### 5.1 Setting max file size
 
 In order to better control user input,
 we should add a limit to the size of the image that is being uploaded.
@@ -1191,7 +1188,7 @@ And that's it!
 The number is in `bytes`,
 hence why we set it as `5_000_000`.
 
-### 5.2 Show errors
+#### 5.2 Show errors
 
 In case a person uploads an image that is too large,
 we should show this feedback to the person!
@@ -1259,7 +1256,7 @@ Awesome! 🎉
   <img width=800 src="https://github.com/dwyl/aws-sdk-mock/assets/17494745/1bf903eb-31d5-48a4-9da9-1f5f64932b6e" />
 </p>
 
-### 5.3 Show image preview
+#### 5.3 Show image preview
 
 As of now, even though our app predicts the given images,
 it is not showing a preview of the image the person submitted.
@@ -1379,7 +1376,7 @@ it is previewed and shown to the person!
   <img width=800 src="https://github.com/dwyl/image-classifier/assets/17494745/2835c24f-f4ba-48bc-aab0-6b39830156ce" />
 </p>
 
-## 6. What about other models?
+### 6. What about other models?
 
 Maybe you weren't happy with the results from this model.
 
@@ -1516,7 +1513,7 @@ Awesome! 🎉
 >
 > For this, check the [`deployment guide`](./deployment.md#5-a-better-model-management).
 
-## 7. How do I deploy this thing?
+### 7. How do I deploy this thing?
 
 There are a few considerations you may want to have
 before considering deploying this.
@@ -1526,7 +1523,7 @@ that will **guide you through deploying this app in `fly.io`**!
 
 Check the [`deployment.md`](./deployment.md) file for more information.
 
-## 8. Showing example images
+### 8. Showing example images
 
 > [!WARNING]
 >
@@ -1552,7 +1549,7 @@ we are going to need to make **three changes**.
 
 Let's go over each one!
 
-### 8.1 Creating a hook in client
+#### 8.1 Creating a hook in client
 
 We are going to detect the inactivity of the person
 with some `Javascript` code.
@@ -1919,7 +1916,7 @@ and setting the `:predicting` property to `false`.
 And that's it!
 Great job! 🥳
 
-### 8.3 Updating the view
+#### 8.3 Updating the view
 
 Now that we've made all the necessary changes to our LiveView,
 we need to update our view so it reflects them!
@@ -2165,7 +2162,7 @@ We've made two changes.
 
 And that's it! 🎉
 
-### 8.4 Using URL of image instead of base64-encoded
+#### 8.4 Using URL of image instead of base64-encoded
 
 While our example list is being correctly rendered,
 we are using additional CPU
@@ -2364,7 +2361,7 @@ Therefore, we're saving some CPU
 to the thing that matters the most:
 _running our model_.
 
-### 8.5 See it running
+#### 8.5 See it running
 
 Now let's see our application in action!
 We are expecting the examples to be shown after
@@ -2380,7 +2377,7 @@ Isn't that cool? 😎
   <img width=800 src="https://github.com/dwyl/image-classifier/assets/17494745/1f8d08d1-f6ca-46aa-8c89-4bab45ad1e54">
 </p>
 
-## 9. Store metadata and classification info
+### 9. Store metadata and classification info
 
 Our app is shaping up quite nicely!
 As it stands, it's an application that does inference on images.
@@ -2398,7 +2395,7 @@ we'll have to configure this ourselves.
 
 Let's do it!
 
-### 9.1 Installing dependencies
+#### 9.1 Installing dependencies
 
 We'll install all the needed dependencies first.
 In `mix.exs`, add the following snippet
@@ -2435,7 +2432,7 @@ to the `deps` section.
 
 Run `mix deps.get` to install these dependencies.
 
-### 9.2 Adding `Postgres` configuration files
+#### 9.2 Adding `Postgres` configuration files
 
 Now let's create the needed files
 to properly connect to a Postgres relational database.
@@ -2571,7 +2568,7 @@ You can now run `mix ecto.create` and `mix ecto.migrate`
 to create the database
 and the `"images"` table.
 
-### 9.3 Creating `Image` schema
+#### 9.3 Creating `Image` schema
 
 For now, let's create a simple table `"images"`
 in our database
@@ -2630,7 +2627,7 @@ before interacting with the database.
 runs it through the changeset
 and inserts it in the database.
 
-### 9.4 Changing our LiveView to persist data
+#### 9.4 Changing our LiveView to persist data
 
 Now that we have our database set up,
 let's change some of our code so we persist data into it!
@@ -2818,7 +2815,7 @@ and the result of the classifying model
 >
 > You can learn more about it in https://github.com/dwyl/learn-postgresql.
 
-## 10. Adding double MIME type check and showing feedback to the person in case of failure
+### 10. Adding double MIME type check and showing feedback to the person in case of failure
 
 Currently, we are not handling any errors
 in case the upload of the image to `imgup` fails.
@@ -2881,22 +2878,17 @@ we need to also update `def handle_progress(:image_list...`
 inside `lib/app_web/live/page_live.ex`
 to properly handle this new function output.
 
-We are also introducing a double MIME type check to ensure that only
-image files are uploaded and processed.
-We use [GenMagic](https://hexdocs.pm/gen_magic/readme.html) provides supervised and customisable access to `libmagic` using a supervised external process.
+We are also introducing a double MIME type check to ensure that only image files are uploaded and processed.
+We use [GenMagic](https://hexdocs.pm/gen_magic/readme.html). It provides supervised and customisable access to `libmagic` using a supervised external process.
 [This gist](https://gist.github.com/leommoore/f9e57ba2aa4bf197ebc5) explains that Magic numbers are the first bits of a file
 which uniquely identify the type of file.
 
 We use the GenMagic server as a daemon; it is started in the Application module.
 It is referenced by its name.
-When we run `perform`, we obtain a map and compare the mime type with the one
-read by `ExImageInfo`.
-If they correspond with each other,
-we continue, else we stop the process.
+When we run `perform`, we obtain a map and compare the mime type with the one read by `ExImageInfo`.
+If they correspond with each other, we continue, else we stop the process.
 
-On your computer,
-in order for this to work locally
-you should install the package `libmagic-dev`.
+On your computer, in order for this to work locally, you should install the package `libmagic-dev`.
 
 > [!NOTE]
 >
@@ -2913,8 +2905,7 @@ you should install the package `libmagic-dev`.
 
 You'll need to add [`gen_magic`](https://github.com/evadne/gen_magic)
 to `mix.exs`.
-This dependency will allow us to access `libmagic`
-through `Elixir`.
+This dependency will allow us to access `libmagic` through `Elixir`.
 
 ```elixir
 def deps do
@@ -2935,8 +2926,7 @@ children = [
 ]
 ```
 
-In the Dockerfile (needed to deploy this app),
-we will install the `libmagic-dev` as well:
+In the Dockerfile (needed to deploy this app), we will install the `libmagic-dev` as well:
 
 ```Dockerfile
 RUN apt-get update -y && \
@@ -2944,7 +2934,7 @@ RUN apt-get update -y && \
   && apt-get clean && rm -f /var/lib/apt/lists/*_*
 ```
 
-Add the follwing function in the module App.Image:
+Add the following function in the module App.Image:
 
 ```elixir
  @doc """
@@ -3095,7 +3085,7 @@ Because we push an event in case the upload fails,
 we are going to make some changes to the Javascript client.
 We are going to **show a toast with the error when the upload fails**.
 
-### 10.1 Showing a toast component with error
+#### 10.1 Showing a toast component with error
 
 To show a [toast component](https://getbootstrap.com/docs/4.3/components/toasts/),
 we are going to use
@@ -3145,16 +3135,13 @@ that is shown in case the upload fails.
 And that's it!
 Quite easy, isn't it? 😉
 
-If `imgup` is down or the image that was sent was,
-for example, invalid,
-an error should be shown,
-like so.
+If `imgup` is down or the image that was sent was for example, invalid, an error should be shown, like so.
 
 <p align="center">
   <img width="800" src="https://github.com/dwyl/image-classifier/assets/17494745/d730d10c-b45e-4dce-a37a-bb389c3cd548" />
 </p>
 
-# Benchmarking models
+## Benchmarking models
 
 You may be wondering which model is best suitable for me?
 Depending on the use case,
@@ -3176,16 +3163,23 @@ and all of the code
 inside the
 [`_comparison`](./_comparison/) folder.
 
-# Semantic search
+<div align="center">
 
-Suppose you want to find a specific image on a certain thema.
-One way to solve this problem is to perform a full-text search query on specific words among these captions.
+## Semantic search
 
-With Machine Learning and models, you can greatly improve the search with _semantic search_: you look for images whose captions are close in terms of _meaning_ to your search.
+</div>
+
+You want to find a specific image on a certain thema.
+One way to solve this problem is to perform a _full-text_ search query on specific words among these captions.
+
+With Machine Learning and models, you can greatly improve the search: you look for images whose captions are close in terms of _meaning_ to your search.
 
 It remains to express what "close" means and how to do this.
 
+### Overview of the process
+
 Once your images are uploaded and captionned, we save the URL and the caption into a database.
+
 The next steps are:
 
 - you record an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API.
@@ -3197,7 +3191,7 @@ We then want to find images whose captions approximates this text in terms of me
 
 - you then run a **knn_neighbour** search. The idea is to work in the embeddings vector space and find the image vectors that are close to the target vector. We used the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. It works with an Index struct. You append incrementally the Index struct - saved into a file - from your captions, and then run a "knn\*search" algorithm on this index with the audio transcription as an input. It returns the most relevant position(s) - indices - among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s). Note that this process is dependant on the metric used; we will use _cosine_similarity_ since the model is trained with it.
 
-## Transcribe an audio recording
+### Transcribe an audio recording
 
 We firstly capture the audio and upload it to the server.
 
@@ -3332,7 +3326,7 @@ def mount(_,_,socket) do
 end
 ```
 
-We `handle_progress` the `:speech` event as we did with the `:image_list` event. We will launch a task to run the Whisper model on this audio file:
+We then create a specific `handle_progress` for the the `:speech` event as we did with the `:image_list` event. It will launch a task to run the Automatic Speech Recognition model on this audio file. We named the serving "Whisper".
 
 ```elixir
 def handle_progress(:speech, entry, socket) when entry.done? do
@@ -3354,7 +3348,7 @@ def handle_progress(:speech, entry, socket) when entry.done? do
 end
 ```
 
-We then need to create the serving for this model. Create a new file "App.Whisper":
+We now create the serving for this model. Create a new file "App.Whisper":
 
 ```elixir
 # /lib/app/sppech_to_text.ex
@@ -3380,7 +3374,7 @@ defmodule App.Whisper do
 end
 ```
 
-We finally need to handle the response from this task which is in the form of:
+The response of this task which is in the form of:
 
 ```elixir
 %{
@@ -3394,7 +3388,7 @@ We finally need to handle the response from this task which is in the form of:
 }
 ```
 
-This response is received in a handle_info callback where : we simply update the socket state with the result and update the booleans used for our UI (the spinner, the button availability, reset of the task once done).
+This response is received in a `handle_info` callback where we simply update the socket state with the result and update the booleans used for our UI (the spinner, the button availability, reset of the task once done).
 
 ```elixir
 def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
@@ -3412,15 +3406,89 @@ def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns}
 end
 ```
 
-## Embeddings and semantic search
+### Embeddings and semantic search
 
-We use a transformer-based pre-trained model [SBERT](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) to compute an embedding - a representation of the text as a vector - for each caption: we picked-up the transformer [sentence-transformers/paraphrase-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) model.
+We want to encode every caption and the input text into a specific vector space. In other words, we encode a string into a list of numbers.
+We use a transformer-based pre-trained model [SBERT](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) to compute an embedding for each caption. We picked-up the transformer [sentence-transformers/paraphrase-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) model.
 The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function once we load the model.
 For simplicity, we did not use the multi-lingual model.
 We instantiate the HNSWLib index with a GenServer and also the tokenizing (which produces embeddings). The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use cosine_similarity.
-TBC
 
-# _Please_ star the repo! ⭐️
+### New dependencies
+
+We will add the Elixir binding `HNSWLib`:
+
+```elixir
+{:hnswlib, "~> 0.1.4"}
+```
+
+We need to instantiate the Index struct which is saved into a file. We whether read the existing file or create a new one.
+This will be done in a GenServer since we also want to load the embedding model. We endow the vector space with a _cosine_ pseudo-metric.
+
+```elixir
+# /lib/app/text_embedding.ex
+defmodule App.TextEmbedding do
+  use GenServer
+  @indexes "indexes.bin"
+
+  def start_link(_) do
+    GenServer.start_link(__MODULE__, {}, name: __MODULE__)
+  end
+
+  # upload or create a new index file
+  def init(_) do
+    path = Application.app_dir(:app, ["priv", "static", "uploads", @indexes])
+    space = :cosine
+
+    {:ok, index} =
+      case File.exists?(path) do
+        false ->
+          HNSWLib.Index.new(_space = space, _dim = 384, _max_elements = 200)
+
+        true ->
+          HNSWLib.Index.load_index(space, 384, Path.expand("priv/" <> @indexes))
+      end
+
+    model_info = nil
+    tokenizer = nil
+    {:ok, {model_info, tokenizer, index}, {:continue, :load}}
+  end
+
+  def handle_continue(:load, {_, _, index}) do
+    transformer = "sentence-transformers/paraphrase-MiniLM-L6-v2"
+
+    {:ok, %{model: _model, params: _params} = model_info} =
+      Bumblebee.load_model({:hf, transformer})
+
+    {:ok, tokenizer} =
+      Bumblebee.load_tokenizer({:hf, transformer})
+
+    {:noreply, {model_info, tokenizer, index}}
+  end
+
+  # called in Liveview `mount`
+  def serve() do
+    GenServer.call(__MODULE__, :serve)
+  end
+
+  def handle_call(:serve, _from, {model_info, tokenizer, index} = state) do
+    serving = Bumblebee.Text.TextEmbedding.text_embedding(model_info, tokenizer)
+    {:reply, {serving, index}, state}
+  end
+end
+```
+
+The GenServer is started in the Application module.
+
+```elixir
+# /lib/app/application.ex
+children = [
+  ...,
+  App.TextEmbedding,
+]
+```
+
+## _Please_ star the repo! ⭐️
 
 If you find this package/repo useful,
 please star on GitHub, so that we know! ⭐
