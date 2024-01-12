@@ -1,4 +1,4 @@
-# Using Elixir machine learning tools for semantic search
+# Using Elixir and machine learning tools for semantic search
 
 Let's use `Elixir` machine learning capabilities to build an application with the following features:
 
@@ -7,7 +7,7 @@ Let's use `Elixir` machine learning capabilities to build an application with th
 
 <br />
 
-- [Using Elixir machine learning tools for semantic search](#using-elixir-machine-learning-tools-for-semantic-search)
+- [Using Elixir and machine learning tools for semantic search](#using-elixir-and-machine-learning-tools-for-semantic-search)
   - [Why? 🤷](#why-)
   - [What? 💭](#what-)
   - [Who? 👤](#who-)
@@ -35,7 +35,7 @@ Let's use `Elixir` machine learning capabilities to build an application with th
     - [7. How do I deploy this thing?](#7-how-do-i-deploy-this-thing)
     - [8. Showing example images](#8-showing-example-images)
       - [8.1 Creating a hook in client](#81-creating-a-hook-in-client)
-    - [8.2 Handling the example images list event inside our LiveView](#82-handling-the-example-images-list-event-inside-our-liveview)
+      - [8.2 Handling the example images list event inside our LiveView](#82-handling-the-example-images-list-event-inside-our-liveview)
       - [8.3 Updating the view](#83-updating-the-view)
       - [8.4 Using URL of image instead of base64-encoded](#84-using-url-of-image-instead-of-base64-encoded)
       - [8.5 See it running](#85-see-it-running)
@@ -51,7 +51,9 @@ Let's use `Elixir` machine learning capabilities to build an application with th
     - [Overview of the process](#overview-of-the-process)
     - [Transcribe an audio recording](#transcribe-an-audio-recording)
     - [Embeddings and semantic search](#embeddings-and-semantic-search)
-    - [New dependencies](#new-dependencies)
+      - [New dependency](#new-dependency)
+      - [Transformer model and HNSWLib Index setup](#transformer-model-and-hnswlib-index-setup)
+      - [Alter schema](#alter-schema)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -1692,7 +1694,7 @@ to handle the `"show_examples"` event.
 
 Let's do that right now!
 
-### 8.2 Handling the example images list event inside our LiveView
+#### 8.2 Handling the example images list event inside our LiveView
 
 Now that we have our client sorted,
 let's head over to our LiveView
@@ -3198,7 +3200,7 @@ We firstly capture the audio and upload it to the server.
 We use a form to capture the audio and use the MediaRecorder API. The Javascript code is triggered by an attached hook _Audio_ declared in the HTML. We use a `live_file_input` and will append the code server side.
 
 ```html
-# page_live.html.heex
+# /lib/app_web/live/page_live.html.heex
 <form phx-change="noop" class="hidden">
   <.live_file_input upload={@uploads.speech} class="hidden" />
 </form>
@@ -3218,17 +3220,31 @@ We use a form to capture the audio and use the MediaRecorder API. The Javascript
   </button>
 </p>
 <audio id="audio" controls></audio>
-<%= if @speech_spin do %>
-<div role="status">
-  <div
-    class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 "
-  >
-    <div
-      class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white"
-    ></div>
-  </div>
-</div>
-<% end %>
+<Spinner.spin spin="{@speech_spin}" />
+```
+
+where we used the component:
+
+```elixir
+# /lib/app_web/components/spinner.ex
+
+defmodule Spinner do
+  use Phoenix.Component
+  # use AppWeb, :html
+
+  attr :spin, :boolean, default: false
+
+  def spin(assigns) do
+    ~H"""
+    <div :if={@spin} role="status">
+      <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
+        </div>
+      </div>
+    </div>
+    """
+  end
+end
 ```
 
 We define the new JS file below in the "assets/js" folder. The important part is the `Phoenix.js` function `upload` to which we pass an identifier "speech" and a list that contains the audio as a `Blob`. We use an action button in the HTML, and attach Javascript listeners to it on the "click", "dataavailable" and "stop" events. We also play with the CSS classes to modify the appearance of the recording action button.
@@ -3238,9 +3254,11 @@ We define the new JS file below in the "assets/js" folder. The important part is
 export default {
   mounted() {
     let mediaRecorder;
-    let audioChunks = [];
+     let audioChunks = [];
     const recordButton = document.getElementById("record");
     const audioElement = document.getElementById("audio");
+    const blue = ["bg-blue-500", "hover:bg-blue-700"];
+    const pulseGreen = ["bg-green-500", "hover:bg-green-700", "animate-pulse"];
 
     _this = this;
 
@@ -3252,12 +3270,8 @@ export default {
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           mediaRecorder = new MediaRecorder(stream);
           mediaRecorder.start();
-          recordButton.classList.remove("bg-blue-500", "hover:bg-blue-700");
-          recordButton.classList.add(
-            "bg-green-500",
-            "hover:bg-green-700",
-            "animate-pulse"
-          );
+          recordButton.classList.remove(...blue);
+          recordButton.classList.add(...pulseGreen);
           recordButton.textContent = "Stop";
 
           mediaRecorder.addEventListener("dataavailable", (event) => {
@@ -3270,12 +3284,8 @@ export default {
 
             _this.upload("speech", [audioBlob]);
             audioChunks = [];
-            recordButton.classList.remove(
-              "bg-green-500",
-              "hover:bg-green-700",
-              "animate-pulse"
-            );
-            recordButton.classList.add("bg-blue-500", "hover:bg-blue-700");
+            recordButton.classList.remove(...pulseGreen);
+            recordButton.classList.add(...blue);
           });
         });
       }
@@ -3303,11 +3313,9 @@ We then update the socket to be returned by the LiveView `mount/3` function. We 
 
 ```elixir
 #page_live.ex
-@upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
 @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
 def mount(_,_,socket) do
-  File.mkdir_p!(@upload_dir)
 
   socket
   |> assign(
@@ -3414,7 +3422,7 @@ The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_emb
 For simplicity, we did not use the multi-lingual model.
 We instantiate the HNSWLib index with a GenServer and also the tokenizing (which produces embeddings). The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use cosine_similarity.
 
-### New dependencies
+#### New dependency
 
 We will add the Elixir binding `HNSWLib`:
 
@@ -3422,8 +3430,10 @@ We will add the Elixir binding `HNSWLib`:
 {:hnswlib, "~> 0.1.4"}
 ```
 
-We need to instantiate the Index struct which is saved into a file. We whether read the existing file or create a new one.
-This will be done in a GenServer since we also want to load the embedding model. We endow the vector space with a _cosine_ pseudo-metric.
+#### Transformer model and HNSWLib Index setup
+
+We need to instantiate the HNSWLib Index struct which is saved into a file. We whether read the existing file or create a new one.
+This will be done in a GenServer since we also want to load the embedding model. We endow the vector space with a _cosine_ pseudo-metric. We also load the model.
 
 ```elixir
 # /lib/app/text_embedding.ex
@@ -3437,6 +3447,8 @@ defmodule App.TextEmbedding do
 
   # upload or create a new index file
   def init(_) do
+    upload_dir = Application.app_dir(:app, ["priv", "static", "uploads"])
+    File.mkdir_p!(upload_dir)
     path = Application.app_dir(:app, ["priv", "static", "uploads", @indexes])
     space = :cosine
 
@@ -3446,7 +3458,8 @@ defmodule App.TextEmbedding do
           HNSWLib.Index.new(_space = space, _dim = 384, _max_elements = 200)
 
         true ->
-          HNSWLib.Index.load_index(space, 384, Path.expand("priv/" <> @indexes))
+          (path <> @indexes) |> dbg()
+          HNSWLib.Index.load_index(space, 384, Path.expand(path <> @indexes))
       end
 
     model_info = nil
@@ -3486,6 +3499,49 @@ children = [
   ...,
   App.TextEmbedding,
 ]
+```
+
+#### Alter schema
+
+We will add a column to the `:images` table. We run a Mix task to generate a timestamped file:
+
+```bash
+mix ecto.gen.migration add_idx
+```
+
+In the "/priv/repo" folder, open the newly created file and add:
+
+```elixir
+defmodule App.Repo.Migrations.AddIndex do
+  use Ecto.Migration
+
+  def change do
+    alter table(:images) do
+      add(:idx, :integer, default: 0)
+    end
+  end
+end
+```
+
+and run the migration.
+
+Modify the `App.Image` struct and the changeset
+
+```elixir
+  schema "images" do
+    ...
+    field(:idx, :integer)
+
+    timestamps(type: :utc_datetime)
+  end
+
+  def changeset(image, params \\ %{}) do
+    image
+    |> Ecto.Changeset.cast(params, [:url, :description, :width, :height, :idx])
+    |> Ecto.Changeset.validate_required([:url, :description, :width, :height])
+
+    ...
+  end
 ```
 
 ## _Please_ star the repo! ⭐️

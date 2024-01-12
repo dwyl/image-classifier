@@ -17,7 +17,7 @@ defmodule App.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
       # Nx serving for the embedding
-      # App.TextEmbedding,
+      App.TextEmbedding,
       # Nx serving for Speech-to-Text
       {Nx.Serving, serving: App.Whisper.serving(), name: Whisper},
       # Nx serving for image classifier

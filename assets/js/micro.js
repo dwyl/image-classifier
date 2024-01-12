@@ -4,6 +4,8 @@ export default {
     let audioChunks = [];
     const recordButton = document.getElementById("record");
     const audioElement = document.getElementById("audio");
+    const blue = ["bg-blue-500", "hover:bg-blue-700"];
+    const pulseGreen = ["bg-green-500", "hover:bg-green-700", "animate-pulse"];
 
     _this = this;
 
@@ -15,12 +17,8 @@ export default {
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           mediaRecorder = new MediaRecorder(stream);
           mediaRecorder.start();
-          recordButton.classList.remove("bg-blue-500", "hover:bg-blue-700");
-          recordButton.classList.add(
-            "bg-green-500",
-            "hover:bg-green-700",
-            "animate-pulse"
-          );
+          recordButton.classList.remove(...blue);
+          recordButton.classList.add(...pulseGreen);
           recordButton.textContent = "Stop";
 
           mediaRecorder.addEventListener("dataavailable", (event) => {
@@ -34,12 +32,8 @@ export default {
 
             _this.upload("speech", [audioBlob]);
             audioChunks = [];
-            recordButton.classList.remove(
-              "bg-green-500",
-              "hover:bg-green-700",
-              "animate-pulse"
-            );
-            recordButton.classList.add("bg-blue-500", "hover:bg-blue-700");
+            recordButton.classList.remove(...pulseGreen);
+            recordButton.classList.add(...blue);
           });
         });
       }

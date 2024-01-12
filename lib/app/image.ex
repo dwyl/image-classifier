@@ -8,13 +8,14 @@ defmodule App.Image do
     field(:width, :integer)
     field(:url, :string)
     field(:height, :integer)
+    field(:idx, :integer)
 
     timestamps(type: :utc_datetime)
   end
 
   def changeset(image, params \\ %{}) do
     image
-    |> Ecto.Changeset.cast(params, [:url, :description, :width, :height])
+    |> Ecto.Changeset.cast(params, [:url, :description, :width, :height, :idx])
     |> Ecto.Changeset.validate_required([:url, :description, :width, :height])
   end
 
