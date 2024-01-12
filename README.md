@@ -55,7 +55,15 @@ Let's use `Elixir` machine learning capabilities to build an application with th
       - [Transformer model and HNSWLib Index setup](#transformer-model-and-hnswlib-index-setup)
       - [Usage of the Index and embeddings](#usage-of-the-index-and-embeddings)
       - [Alter schema](#alter-schema)
-      - [](#)
+      - [How to use HNSWLib, the Elixir binding for the hnswlib library](#how-to-use-hnswlib-the-elixir-binding-for-the-hnswlib-library)
+        - [Create an Index struct](#create-an-index-struct)
+        - [Add vectors to the Index struct](#add-vectors-to-the-index-struct)
+        - [Query nearest vector(s) in the index](#query-nearest-vectors-in-the-index)
+        - [Save an Index to file](#save-an-index-to-file)
+        - [Load an Index from file](#load-an-index-from-file)
+        - [How to use `knn_query`](#how-to-use-knn_query)
+        - [Example](#example)
+        - [Notes on vector spaces](#notes-on-vector-spaces)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -3696,7 +3704,252 @@ Modify the `App.Image` struct and the changeset
   end
 ```
 
-####
+#### How to use HNSWLib, the Elixir binding for the [hnswlib](https://github.com/nmslib/hnswlib) library
+
+I add some comments on the library HNSWLib. The intention is to try to clarify when you can use a look-up by index and/or by embedding, and secondly why you need to normalise for `cosine`.
+
+The Index is instantiated as in the GenServer above.
+
+> Currently in development, alpha software.
+
+##### Create an Index struct
+
+```elixir
+# working in L2-space
+# other possible values are
+#  `:ip` (inner product)
+#  `:cosine` (cosine similarity)
+iex> space = :l2
+:l2
+# each vector is a 2D-vec
+iex> dim = 2
+2
+# limit the maximum elements to 200
+iex> max_elements = 200
+200
+# create Index
+iex> {:ok, index} = HNSWLib.Index.new(space, dim, max_elements)
+{:ok,
+ %HNSWLib.Index{
+   space: :l2,
+   dim: 2,
+   reference: #Reference<0.2548668725.3381002243.154990>
+ }}
+```
+
+##### Add vectors to the Index struct
+
+The Index struct is incrementally build. Let's add 5 vectors:
+
+```elixir
+iex> data =
+  Nx.tensor(
+    [
+      [42, 42],
+      [43, 43],
+      [0, 0],
+      [200, 200],
+      [200, 220]
+    ],
+    type: :f32
+  )
+#Nx.Tensor<
+  f32[5][2]
+  [
+    [42.0, 42.0],
+    [43.0, 43.0],
+    [0.0, 0.0],
+    [200.0, 200.0],
+    [200.0, 220.0]
+  ]
+>
+# we get the number of elements in the Index struct
+iex> HNSWLib.Index.get_current_count(index)
+{:ok, 0}
+# we add the 5 previous elements to the index struct
+iex> HNSWLib.Index.add_items(index, data)
+:ok
+# we check the current count of the index struct
+iex> HNSWLib.Index.get_current_count(index)
+{:ok, 5}
+```
+
+##### Query nearest vector(s) in the index
+
+`knn_query` returns a tuple `(:ok, labels, distances}`. The "labels" tensor contains the indices in the Index struct of the `k` closest elements. The "distances" tensor contains the corresponding distance between these closest elements and the query input.
+
+```elixir
+# query
+iex> query = Nx.tensor([1, 2], type: :f32)
+#Nx.Tensor<
+  f32[2]
+  [1.0, 2.0]
+>
+iex> {:ok, labels, dists} = HNSWLib.Index.knn_query(index, query)
+{:ok,
+ #Nx.Tensor<
+   u64[1][1]
+   [
+     [2]
+   ]
+ >,
+ #Nx.Tensor<
+   f32[1][1]
+   [
+     [5.0]
+   ]
+ >}
+
+# we look for the 3 closest neighbours
+iex> {:ok, labels, dists} = HNSWLib.Index.knn_query(index, query, k: 3)
+{:ok,
+ #Nx.Tensor<
+   u64[1][3]
+   [
+     [2, 0, 1]
+   ]
+ >,
+ #Nx.Tensor<
+   f32[1][3]
+   [
+     [5.0, 3281.0, 3445.0]
+   ]
+ >}
+```
+
+##### Save an Index to file
+
+```elixir
+iex> HNSWLib.Index.save_index(index, "my_index.bin")
+:ok
+```
+
+##### Load an Index from file
+
+```elixir
+iex> {:ok, saved_index} = HNSWLib.Index.load_index(space, dim, "my_index.bin")
+{:ok,
+ %HNSWLib.Index{
+   space: :l2,
+   dim: 2,
+   reference: #Reference<0.2105700569.2629697564.236704>
+ }}
+iex> HNSWLib.Index.get_current_count(saved_index)
+{:ok, 5}
+iex> {:ok, data} = HNSWLib.Index.get_items(saved_index, [2, 0, 1])
+{:ok,
+ [
+   <<0, 0, 0, 0, 0, 0, 0, 0>>,
+   <<0, 0, 40, 66, 0, 0, 40, 66>>,
+   <<0, 0, 44, 66, 0, 0, 44, 66>>
+ ]}
+iex> tensors = Nx.stack(Enum.map(data, fn d -> Nx.from_binary(d, :f32) end))
+#Nx.Tensor<
+  f32[3][2]
+  [
+    [0.0, 0.0],
+    [42.0, 42.0],
+    [43.0, 43.0]
+  ]
+>
+```
+
+##### How to use `knn_query`
+
+If you add a single vector to the Index struct at a time, you can save the current index count. With the response of `knn_query`, you can then look up for the closest elements.
+
+```elixir
+:ok  = HNSWLib.Index.add_items(index, normed_data)
+{:ok, idx}  =  HNSWLib.Index.get_current_count(index)
+App.Repo.insert(%Data{}, idx: idx)
+:ok =  HNSWLib.Index.save_index(index, saved_index)
+```
+
+If you add multiple vectors to the Index struct, you won't get each individual index but you can only look up with the embeddings. Then use `get_items` as above and transform the binaries into embeddings for your look up.
+
+When you endow the vector space with the `cosine` distance, you need to normalise the embeddings (see note below)
+
+##### Example
+
+Suppose you have an `Nx.Serving` that runs a model. You get embeddings, save them and build your Index struct with them.
+
+```elixir
+# you get an embedding
+%{embedding: data} =
+    Nx.Serving.run(my_serving(), input)
+# you normalise the embedding
+data =
+    Nx.divide(data, Nx.LinAlg.norm(data))
+# you save the embedding for the look up
+{:ok, _input} =
+    App.Input.save(%Input{}, %{embedding: data})
+# you build your Index struct
+:ok = HNSWLib.Index.add_items(index, data)
+HNSWLib.Index.save_index(index, "my_index.bin")
+```
+
+You run a `knn_query` with a given embedding (from the same serving) for the closest element.
+
+```elixir
+# you normalise your query data
+%{embedding: query_data} =
+    Nx.Serving.run(my_serving(), input_embedding)
+
+query_data =
+    Nx.divide(query_data, Nx.LinAlg.norm(query_data))
+{:ok, labels, _d} =
+    HNSWLib.Index.knn_query(index, query_data, k: 1)
+
+{:ok, data} = HNSWLib.Index.get_items(index, Nx.to_flat_list(labels[0]))
+
+t =
+    data
+    |> Enum.map(fn d -> Nx.from_binary(d, :f32) end)
+    |> Nx.stack()
+
+App.Input.get_by(%{embedding: t})
+```
+
+##### Notes on vector spaces
+
+A vector space of embeddings can be equiped with an (euclidean) _inner product_. If $u=(u_1,\dots,u_n)$ and $v=(v_1,\dots,v_n)$ are two embeddings with their coordinates, the (euclidean) inner product is defined as:
+
+$< u,v >=u_1v_1+\cdots+u_nv_n$
+
+This inner product induces an euclidean _norm_:
+
+$||u|| = \sqrt{< u,u >} = \sqrt{u_1^2+\cdots+u_n^2}$
+
+Let $u_v$ be the perpendicular projection of $u$ on $v$. Then:
+
+$< u, v > = < u_v,v > = ||u||\cdot ||v|| \cos\widehat{u,v}$
+
+The value below is known as the _cosine similarity_.
+
+$<\frac{u}{||u||}\frac{v}{\||v||}> = \cos\widehat{u,v}$.
+
+Remark that the norm of the new embedding $\frac1{||u||}u$ is 1. We say that the embedding is $L_2$-normalised.
+
+The previous formula shows that the inner product of normalised (aka unit) embeddings is the `cosine` of the angle between these "normalised" embeddings.
+
+Source: <https://en.wikipedia.org/wiki/Cosine_similarity>
+
+_Note that this is not a distance._
+
+The norm in turn induces a _distance_:
+$d(u,v) = ||u-v||$
+
+By definition,  
+$||u-v||^2  = < u-v,u-v >$.
+so by developping, we obtain:
+$||u-v||^2  = ||u||^2+||v||^2-2< u,v >$
+
+Consider now two normalised vectors. We have:
+$\frac12||u-v||^2=1-\cos\widehat{u,v} = d_c(u,v)$
+
+This is commonly known as the "cosine distance" _when the embeddings are normalised_. It ranges from 0 to 2. Note that it is not a true distance metric.
+
+Finally, note that since we are dealing with finite dimensional vector spaces, all the norms are equivalent (in some precise mathematical way). This means that the limit points are always the same. However, the values of the distances can be quite different, and a "clusterisation" processes can give significantly different results. The first hint for which norm to choose is to take the norm used to train the model.
 
 ## _Please_ star the repo! ⭐️
 
