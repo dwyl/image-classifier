@@ -53,7 +53,9 @@ Let's use `Elixir` machine learning capabilities to build an application with th
     - [Embeddings and semantic search](#embeddings-and-semantic-search)
       - [New dependency](#new-dependency)
       - [Transformer model and HNSWLib Index setup](#transformer-model-and-hnswlib-index-setup)
+      - [Usage of the Index and embeddings](#usage-of-the-index-and-embeddings)
       - [Alter schema](#alter-schema)
+      - [](#)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -3432,8 +3434,9 @@ We will add the Elixir binding `HNSWLib`:
 
 #### Transformer model and HNSWLib Index setup
 
-We need to instantiate the HNSWLib Index struct which is saved into a file. We whether read the existing file or create a new one.
+We will encode every caption as a vector with the appropriate serving that runs the "sentence-transformers/paraphrase-MiniLM-L6-v2" model.
 This will be done in a GenServer since we also want to load the embedding model. We endow the vector space with a _cosine_ pseudo-metric. We also load the model.
+In the GenServer, we will also instantiate the HNSWLib Index struct which is saved into a file. When the app starts, we whether read the existing file or create a new one.
 
 ```elixir
 # /lib/app/text_embedding.ex
@@ -3449,17 +3452,20 @@ defmodule App.TextEmbedding do
   def init(_) do
     upload_dir = Application.app_dir(:app, ["priv", "static", "uploads"])
     File.mkdir_p!(upload_dir)
-    path = Application.app_dir(:app, ["priv", "static", "uploads", @indexes])
+    path = Path.join([upload_dir, @indexes])
     space = :cosine
+
+    require Logger
 
     {:ok, index} =
       case File.exists?(path) do
         false ->
+          Logger.info("New Index")
           HNSWLib.Index.new(_space = space, _dim = 384, _max_elements = 200)
 
         true ->
-          (path <> @indexes) |> dbg()
-          HNSWLib.Index.load_index(space, 384, Path.expand(path <> @indexes))
+          Logger.info("Existing Index")
+          HNSWLib.Index.load_index(space, 384, path)
       end
 
     model_info = nil
@@ -3501,9 +3507,155 @@ children = [
 ]
 ```
 
+#### Usage of the Index and embeddings
+
+We firstly append the Liveview socket with the index and the serving of the transformer. We can further use them in our callbacks.
+
+```elixir
+def mount(_, _, socket) do
+  {serving, index} = App.TextEmbedding.serve()
+  ...
+  {:ok,
+    socket
+    |> assign(
+      serve_embedding: serving,
+      index: index,
+      db_img: nil,
+      transcription: nil,
+      micro_off: false,
+      speech_spin: false,
+      search_result: nil
+    )
+    |> alow_upload(...)
+  }
+end
+```
+
+Every time we upload an image, we get back an URL from our bucket and we compute a caption.
+We will compute an embedding and save it into the Index. This is done in the `handle_info` callback.
+
+```elixir
+cond do
+  # If the upload task has finished executing, we update the socket assigns.
+  Map.get(assigns, :task_ref) == ref ->
+    image =
+      %{
+        url: assigns.image_info.url,
+        width: assigns.image_info.width,
+        height: assigns.image_info.height,
+        description: label
+      }
+
+    saved_index = Path.expand("priv/static/uploads/indexes.bin")
+
+    with %{embedding: data} <- Nx.Serving.run(serving, label),
+        # compute a normed embedding (cosine case only) on the text result
+        normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
+        :ok <- HNSWLib.Index.add_items(index, normed_data),
+        {:ok, idx} <- HNSWLib.Index.get_current_count(index),
+        :ok <- HNSWLib.Index.save_index(index, saved_index) do
+      Map.merge(image, %{idx: idx, caption: label})
+      |> App.Image.insert()
+
+      {:noreply,
+        socket
+        |> assign(running?: false, db_img: db_img, index: index, task_ref: nil, label: label)}
+    end
+```
+
+Every time we produce an audio file, we transcribe it into a text.
+We will compute an embedding from this text.
+We will then find the nearest neighbour of this embedding among the current set of embeddings (from your images). To do so, we use the function `handle_knn`, see further below.
+
+```elixir
+def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} = socket)
+      when assigns.audio_ref == ref do
+  Process.demonitor(ref, [:flush])
+  File.rm!(@tmp_wav)
+
+  require Logger
+
+  %{serve_embedding: serving, index: index} = assigns
+    # compute an normed embedding (cosine case only) on the text result
+    # and returns an App.Image{} as the result of a "knn_search"
+  with %{embedding: input_embedding} <- Nx.Serving.run(serving, text),
+        normed_input <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
+        %App.Image{} = result <- handle_knn(index, normed_input) do
+
+    {:noreply,
+      assign(socket,
+        transcription: String.trim(text),
+        micro_off: false,
+        speech_spin: false,
+        search_result: result,
+        audio_ref: nil
+      )}
+  else
+      # record without entries
+    {:error, "no entries in Index"} ->
+      Logger.warning("No entries in Index")
+
+      {:noreply,
+        assign(socket,
+          micro_off: false,
+          search_result: nil,
+          speech_spin: false,
+          audio_ref: nil
+        )}
+
+    nil ->
+      Logger.warning("No entries")
+
+      {:noreply,
+        assign(socket,
+          transcription: String.trim(text),
+          micro_off: false,
+          search_result: nil,
+          speech_spin: false,
+          audio_ref: nil
+        )}
+  end
+end
+```
+
+The "nearest neighbour" search function calls the function `HNSWLib.Index.knn_query(index, input, k: 1)`. It returns a tuple `{:ok, indices, distances}` where "indices" and "distances" are the responses as lists whose length depends on the `k` parameter used: it is the number of neighbours you want to find. We ask for a single neighbour for simplicity. If the Index is not empty, then you get a unique response with `k=1`. You can further use a cut-off distance to exclude responses that might not be meaningful.
+
+```elixir
+def handle_knn(_, nil), do: {:error, "no index found"}
+
+def handle_knn(index, input) do
+  case HNSWLib.Index.get_current_count(index) do
+    {:ok, 0} ->
+      {:error, "no entries in index"}
+
+    {:ok, _c} ->
+      # check the embeddings
+      # {:ok, l} = HNSWLib.Index.get_current_count(index) |> dbg()
+
+      # for i <- 0..(l - 1) do
+      #   {:ok, dt} = HNSWLib.Index.get_items(index, [i])
+      #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
+      # end
+
+      case HNSWLib.Index.knn_query(index, input, k: 1) do
+        {:ok, label, distance} ->
+          dbg(distance)
+
+          label[0]
+          |> Nx.to_flat_list()
+          |> hd()
+          |> then(fn idx ->
+            App.Repo.get_by(App.Image, %{idx: idx + 1})
+          end)
+      end
+  end
+end
+
+```
+
 #### Alter schema
 
-We will add a column to the `:images` table. We run a Mix task to generate a timestamped file:
+We will save the index found We will add a column to the `:images` table. We run a Mix task to generate a timestamped file:
 
 ```bash
 mix ecto.gen.migration add_idx
@@ -3543,6 +3695,8 @@ Modify the `App.Image` struct and the changeset
     ...
   end
 ```
+
+####
 
 ## _Please_ star the repo! ⭐️
 

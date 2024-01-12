@@ -50,7 +50,6 @@ defmodule AppWeb.PageLive do
        micro_off: false,
        speech_spin: false,
        search_result: nil
-       #  search_result: nil
      )
      |> allow_upload(:image_list,
        accept: ~w(image/*),
@@ -244,13 +243,15 @@ defmodule AppWeb.PageLive do
     dbg(result)
     File.rm!(@tmp_wav)
 
+    require Logger
+
     %{serve_embedding: serving, index: index} = assigns
     # compute an normed embedding (cosine case only) on the text result
     # and returns an App.Image{} as the result of a "knn_search"
-    with %{embedding: data} <- Nx.Serving.run(serving, text),
-         normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
-         %App.Image{} = result <- handle_knn(normed_data, index) do
-      {text, data, normed_data, result} |> dbg()
+    with %{embedding: input_embedding} <- Nx.Serving.run(serving, text),
+         normed_input <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
+         %App.Image{} = result <- handle_knn(index, normed_input) do
+      {text, input_embedding, normed_input, result} |> dbg()
 
       {:noreply,
        assign(socket,
@@ -262,8 +263,8 @@ defmodule AppWeb.PageLive do
        )}
     else
       # record without entries
-      {:error, "no entries in index"} ->
-        IO.puts("error")
+      {:error, "no entries in Index"} ->
+        Logger.warning("No entries in Index")
 
         {:noreply,
          assign(socket,
@@ -274,7 +275,7 @@ defmodule AppWeb.PageLive do
          )}
 
       nil ->
-        IO.puts("nil")
+        Logger.warning("No entries")
 
         {:noreply,
          assign(socket,
@@ -339,27 +340,15 @@ defmodule AppWeb.PageLive do
              :ok <- HNSWLib.Index.add_items(index, normed_data),
              {:ok, idx} <- HNSWLib.Index.get_current_count(index),
              :ok <- HNSWLib.Index.save_index(index, saved_index) do
-          {idx} |> dbg()
-
           db_img =
-            case db_img do
-              nil ->
-                Map.merge(image, %{idx: idx, caption: label})
-                |> App.Image.insert()
-                |> dbg()
-
-              _img ->
-                :ok
-                # App.Image.update!(img, %{idx: idx, caption: label})
-            end
+            Map.merge(image, %{idx: idx, caption: label})
+            |> App.Image.insert()
+            |> dbg()
 
           {:noreply,
            socket
            |> assign(running?: false, db_img: db_img, index: index, task_ref: nil, label: label)}
         end
-
-      # Update socket assigns
-      # {:noreply, assign(socket, label: label, running?: false)}
 
       # If the example task has finished executing, we upload the socket assigns.
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
@@ -386,9 +375,9 @@ defmodule AppWeb.PageLive do
     end
   end
 
-  def handle_knn(_, nil), do: {:error, "no index found"}
+  def handle_knn(nil, _), do: {:error, "no index found"}
 
-  def handle_knn(data, index) do
+  def handle_knn(index, input) do
     case HNSWLib.Index.get_current_count(index) do
       {:ok, 0} ->
         {:error, "no entries in index"}
@@ -402,12 +391,16 @@ defmodule AppWeb.PageLive do
         #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
         # end
 
-        case HNSWLib.Index.knn_query(index, data, k: 1) do
-          {:ok, label, _distance} ->
+        case HNSWLib.Index.knn_query(index, input, k: 1) do
+          {:ok, label, distance} ->
+            dbg(distance)
+
             label[0]
             |> Nx.to_flat_list()
             |> hd()
-            |> then(&App.Repo.get_by(App.Image, %{idx: &1 + 1}))
+            |> then(fn idx ->
+              App.Repo.get_by(App.Image, %{idx: idx + 1})
+            end)
         end
     end
   end

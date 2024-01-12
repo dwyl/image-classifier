@@ -11,18 +11,20 @@ defmodule App.TextEmbedding do
     upload_dir = Application.app_dir(:app, ["priv", "static", "uploads"])
     File.mkdir_p!(upload_dir)
 
-    path = Application.app_dir(:app, ["priv", "static", "uploads", @indexes])
+    path = Path.join([upload_dir, @indexes])
     space = :cosine
+
+    require Logger
 
     {:ok, index} =
       case File.exists?(path) do
         false ->
-          IO.puts("new")
+          Logger.info("New Index")
           HNSWLib.Index.new(_space = space, _dim = 384, _max_elements = 200)
 
         true ->
-          IO.puts("load Index")
-          HNSWLib.Index.load_index(space, 384, Path.expand(path <> @indexes))
+          Logger.info("Existing Index")
+          HNSWLib.Index.load_index(space, 384, path)
       end
 
     model_info = nil
