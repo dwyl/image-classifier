@@ -2,8 +2,8 @@
 
 Let's use `Elixir` machine learning capabilities to build an application with the following features:
 
-1. Image captioning: you can upload an image to a bucket and automatically caption it,
-2. Semantic search: you provide an audio input and the app runs a [symmetric semantic search](https://sbert.net/examples/applications/semantic-search/README.html) to find your relevant images.
+1. **Image captioning**: you can upload an image to a bucket and automatically caption it,
+2. **Semantic search**: you provide an audio input and the app runs a [symmetric semantic search](https://sbert.net/examples/applications/semantic-search/README.html) with **audio transcription**, **embeddings** and **knn search** to find the most relevant image.
 
 <br />
 
@@ -50,23 +50,17 @@ Let's use `Elixir` machine learning capabilities to build an application with th
   - [Semantic search](#semantic-search)
     - [Overview of the process](#overview-of-the-process)
     - [Transcribe an audio recording](#transcribe-an-audio-recording)
-    - [Embeddings and semantic search](#embeddings-and-semantic-search)
-    - [New dependencies](#new-dependencies)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
 
 ## Why? 🤷
 
-Building our
-[app](https://github.com/dwyl/app),
-we consider `images` an _essential_
-medium of communication.
+Building our [app](https://github.com/dwyl/app), we consider `images` an _essential_ medium of communication.
 
-By adding a way of captioning images,
-we make it _easy_ for people
-to suggest meta tags to describe images
-so they become **searchable**.
+You may have a lots of images in your account, and you may want to find a way to retrieve the most appropriate one.
+
+By adding a way of captioning images, we make it _easy_ for people to suggest meta tags that describe images so they become **searchable**. We expose further how this can be achieved.
 
 ## What? 💭
 
@@ -76,6 +70,10 @@ that will allow you to choose/drag an image
 and automatically caption the image.
 
 Furthermore, the app will allow the user to record an audio which describes the image(s) you want to find.
+
+The audio will be transcribed into a text, similar to the caption.
+
+We then encode these texts as vectors and run a _knn_ search.
 
 ## Who? 👤
 
@@ -234,6 +232,7 @@ and create the following file
 `page_live.ex`.
 
 ```elixir
+#/lib/app_web/live/page_live.ex
 defmodule AppWeb.PageLive do
   use AppWeb, :live_view
 
@@ -350,8 +349,7 @@ and changed our view!
 ### 3. Receiving image files
 
 Now, let's start by receiving some image files.
-In order to classify them, we need to have access to begin with,
-right?
+In order to classify them, we need to have access to begin with, right? NOTE: NOT CLEAR.
 
 With `LiveView`,
 we can easily do this by using
@@ -469,7 +467,7 @@ defmodule AppWeb.PageLive do
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(label: nil, running: false, task_ref: nil)
+     |> assign(label: nil, running?: false, task_ref: nil)
      |> allow_upload(:image_list,
        accept: ~w(image/*),
        auto_upload: true,
@@ -512,7 +510,7 @@ end
 - when `mount/3`ing the LiveView,
   we are creating three socket assigns:
   `label` pertains to the model prediction;
-  `running` is a boolean referring to whether the model is running or not;
+  `running?` is a boolean referring to whether the model is running or not;
   `task_ref` refers to the reference of the task that was created for image classification
   (we'll delve into this further later down the line).
   Additionally, we are using the `allow_upload/3` function to define our upload configuration.
@@ -548,8 +546,7 @@ end
   because we don't need to do anything with them.
 
 And that's it!
-If you run `mix phx.server`,
-nothing will change.
+If you run `mix phx.server`, nothing will change.
 
 ### 4. Integrating `Bumblebee` 🐝
 
@@ -574,12 +571,8 @@ def start(_type, _args) do
     {Nx.Serving, serving: serving(), name: ImageClassifier},
     # Start the Endpoint (http/https)
     AppWeb.Endpoint
-    # Start a worker by calling: App.Worker.start_link(arg)
-    # {App.Worker, arg}
   ]
 
-  # See https://hexdocs.pm/elixir/Supervisor.html
-  # for other strategies and supported options
   opts = [strategy: :one_for_one, name: App.Supervisor]
   Supervisor.start_link(children, opts)
 end
@@ -596,34 +589,21 @@ def serving do
 end
 ```
 
-We are using
-[`Nx.Serving`](https://hexdocs.pm/nx/Nx.Serving.html),
-which simply allows us to encapsulates tasks,
-be it networking, machine learning, data processing or any other task.
+We are using [`Nx.Serving`](https://hexdocs.pm/nx/Nx.Serving.html), which simply allows us to encapsulates tasks; it can be networking, machine learning, data processing or any other task.
 
-In this specific case,
-we are using it to **batch requests**.
-This is extremely useful and important
-because we are using models that typically run on
+In this specific case, we are using it to **batch requests**.
+This is extremely useful and important because we are using models that typically run on
 [GPU](https://en.wikipedia.org/wiki/Graphics_processing_unit).
 The GPU is _really good_ at **parallelizing tasks**.
-Therefore, instead of sending an image classification request one by one,
-we can _batch them_/bundle them together as much as we can
-and then send it over.
+Therefore, instead of sending an image classification request one by one, we can _batch them_/bundle them together as much as we can and then send it over.
 
 We can define the `batch_size` and `batch_timeout` with `Nx.Serving`.
-We're going to use the default values,
-hence why we're not explicitly defining them.
+We're going to use the default values, hence why we're not explicitly defining them.
 
 With `Nx.Serving`, we define a `serving/0` function
-that is then used by it,
-which in turn is executed in the supervision tree.
+that is then used by it, which in turn is executed in the supervision tree since we declare it as a child in the Application module.
 
-In the `serving/0` function,
-we are loading the
-[`ResNet-50`](https://huggingface.co/microsoft/resnet-50)
-model
-and its featurizer.
+In the `serving/0` function, we are loading the[`ResNet-50`](https://huggingface.co/microsoft/resnet-50) model and its featurizer.
 
 > [!NOTE]
 > A `featurizer` can be seen as a
@@ -637,11 +617,8 @@ and its featurizer.
 > [padding](https://www.baeldung.com/cs/deep-neural-networks-padding),
 > and encoding to prepare the data for model training or inference.
 
-Lastly, this function returns
-a builds serving for image classification
-by calling [`image_classification/3`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_classification/3),
-where we can define our compiler and task batch size.
-We've given our serving function the name `ImageClassifier`.
+Lastly, this function returns a serving for image classification by calling [`image_classification/3`](https://hexdocs.pm/bumblebee/Bumblebee.Vision.html#image_classification/3), where we can define our compiler and task batch size.
+We gave our serving function the name `ImageClassifier` as declared in the Application module.
 
 #### 4.2 `Async` processing the image for classification
 
@@ -650,15 +627,11 @@ and get a prediction of it!
 
 Every time we upload an image,
 we are going to run **async processing**.
-This means that the task responsible for image classification
-will be created asynchronously,
-meaning that the LiveView _won't have to wait_ for this task to finish
+This means that the task responsible for image classification will be run in another process, thus asynchronously, meaning that the LiveView _won't have to wait_ for this task to finish
 to continue working.
 
-For this scenario,
-we are going to be using the
-[`Task` module](https://hexdocs.pm/elixir/1.14/Task.html)
-to spawn processes to complete this task.
+For this scenario, we are going to be using the
+[`Task` module](https://hexdocs.pm/elixir/1.14/Task.html) to spawn processes to complete this task.
 
 Go to `lib/app_web/live/page_live.ex`
 and change the following code.
@@ -675,7 +648,7 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
     task = Task.async(fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
 
     # Update socket assigns to show spinner whilst task is running
-    {:noreply, assign(socket, running: true, task_ref: task.ref)}
+    {:noreply, assign(socket, running?: true, task_ref: task.ref)}
 end
 
 @impl true
@@ -688,7 +661,7 @@ def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket) do
   %{predictions: [%{label: label}]} = result
 
   # Update the socket assigns with result and stopping spinner.
-  {:noreply, assign(socket, label: label, running: false)}
+  {:noreply, assign(socket, label: label, running?: false)}
 end
 ```
 
@@ -715,7 +688,7 @@ to call our `Nx.Serving` build function `ImageClassifier` we've defined earlier,
 thus initiating a batched run with the image tensor.
 While the task is spawned,
 we update the socket assigns with the reference to the task (`:task_ref`)
-and update the `:running` assign to `true`,
+and update the `:running?` assign to `true`,
 so we can show a spinner or a loading animation.
 
 When the task is spawned using `Task.async/1`,
@@ -740,7 +713,7 @@ and we can discard an exit message.
 
 In this same function, we destructure the prediction
 from the model and assign it to the socket assign `:label`
-and set `:running` to `false`.
+and set `:running?` to `false`.
 
 Quite beautiful, isn't it?
 With this, we don't have to worry if the person closes the browser tab.
@@ -1016,7 +989,7 @@ and change it to this.
         >
           <span>Description: </span>
           <!-- Spinner -->
-          <%= if @running do %>
+          <%= if @running? do %>
           <div role="status">
             <div
               class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 "
@@ -1041,7 +1014,7 @@ and change it to this.
 In these changes,
 we've added the output of the model in the form of text.
 We are rendering a spinner
-if the `:running` socket assign is set to true.
+if the `:running?` socket assign is set to true.
 Otherwise,
 we add the `:label`, which holds the prediction made by the model.
 
@@ -1172,7 +1145,7 @@ when mounting the `LiveView`!
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(label: nil, running: false, task_ref: nil)
+     |> assign(label: nil, running?: false, task_ref: nil)
      |> allow_upload(:image_list,
        accept: ~w(image/*),
        auto_upload: true,
@@ -1267,7 +1240,7 @@ pertaining to the [base64](https://en.wikipedia.org/wiki/Base64) representation
 of the image in `lib/app_web/live_page/live.ex`
 
 ```elixir
-     |> assign(label: nil, running: false, task_ref: nil, image_preview_base64: nil)
+     |> assign(label: nil, running?: false, task_ref: nil, image_preview_base64: nil)
 ```
 
 We've added `image_preview_base64`
@@ -1299,7 +1272,7 @@ change the `handle_progress/3` function to the following.
       base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
 
       # Update socket assigns to show spinner whilst task is running
-      {:noreply, assign(socket, running: true, task_ref: task.ref, image_preview_base64: base64)}
+      {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64)}
   end
 ```
 
@@ -1480,7 +1453,7 @@ that is called after the async task is completed.
 
     %{results: [%{text: label}]} = result # change this line
 
-    {:noreply, assign(socket, label: label, running: false)}
+    {:noreply, assign(socket, label: label, running?: false)}
   end
 ```
 
@@ -3196,13 +3169,14 @@ We then want to find images whose captions approximates this text in terms of me
 We firstly capture the audio and upload it to the server.
 
 We use a form to capture the audio and use the MediaRecorder API. The Javascript code is triggered by an attached hook _Audio_ declared in the HTML. We use a `live_file_input` and will append the code server side.
+We also let the user listen to his audio by adding an [embedded audio element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) `<audio>` in the HTML.
+
+We also add a spinner to display that the transcription process is running, in the same way as we did for the captioning process. We introduce a Phoenix component to avoid code duplication.
 
 ```html
 # page_live.html.heex
-<form phx-change="noop" class="hidden">
+<form phx-change="noop">
   <.live_file_input upload={@uploads.speech} class="hidden" />
-</form>
-<p>
   <button
     id="record"
     class="bg-blue-500 hover:bg-blue-700 text-white font-bold px-4 rounded"
@@ -3216,19 +3190,37 @@ We use a form to capture the audio and use the MediaRecorder API. The Javascript
     />
     <span>Record</span>
   </button>
-</p>
+</form>
 <audio id="audio" controls></audio>
-<%= if @speech_spin do %>
-<div role="status">
-  <div
-    class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 "
-  >
-    <div
-      class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white"
-    ></div>
-  </div>
-</div>
-<% end %>
+<AppWeb.Spinner.spin spin="{@speech_spin}" />
+```
+
+The Spinner component takes a socket attribute. You can also use it to display the spinner when the captioning task is running, with
+
+```elixir
+<AppWeb.Spinner.spin spin={@running?} />
+```
+
+The component is:
+
+```elixir
+# /lib/app_web/components/spinner.ex
+defmodule AppWeb.Spinner do
+  use Phoenix.Component
+
+  attr :spin, :boolean, default: false
+
+  def spin(assigns) do
+    ~H"""
+    <div :if={@spin} role="status">
+      <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
+        </div>
+      </div>
+    </div>
+    """
+  end
+end
 ```
 
 We define the new JS file below in the "assets/js" folder. The important part is the `Phoenix.js` function `upload` to which we pass an identifier "speech" and a list that contains the audio as a `Blob`. We use an action button in the HTML, and attach Javascript listeners to it on the "click", "dataavailable" and "stop" events. We also play with the CSS classes to modify the appearance of the recording action button.
@@ -3287,13 +3279,11 @@ let liveSocket = new LiveSocket("/live", Socket, {
 });
 ```
 
-We now need to add some code server-side. The uploaded audio file will be saved on disk as a temporary file on the "/priv/static/uploads" folder. We declare this folder in the "/lib/app_web.ex" file and append the list of static files served by Phoenix as so:
+We now need to add some code server-side.
 
-```elixir
-  def static_paths, do: ~w(assets fonts images favicon.ico robots.txt uploads)
-```
+The uploaded audio file will be saved on disk as a temporary file on the "/priv/static/uploads" folder.
 
-We then update the socket to be returned by the LiveView `mount/3` function. We pass extra arguments - typically booleans for the UI such as the button disabling and the spinner - as well as another `allow_upload/3` to handle the upload process.
+We then update the socket to be returned by the LiveView in the `mount/3` function. We pass extra arguments - typically booleans for the UI such as the button disabling and the spinner - as well as another `allow_upload/3` to handle the upload process of the audio file.
 
 ```elixir
 #page_live.ex
@@ -3361,14 +3351,13 @@ defmodule App.Whisper do
       generation_config,
       chunk_num_seconds: 30,
       task: :transcribe,
-      # stream: true,
       defn_options: [compiler: EXLA]
     )
   end
 end
 ```
 
-The response of this task which is in the form of:
+The response of this task is in the following form:
 
 ```elixir
 %{
@@ -3382,7 +3371,7 @@ The response of this task which is in the form of:
 }
 ```
 
-This response is received in a `handle_info` callback where we simply update the socket state with the result and update the booleans used for our UI (the spinner, the button availability, reset of the task once done).
+We capture this response in a `handle_info` callback where we simply prune the temporary audoi file and update the socket state with the result and update the booleans used for our UI (the spinner, the button availability, reset of the task once done).
 
 ```elixir
 def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
@@ -3398,88 +3387,6 @@ def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns}
       audio_ref: nil
     )}
 end
-```
-
-### Embeddings and semantic search
-
-We want to encode every caption and the input text into a specific vector space. In other words, we encode a string into a list of numbers.
-We use a transformer-based pre-trained model [SBERT](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) to compute an embedding for each caption. We picked-up the transformer [sentence-transformers/paraphrase-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) model.
-The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function once we load the model.
-For simplicity, we did not use the multi-lingual model.
-We instantiate the HNSWLib index with a GenServer and also the tokenizing (which produces embeddings). The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use cosine_similarity.
-
-### New dependencies
-
-We will add the Elixir binding `HNSWLib`:
-
-```elixir
-{:hnswlib, "~> 0.1.4"}
-```
-
-We need to instantiate the Index struct which is saved into a file. We whether read the existing file or create a new one.
-This will be done in a GenServer since we also want to load the embedding model. We endow the vector space with a _cosine_ pseudo-metric.
-
-```elixir
-# /lib/app/text_embedding.ex
-defmodule App.TextEmbedding do
-  use GenServer
-  @indexes "indexes.bin"
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, {}, name: __MODULE__)
-  end
-
-  # upload or create a new index file
-  def init(_) do
-    path = Application.app_dir(:app, ["priv", "static", "uploads", @indexes])
-    space = :cosine
-
-    {:ok, index} =
-      case File.exists?(path) do
-        false ->
-          HNSWLib.Index.new(_space = space, _dim = 384, _max_elements = 200)
-
-        true ->
-          HNSWLib.Index.load_index(space, 384, Path.expand("priv/" <> @indexes))
-      end
-
-    model_info = nil
-    tokenizer = nil
-    {:ok, {model_info, tokenizer, index}, {:continue, :load}}
-  end
-
-  def handle_continue(:load, {_, _, index}) do
-    transformer = "sentence-transformers/paraphrase-MiniLM-L6-v2"
-
-    {:ok, %{model: _model, params: _params} = model_info} =
-      Bumblebee.load_model({:hf, transformer})
-
-    {:ok, tokenizer} =
-      Bumblebee.load_tokenizer({:hf, transformer})
-
-    {:noreply, {model_info, tokenizer, index}}
-  end
-
-  # called in Liveview `mount`
-  def serve() do
-    GenServer.call(__MODULE__, :serve)
-  end
-
-  def handle_call(:serve, _from, {model_info, tokenizer, index} = state) do
-    serving = Bumblebee.Text.TextEmbedding.text_embedding(model_info, tokenizer)
-    {:reply, {serving, index}, state}
-  end
-end
-```
-
-The GenServer is started in the Application module.
-
-```elixir
-# /lib/app/application.ex
-children = [
-  ...,
-  App.TextEmbedding,
-]
 ```
 
 ## _Please_ star the repo! ⭐️
