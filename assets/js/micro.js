@@ -4,6 +4,7 @@ export default {
     let audioChunks = [];
     const recordButton = document.getElementById("record");
     const audioElement = document.getElementById("audio");
+    const text = document.getElementById("text");
     const blue = ["bg-blue-500", "hover:bg-blue-700"];
     const pulseGreen = ["bg-green-500", "hover:bg-green-700", "animate-pulse"];
 
@@ -12,14 +13,14 @@ export default {
     recordButton.addEventListener("click", () => {
       if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
-        recordButton.textContent = "Record";
+        text.textContent = "Record";
       } else {
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           mediaRecorder = new MediaRecorder(stream);
           mediaRecorder.start();
           recordButton.classList.remove(...blue);
           recordButton.classList.add(...pulseGreen);
-          recordButton.textContent = "Stop";
+          text.textContent = "Stop";
 
           mediaRecorder.addEventListener("dataavailable", (event) =>
             audioChunks.push(event.data)

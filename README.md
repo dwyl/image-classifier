@@ -3191,8 +3191,10 @@ We also add a spinner to display that the transcription process is running, in t
     <span>Record</span>
   </button>
 </form>
-<audio id="audio" controls></audio>
-<AppWeb.Spinner.spin spin="{@speech_spin}" />
+<p class="flex flex-col items-center">
+  <audio id="audio" controls></audio>
+  <AppWeb.Spinner.spin spin="{@speech_spin}" />
+</p>
 ```
 
 The Spinner component takes a socket attribute. You can also use it to display the spinner when the captioning task is running, with
