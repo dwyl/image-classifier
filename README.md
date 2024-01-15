@@ -3170,8 +3170,9 @@ Source: <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir
 
 We firstly capture the audio and upload it to the server.
 
-We use a form to capture the audio and use the MediaRecorder API. The Javascript code is triggered by an attached hook _Audio_ declared in the HTML. We use a `live_file_input` and will append the code server side.
-We also let the user listen to his audio by adding an [embedded audio element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) `<audio>` in the HTML.
+We use a form to capture the audio and use the MediaRecorder API. The Javascript code is triggered by an attached hook _Audio_ declared in the HTML.
+We use a `live_file_input` and will append the code server side.
+We also let the user listen to his audio by adding an [embedded audio element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) `<audio>` in the HTML. Its source is the audio blob as an URL object.
 
 We also add a spinner to display that the transcription process is running, in the same way as we did for the captioning process. We introduce a Phoenix component to avoid code duplication.
 
@@ -3262,6 +3263,7 @@ export default {
 
           mediaRecorder.addEventListener("stop", () => {
             const audioBlob = new Blob(audioChunks);
+            // the source of the audio element
             audioElement.src = URL.createObjectURL(audioBlob);
 
             _this.upload("speech", [audioBlob]);
