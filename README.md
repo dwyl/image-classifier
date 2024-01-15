@@ -3188,7 +3188,7 @@ We also add a spinner to display that the transcription process is running, in t
       outline
       class="w-6 h-6 text-white font-bold group-active:animate-pulse"
     />
-    <span>Record</span>
+    <span id="text">Record</span>
   </button>
 </form>
 <p class="flex flex-col items-center">
@@ -3197,7 +3197,7 @@ We also add a spinner to display that the transcription process is running, in t
 </p>
 ```
 
-The Spinner component takes a socket attribute. You can also use it to display the spinner when the captioning task is running, with
+The Spinner component takes a socket attribute. You can also use it to display the spinner when the captioning task is running, with:
 
 ```elixir
 <AppWeb.Spinner.spin spin={@running?} />
@@ -3380,8 +3380,8 @@ We capture this response in a `handle_info` callback where we simply prune the t
 ```elixir
 def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
       when assigns.audio_ref == ref do
-    Process.demonitor(ref, [:flush])
-    File.rm!(@tmp_wav)
+  Process.demonitor(ref, [:flush])
+  File.rm!(@tmp_wav)
 
   {:noreply,
     assign(socket,
