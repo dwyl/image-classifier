@@ -1,12 +1,12 @@
 export default {
   mounted() {
-    let mediaRecorder;
-    let audioChunks = [];
-    const recordButton = document.getElementById("record");
-    const audioElement = document.getElementById("audio");
-    const text = document.getElementById("text");
-    const blue = ["bg-blue-500", "hover:bg-blue-700"];
-    const pulseGreen = ["bg-green-500", "hover:bg-green-700", "animate-pulse"];
+    let mediaRecorder,
+      audioChunks = [];
+    const recordButton = document.getElementById("record"),
+      audioElement = document.getElementById("audio"),
+      text = document.getElementById("text"),
+      blue = ["bg-blue-500", "hover:bg-blue-700"],
+      pulseGreen = ["bg-green-500", "hover:bg-green-700", "animate-pulse"];
 
     _this = this;
 
