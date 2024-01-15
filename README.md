@@ -3201,11 +3201,13 @@ We then want to find images whose captions approximates this text in terms of me
 
 - you transform a text into a vector. We used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function. This encoding is done for each image caption.
 
-- you then run a **knn_neighbour** search. The idea is to work in the embeddings vector space and find the image vectors that are close to the target vector. We used the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. It works with an Index struct. You append incrementally the Index struct - saved into a file - from your captions, and then run a "knn\*search" algorithm on this index with the audio transcription as an input. It returns the most relevant position(s) - indices - among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s). Note that this process is dependant on the metric used; we will use _cosine_similarity_ since the model is trained with it.
+- you then run a **knn_neighbour** search. The idea is to work in the embeddings vector space and find the image vectors that are close to the target vector. We used the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. It works with an Index struct. You append incrementally the Index struct - saved into a file - from your captions, and then run a "knn\*search" algorithm on this index with the audio transcription as an input. It returns the most relevant position(s) - indices - among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s). Note that this process is dependant on the metric used; we will use [cosine_similarity](https://en.wikipedia.org/wiki/Cosine_similarity) since the model is trained with it.
 
 ### Transcribe an audio recording
 
 We firstly capture the audio and upload it to the server.
+
+Source: <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>
 
 We use a form to capture the audio and use the MediaRecorder API. The Javascript code is triggered by an attached hook _Audio_ declared in the HTML. We use a `live_file_input` and will append the code server side.
 
@@ -3226,11 +3228,11 @@ We use a form to capture the audio and use the MediaRecorder API. The Javascript
       outline
       class="w-6 h-6 text-white font-bold group-active:animate-pulse"
     />
-    <span>Record</span>
+    <span id="text">Record</span>
   </button>
 </p>
 <audio id="audio" controls></audio>
-<Spinner.spin spin="{@speech_spin}" />
+<AppWeb.Spinner.spin spin="{@speech_spin}" />
 ```
 
 where we used the component:
@@ -3263,26 +3265,28 @@ We define the new JS file below in the "assets/js" folder. The important part is
 // /assets/js/micro.js
 export default {
   mounted() {
-    let mediaRecorder;
-     let audioChunks = [];
-    const recordButton = document.getElementById("record");
-    const audioElement = document.getElementById("audio");
-    const blue = ["bg-blue-500", "hover:bg-blue-700"];
-    const pulseGreen = ["bg-green-500", "hover:bg-green-700", "animate-pulse"];
+    let mediaRecorder,
+      audioChunks = [];
+    const recordButton = document.getElementById("record"),
+      audioElement = document.getElementById("audio"),
+      text = document.getElementById("text"),
+      blue = ["bg-blue-500", "hover:bg-blue-700"],
+      pulseGreen = ["bg-green-500", "hover:bg-green-700", "animate-pulse"];
+
 
     _this = this;
 
     recordButton.addEventListener("click", () => {
       if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
-        recordButton.textContent = "Record";
+        text.textContent = "Record";
       } else {
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           mediaRecorder = new MediaRecorder(stream);
           mediaRecorder.start();
           recordButton.classList.remove(...blue);
           recordButton.classList.add(...pulseGreen);
-          recordButton.textContent = "Stop";
+          text.textContent = "Stop";
 
           mediaRecorder.addEventListener("dataavailable", (event) => {
             audioChunks.push(event.data);
