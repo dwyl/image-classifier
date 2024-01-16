@@ -3458,7 +3458,7 @@ We will add the Elixir binding `HNSWLib`:
 
 We will encode every caption as a vector with the appropriate serving that runs the "sentence-transformers/paraphrase-MiniLM-L6-v2" model.
 The model will be loaded via a GenServer.
-We instantiate the Index struct via a file needed by HNSWLib in another GenServer. We endow the vector space with a _cosine_ pseudo-metric. When the app starts, we whether read the existing file or create a new one.
+We instantiate the Index struct via a file needed by HNSWLib in another GenServer. We endow the vector space with a _cosine_ pseudo-metric. When the app starts, we either read the existing file or create a new one.
 
 ```elixir
 defmodule App.KnnIndex do
@@ -3503,7 +3503,7 @@ defmodule App.KnnIndex do
 end
 ```
 
-The next GenServer uses `handle_continue` to off-load the app start-up. Indeed, all process are started synchronously in the Application module. The `handle_continue` used in this GenServer will continue the load process asynchronously and guaranties that this GenServer will not accept any messages until this task is finished. This speeds-up the load process.
+The next GenServer loads the model and uses `handle_continue`. Since all processes are started synchronously in the Application module, the `handle_continue` callback used in this GenServer will continue the load process asynchronously and guaranties that this GenServer will not accept any messages until this task is finished. This speeds-up the load process.
 
 ```elixir
 # /lib/app/text_embedding.ex
