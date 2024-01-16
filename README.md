@@ -1,25 +1,42 @@
-# Using Elixir machine learning tools for semantic search
+<div align="center">
 
-Let's use `Elixir` machine learning capabilities to build an application with the following features:
+# Image Captioning & Semantic Search in `Elixir`
 
-1. **Image captioning**: you can upload an image to a bucket and automatically caption it,
-2. **Semantic search**: you provide an audio input and the app runs a [symmetric semantic search](https://sbert.net/examples/applications/semantic-search/README.html) with **audio transcription**, **embeddings** and **knn search** to find the most relevant image.
+
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/dwyl/image-classifier/ci.yml?label=build&style=flat-square&branch=main)
+[![codecov.io](https://img.shields.io/codecov/c/github/dwyl/image-classifier/main.svg?style=flat-square)](https://codecov.io/github/dwyl/image-classifier?branch=main)
+[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat-square)](https://github.com/dwyl/image-classifier/issues)
+[![HitCount](https://hits.dwyl.com/dwyl/image-classifier.svg?style=flat-square&show=unique)](https://hits.dwyl.com/dwyl/image-classifier)
+
+Let's use `Elixir` machine learning capabilities 
+to build an application 
+that performs **image captioning**
+and **semantic search**
+to search for uploaded images 
+with your voice! 🎙️
+
+<p align="center">
+  <img src="https://github.com/dwyl/image-classifier/assets/17494745/05d0b510-ef9a-4a51-8425-d27902b0f7ad">
+</p>
+
+</div>
+
 
 <br />
 
-- [Using Elixir machine learning tools for semantic search](#using-elixir-machine-learning-tools-for-semantic-search)
+- [Image Captioning \& Semantic Search in `Elixir`](#image-captioning--semantic-search-in-elixir)
   - [Why? 🤷](#why-)
   - [What? 💭](#what-)
   - [Who? 👤](#who-)
   - [How? 💻](#how-)
   - [Prerequisites](#prerequisites)
-  - [Image Captioning in `Elixir`](#image-captioning-in-elixir)
+  - [🌄 Image Captioning in `Elixir`](#-image-captioning-in-elixir)
     - [0. Creating a fresh `Phoenix` project](#0-creating-a-fresh-phoenix-project)
     - [1. Installing initial dependencies](#1-installing-initial-dependencies)
     - [2. Adding `LiveView` capabilities to our project](#2-adding-liveview-capabilities-to-our-project)
     - [3. Receiving image files](#3-receiving-image-files)
-    - [4. Integrating `Bumblebee` 🐝](#4-integrating-bumblebee-)
-      - [4.1 `Nx` configuration ⚙️](#41-nx-configuration-️)
+    - [4. Integrating `Bumblebee`](#4-integrating-bumblebee)
+      - [4.1 `Nx` configuration](#41-nx-configuration)
       - [4.2 `Async` processing the image for classification](#42-async-processing-the-image-for-classification)
         - [4.2.1 Considerations regarding `async` processes](#421-considerations-regarding-async-processes)
         - [4.2.2 Alternative for better testing](#422-alternative-for-better-testing)
@@ -46,8 +63,8 @@ Let's use `Elixir` machine learning capabilities to build an application with th
       - [9.4 Changing our LiveView to persist data](#94-changing-our-liveview-to-persist-data)
     - [10. Adding double MIME type check and showing feedback to the person in case of failure](#10-adding-double-mime-type-check-and-showing-feedback-to-the-person-in-case-of-failure)
       - [10.1 Showing a toast component with error](#101-showing-a-toast-component-with-error)
-  - [Benchmarking models](#benchmarking-models)
-  - [Semantic search](#semantic-search)
+    - [11. Benchmarking image captioning models](#11-benchmarking-image-captioning-models)
+  - [🔍 Semantic search](#-semantic-search)
     - [Overview of the process](#overview-of-the-process)
     - [Transcribe an audio recording](#transcribe-an-audio-recording)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
@@ -107,24 +124,24 @@ In addition to this, **_some_ knowledge of `AWS`** - what it is, what an `S3` bu
 > please open an issue!
 > [/dwyl/image-classifier/issues](https://github.com/dwyl/image-classifier/issues)
 
+
+
 <div align="center">
 
-## Image Captioning in `Elixir`
+## 🌄 Image Captioning in `Elixir` 
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/dwyl/image-classifier/ci.yml?label=build&style=flat-square&branch=main)
-[![codecov.io](https://img.shields.io/codecov/c/github/dwyl/image-classifier/main.svg?style=flat-square)](https://codecov.io/github/dwyl/image-classifier?branch=main)
-[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat-square)](https://github.com/dwyl/image-classifier/issues)
-[![HitCount](https://hits.dwyl.com/dwyl/image-classifier.svg?style=flat-square&show=unique)](https://hits.dwyl.com/dwyl/image-classifier)
-
-Caption your images using
-machine learning models
-within `Phoenix`!
-
-<p align="center">
-  <img src="https://github.com/dwyl/image-classifier/assets/17494745/05d0b510-ef9a-4a51-8425-d27902b0f7ad">
-</p>
+In this section, we'll be start building our application
+with `Bumblebee` that supports Transformer models.
+At the end of this section,
+you'll have a fully functional application
+that receives an image,
+processes it accordingly
+and captions it.
 
 </div>
+
+
+
 
 ### 0. Creating a fresh `Phoenix` project
 
@@ -548,12 +565,12 @@ end
 And that's it!
 If you run `mix phx.server`, nothing will change.
 
-### 4. Integrating `Bumblebee` 🐝
+### 4. Integrating `Bumblebee`
 
 Now here comes the fun part!
 It's time to do some image captioning! 🎉
 
-#### 4.1 `Nx` configuration ⚙️
+#### 4.1 `Nx` configuration
 
 We first need to add some initial setup in the
 `lib/app/application.ex` file.
@@ -3114,7 +3131,7 @@ If `imgup` is down or the image that was sent was for example, invalid, an error
   <img width="800" src="https://github.com/dwyl/image-classifier/assets/17494745/d730d10c-b45e-4dce-a37a-bb389c3cd548" />
 </p>
 
-## Benchmarking models
+### 11. Benchmarking image captioning models
 
 You may be wondering which model is best suitable for me?
 Depending on the use case,
@@ -3136,45 +3153,121 @@ and all of the code
 inside the
 [`_comparison`](./_comparison/) folder.
 
+
 <div align="center">
 
-## Semantic search
+## 🔍 Semantic search
+
+> Imagine a person wants to see an image that was uploaded
+under a certain thema.
+One way to solve this problem is to perform a **_full-text_ search query** on specific words among these captions.
 
 </div>
 
-You want to find a specific image on a certain thema.
-One way to solve this problem is to perform a _full-text_ search query on specific words among these captions.
+> [!NOTE]
+>
+> This section was kindly implemented and documented by 
+> [@nrdean](https://github.com/ndrean).
+> Do check him out! 🎉
 
-With Machine Learning and models, you can greatly improve the search: you look for images whose captions are close in terms of _meaning_ to your search.
+We can leverage machine learning to greatly improve this search process:
+we'll look for images whose captions *are close in terms of meaning*
+to the search.
 
-It remains to express what "close" means and how to do this.
+In this section you'll learn how to perform
+[**semantic search**](https://www.elastic.co/what-is/semantic-search)
+with machine learning.
+These techniques are widely used in search engines,
+including in widespread tools like 
+[Elastic Search](https://www.elastic.co/).
+
 
 ### Overview of the process
 
-Once your images are uploaded and captionned, we save the URL and the caption into a database.
+Let's go over the process in detail 
+so we know what to expect.
 
-The next steps are:
+As it stands, when images are uploaded and captioned,
+the URL is saved, as well as the caption,
+in our local database.
 
-- you record an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API.
-- you run a **Speech-To-Text** process to produce a text transcription from the audio. We need to load the _pre-trained_ model [openai/whisper-small](https://huggingface.co/openai/whisper-small) from <https://huggingface.co> and use it with the help of the [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5) function to run this model against our input.
+Here's an overview of how semantic search usually works
+(which is what we'll exactly implement).
 
-We then want to find images whose captions approximates this text in terms of meaning. This transcription is the "target text". This is where **embeddings** come into play: we encode each transcription as a _vector_ - aka embedding - and then use an approximation algorithm to find the closest neighbours.
+<p align="center">
+  <img width="800" src="https://github.com/dwyl/image-classifier/assets/17494745/90e3d370-b324-46fc-b1f6-83b6240f28a5" />
+</p>
 
-- you transform a text into a vector. We used the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function. This encoding is done for each image caption.
+> Source: https://www.elastic.co/what-is/semantic-search
 
-- you then run a **knn_neighbour** search. The idea is to work in the embeddings vector space and find the image vectors that are close to the target vector. We used the [HNSWLib](https://github.com/elixir-nx/hnswlib) Elixir binding for this. It works with an Index struct. You append incrementally the Index struct - saved into a file - from your captions, and then run a "knn\*search" algorithm on this index with the audio transcription as an input. It returns the most relevant position(s) - indices - among the Index struct indices. This is where you need to save whether the index or the embedding to look-up for the corresponding image(s). Note that this process is dependant on the metric used; we will use _cosine_similarity_ since the model is trained with it.
+
+So, we'll be:
+
+- recording an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API.
+- running a **Speech-To-Text** process to produce a text transcription
+from the audio. 
+We need to load the _pre-trained_ model 
+[openai/whisper-small](https://huggingface.co/openai/whisper-small) 
+from <https://huggingface.co> 
+and use it with the help of the 
+[Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5) 
+function to run this model against our input.
+
+We then want to find images whose captions 
+approximates this text in terms of meaning. 
+This transcription is the `"target text"`. 
+This is where **embeddings** come into play: 
+we encode each transcription as a _vector_ - aka embedding - 
+and then use an approximation algorithm to find the closest neighbours.
+Embeddings are basically **vector representations** of certain inputs,
+which in our case, are audio files.
+
+- we'll transform a text into a vector. 
+We'll the transformer 
+[`sentence-transformers/paraphrase-MiniLM-L6-v2` ](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2)
+with the help of the 
+[Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function. 
+This encoding is done for each image caption.
+
+- after this, we'll then run a [**knn_neighbour**](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) search. 
+The idea is to work in the embeddings vector space 
+and find the image vectors that are close to the target vector. 
+We'll be using the [HNSWLib library](https://github.com/elixir-nx/hnswlib)
+, an Elixir binding for this.
+It works with an [`**index struct**`](https://www.datastax.com/guides/what-is-a-vector-index) - this struct will allow us to efficiently retrieve
+vector data. 
+We'll be incrementally appending the `index struct` - saved into a file - 
+from the captions, 
+and then run a "knn\*search" algorithm on this `index` 
+with the audio transcription as an input. 
+This algorithm will return the most relevant position(s) - `indices` - 
+among the `index` struct indices. 
+This is where we'll need to save 
+whether the index or the embedding to look-up for the corresponding image(s). 
+Do note that all of this process is dependant on the 
+[similarity metric](https://www.pinecone.io/learn/vector-similarity/) 
+used by the embedding model. 
+Because the model we've chosen was trained with **_cosine_similarity_**,
+that's what we'll use.
+
 
 ### Transcribe an audio recording
 
-Source: <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>
+`Source: <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>`
 
 We firstly capture the audio and upload it to the server.
 
-We use a form to capture the audio and use the MediaRecorder API. The Javascript code is triggered by an attached hook _Audio_ declared in the HTML.
+We use a form to capture the audio and use the `MediaRecorder API`. 
+The Javascript code is triggered by an attached hook `Audio` declared in the HTML.
 We use a `live_file_input` and will append the code server side.
-We also let the user listen to his audio by adding an [embedded audio element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) `<audio>` in the HTML. Its source is the audio blob as an URL object.
+We also let the user listen to his audio by adding an [embedded audio element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) `<audio>` 
+in the HTML. Its source is the audio blob as an URL object.
 
-We also add a spinner to display that the transcription process is running, in the same way as we did for the captioning process. We introduce a Phoenix component to avoid code duplication.
+We also add a spinner to display that the transcription process is running, 
+in the same way as we did for the captioning process. 
+We introduce a Phoenix component to avoid code duplication.
+
+In `page_live_html.heex`, add the following snippet of code.
 
 ```html
 # page_live.html.heex
@@ -3200,13 +3293,18 @@ We also add a spinner to display that the transcription process is running, in t
 </p>
 ```
 
-The Spinner component takes a socket attribute. You can also use it to display the spinner when the captioning task is running, with:
+The `Spinner` component takes a socket attribute. 
+You can also use it to display the spinner when the captioning task is running, 
+with:
 
 ```elixir
 <AppWeb.Spinner.spin spin={@running?} />
 ```
 
-The component is:
+Create the file 
+`spinner.ex` in `lib/app_web/components/`
+and create the `Spinner` component,
+like so:
 
 ```elixir
 # /lib/app_web/components/spinner.ex
@@ -3228,7 +3326,16 @@ defmodule AppWeb.Spinner do
 end
 ```
 
-We define the new JS file below in the "assets/js" folder. The important part is the `Phoenix.js` function `upload` to which we pass an identifier "speech" and a list that contains the audio as a `Blob`. We use an action button in the HTML, and attach Javascript listeners to it on the "click", "dataavailable" and "stop" events. We also play with the CSS classes to modify the appearance of the recording action button.
+We define the new JS file below in the `assets/js` folder. 
+The important part is the `Phoenix.js` function `upload`, 
+to which we pass an identifier `"speech"` 
+and a list that contains the audio as a `Blob`. 
+We use an action button in the HTML, 
+and attach Javascript listeners to it on the `"click"`, `"dataavailable"` and `"stop"` events. 
+We also play with the CSS classes to modify the appearance of the recording action button.
+
+Create a file called `assets/js/micro.js`
+and use the code below.
 
 ```js
 // /assets/js/micro.js
@@ -3236,6 +3343,9 @@ export default {
   mounted() {
     let mediaRecorder,
       audioChunks = [];
+
+    // Defining the elements and styles to be used during recording
+    // and shown on the HTML.
     const recordButton = document.getElementById("record"),
       audioElement = document.getElementById("audio"),
       text = document.getElementById("text"),
@@ -3245,22 +3355,35 @@ export default {
 
     _this = this;
 
+    // Adding event listener for "click" event
     recordButton.addEventListener("click", () => {
+
+      // Check if it's recording.
+      // If it is, we stop the record and update the elements.
       if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
         text.textContent = "Record";
-      } else {
+      } 
+
+      // Otherwise, it means the user wants to start recording.
+      else {
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+
+          // Instantiate MediaRecorder
           mediaRecorder = new MediaRecorder(stream);
           mediaRecorder.start();
+
+          // And update the elements
           recordButton.classList.remove(...blue);
           recordButton.classList.add(...pulseGreen);
           text.textContent = "Stop";
 
+          // Add "dataavailable" event handler
           mediaRecorder.addEventListener("dataavailable", (event) => {
             audioChunks.push(event.data);
           });
 
+          // Add "stop" event handler for when the recording stops.
           mediaRecorder.addEventListener("stop", () => {
             const audioBlob = new Blob(audioChunks);
             // the source of the audio element
@@ -3276,7 +3399,11 @@ export default {
     });
   },
 };
+```
 
+Now let's add this hook in our `assets/js/app.js` file.
+
+```js
 // /assets/js/app.js
 ...
 import Audio from "./micro.js";
@@ -3287,11 +3414,19 @@ let liveSocket = new LiveSocket("/live", Socket, {
 });
 ```
 
-We now need to add some code server-side.
+We now need to add some server-side code.
 
-The uploaded audio file will be saved on disk as a temporary file on the "/priv/static/uploads" folder.
+The uploaded audio file will be saved on disk as a temporary file 
+in the `/priv/static/uploads` folder.
 
-We then update the socket to be returned by the LiveView in the `mount/3` function. We pass extra arguments - typically booleans for the UI such as the button disabling and the spinner - as well as another `allow_upload/3` to handle the upload process of the audio file.
+We then update the socket to be returned by the LiveView 
+in the `mount/3` function. 
+We pass extra arguments - 
+typically booleans for the UI such as the button disabling and the spinner - 
+as well as another `allow_upload/3` to handle the upload process of the audio file.
+
+In `lib/app_web/live/page_live.ex`, 
+we change the code like so:
 
 ```elixir
 #page_live.ex
@@ -3318,7 +3453,11 @@ def mount(_,_,socket) do
 end
 ```
 
-We then create a specific `handle_progress` for the the `:speech` event as we did with the `:image_list` event. It will launch a task to run the Automatic Speech Recognition model on this audio file. We named the serving "Whisper".
+We then create a specific `handle_progress` for the the `:speech` event 
+as we did with the `:image_list` event. 
+It will launch a task to run the **Automatic Speech Recognition model** 
+on this audio file. 
+We named the serving `"Whisper"`.
 
 ```elixir
 def handle_progress(:speech, entry, socket) when entry.done? do
@@ -3340,7 +3479,9 @@ def handle_progress(:speech, entry, socket) when entry.done? do
 end
 ```
 
-We now create the serving for this model. Create a new file "App.Whisper":
+We now create the serving for this model. 
+Let's create a module `App.Whisper`
+inside a new file `lib/app/sppech_to_text.ex`.
 
 ```elixir
 # /lib/app/sppech_to_text.ex
@@ -3365,6 +3506,9 @@ defmodule App.Whisper do
 end
 ```
 
+As you can see, this is a serving function
+similar to what we've done with image captioning.
+
 The response of this task is in the following form:
 
 ```elixir
@@ -3372,14 +3516,18 @@ The response of this task is in the following form:
   chunks:
   [%{
       text: "Hi there",
-              ^^^the text of our audio
+              #^^^the text of our audio
       start_timestamp_seconds: nil,
       end_timestamp_seconds: nil
   }]
 }
 ```
 
-We capture this response in a `handle_info` callback where we simply prune the temporary audoi file and update the socket state with the result and update the booleans used for our UI (the spinner, the button availability, reset of the task once done).
+We capture this response in a `handle_info` callback 
+where we simply prune the temporary audio file 
+and update the socket state with the result,
+and update the booleans used for our UI 
+(the spinner element, the button availability and reset of the task once done).
 
 ```elixir
 def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
