@@ -3170,10 +3170,7 @@ as they add more models,
 this comparison table will grow.
 So any contribution is more than welcome! 🎉
 
-You may check the guide
-and all of the code
-inside the
-[`_comparison`](./_comparison/) folder.
+You may check the guide and all of the code inside the [`_comparison`](./_comparison/) folder.
 
 <div align="center">
 
@@ -3207,7 +3204,7 @@ We then want to find images whose captions approximates this text in terms of me
 
 We firstly capture the audio and upload it to the server.
 
-Source: <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>
+- Source: <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>
 
 We use a form to capture the audio and use the MediaRecorder API. The Javascript code is triggered by an attached hook _Audio_ declared in the HTML. We use a `live_file_input` and will append the code server side.
 We also let the user listen to his audio by adding an embedded audio element `<audio>` in the HTML. Its source is the audio blob as an URL object.
@@ -3439,6 +3436,8 @@ end
 ```
 
 ### Embeddings and semantic search
+
+- Source: https://dockyard.com/blog/2023/01/11/semantic-search-with-phoenix-axon-bumblebee-and-exfaiss
 
 We want to encode every caption and the input text into a specific vector space. In other words, we encode a string into a list of numbers.
 We use a transformer-based pre-trained model [SBERT](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) to compute an embedding for each caption. We picked-up the transformer [sentence-transformers/paraphrase-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) model.
@@ -3761,11 +3760,9 @@ Modify the `App.Image` struct and the changeset
 
 #### How to use HNSWLib, the Elixir binding for the [hnswlib](https://github.com/nmslib/hnswlib) library
 
-I add some comments on the library HNSWLib. The intention is to try to clarify when you can use a look-up by index and/or by embedding, and secondly why you need to normalise for `cosine`.
+We added some comments on the library HNSWLib. The intention is to clarify when you can use a look-up by index and/or by embedding, and secondly why you need to normalise for `cosine`.
 
-The Index is instantiated as in the GenServer above.
-
-> Currently in development, alpha software.
+> Note: the package is currently in development, alpha software.
 
 ##### Create an Index struct
 
@@ -3794,7 +3791,7 @@ iex> {:ok, index} = HNSWLib.Index.new(space, dim, max_elements)
 
 ##### Add vectors to the Index struct
 
-The Index struct is incrementally build. Let's add 5 vectors:
+The Index struct is incrementally build. Let's add 5 vectors of length 2:
 
 ```elixir
 iex> data =
@@ -3818,20 +3815,34 @@ iex> data =
     [200.0, 220.0]
   ]
 >
-# we get the number of elements in the Index struct
+```
+
+We get the number of elements in the Index struct:
+
+```elixir
 iex> HNSWLib.Index.get_current_count(index)
 {:ok, 0}
-# we add the 5 previous elements to the index struct
+```
+
+We can add the 5 previous elements altogether to the index struct, or one by one:
+
+```elixir
 iex> HNSWLib.Index.add_items(index, data)
 :ok
-# we check the current count of the index struct
+```
+
+We check the current count of the index struct:
+
+```elixir
 iex> HNSWLib.Index.get_current_count(index)
 {:ok, 5}
 ```
 
 ##### Query nearest vector(s) in the index
 
-`knn_query` returns a tuple `(:ok, labels, distances}`. The "labels" tensor contains the indices in the Index struct of the `k` closest elements. The "distances" tensor contains the corresponding distance between these closest elements and the query input.
+The function `knn_query` returns a tuple `(:ok, labels, distances}`.
+The "labels" tensor contains the indices in the Index struct of the `k` closest elements.
+The "distances" tensor contains the corresponding distance between these closest elements and the query input.
 
 ```elixir
 # query
@@ -3854,8 +3865,11 @@ iex> {:ok, labels, dists} = HNSWLib.Index.knn_query(index, query)
      [5.0]
    ]
  >}
+```
 
-# we look for the 3 closest neighbours
+We look for the 3 closest neighbours:
+
+```elixir
 iex> {:ok, labels, dists} = HNSWLib.Index.knn_query(index, query, k: 3)
 {:ok,
  #Nx.Tensor<
@@ -4002,9 +4016,11 @@ $||u-v||^2  = ||u||^2+||v||^2-2< u,v >$
 Consider now two normalised vectors. We have:
 $\frac12||u-v||^2=1-\cos\widehat{u,v} = d_c(u,v)$
 
-This is commonly known as the "cosine distance" _when the embeddings are normalised_. It ranges from 0 to 2. Note that it is not a true distance metric.
+This is commonly known as the **cosine distance** _when the embeddings are normalised_. It ranges from 0 to 2. Note that it is not a true distance metric.
 
-Finally, note that since we are dealing with finite dimensional vector spaces, all the norms are equivalent (in some precise mathematical way). This means that the limit points are always the same. However, the values of the distances can be quite different, and a "clusterisation" processes can give significantly different results. The first hint for which norm to choose is to take the norm used to train the model.
+Finally, note that since we are dealing with finite dimensional vector spaces, all the norms are equivalent (in some precise mathematical way). This means that the limit points are always the same. However, the values of the distances can be quite different, and a "clusterisation" processes can give significantly different results.
+
+The first hint to which norm to choose is to take the norm used to train the model.
 
 ## _Please_ star the repo! ⭐️
 
