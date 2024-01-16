@@ -3461,6 +3461,7 @@ The model will be loaded via a GenServer.
 We instantiate the Index struct via a file needed by HNSWLib in another GenServer. We endow the vector space with a _cosine_ pseudo-metric. When the app starts, we either read the existing file or create a new one.
 
 ```elixir
+# /lib/app/knn_index.ex
 defmodule App.KnnIndex do
   use GenServer
 
