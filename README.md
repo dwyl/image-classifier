@@ -3503,6 +3503,8 @@ defmodule App.KnnIndex do
 end
 ```
 
+The next GenServer uses `handle_continue` to off-load the app start-up. Indeed, all process are started synchronously in the Application module. The `handle_continue` used in this GenServer will continue the load process asynchronously and guaranties that this GenServer will not accept any messages until this task is finished. This speeds-up the load process.
+
 ```elixir
 # /lib/app/text_embedding.ex
 defmodule App.TextEmbedding do
