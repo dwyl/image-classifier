@@ -66,7 +66,7 @@ with your voice! 🎙️
     - [11. Benchmarking image captioning models](#11-benchmarking-image-captioning-models)
   - [🔍 Semantic search](#-semantic-search)
     - [Overview of the process](#overview-of-the-process)
-    - [Transcribe an audio recording](#transcribe-an-audio-recording)
+    - [1. Transcribe an audio recording](#1-transcribe-an-audio-recording)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -3250,8 +3250,26 @@ used by the embedding model.
 Because the model we've chosen was trained with **_cosine_similarity_**,
 that's what we'll use.
 
+Before starting, let's install some dependencies that we'll need.
+Add these to the `deps` section in `mix.exs`.
 
-### Transcribe an audio recording
+```elixir
+def deps do
+  [
+    {:hnswlib, "~> 0.1.4"}
+  ]
+end
+```
+
+- `**hnswlib**` is a library used to use the 
+[k-nearest neighbors algorithm](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
+in `Elixir`.
+
+And run `mix deps.get`.
+
+
+
+### 1. Transcribe an audio recording
 
 `Source: <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>`
 
@@ -3508,6 +3526,28 @@ end
 
 As you can see, this is a serving function
 similar to what we've done with image captioning.
+Don't forget to add this serving function in the 
+`lib/app/application.ex`
+so it's available throughout the application in runtime.
+
+```elixir
+# lib/app/application.ex
+  def start(_type, _args) do
+    App.Models.verify_and_download_models()
+
+    children = [
+      # Start the Telemetry supervisor
+      AppWeb.Telemetry,
+      # Setup DB
+      App.Repo,
+      # Start the PubSub system
+      {Phoenix.PubSub, name: App.PubSub},
+      # Nx serving for the embedding
+      # App.TextEmbedding,
+      # Nx serving for Speech-to-Text
+      {Nx.Serving, serving: App.Whisper.serving(), name: Whisper},
+      ....
+```
 
 The response of this task is in the following form:
 
