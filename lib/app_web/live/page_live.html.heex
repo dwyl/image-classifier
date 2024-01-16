@@ -170,10 +170,9 @@
             outline
             class="w-6 h-6 text-white font-bold group-active:animate-pulse"
           />
-          <span>Record</span>
+          <span id="text">Record</span>
         </button>
         <audio id="audio" controls></audio>
-        <%= @speech_spin %>
         <AppWeb.Spinner.spin spin={@speech_spin} />
       </p>
 

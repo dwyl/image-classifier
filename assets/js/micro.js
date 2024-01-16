@@ -1,7 +1,7 @@
 export default {
   mounted() {
-    let mediaRecorder,
-      audioChunks = [];
+    let mediaRecorder;
+    let audioChunks = [];
     const recordButton = document.getElementById("record"),
       audioElement = document.getElementById("audio"),
       text = document.getElementById("text"),

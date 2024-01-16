@@ -24,8 +24,9 @@ defmodule AppWeb.PageLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    # File.mkdir_p!(@upload_dir)
-    {serving, index} = App.TextEmbedding.serve()
+    # load the embedding and the Index
+    serving = App.TextEmbedding.serve()
+    index = App.KnnIndex.load_index()
 
     {:ok,
      socket

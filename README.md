@@ -3210,6 +3210,9 @@ We firstly capture the audio and upload it to the server.
 Source: <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>
 
 We use a form to capture the audio and use the MediaRecorder API. The Javascript code is triggered by an attached hook _Audio_ declared in the HTML. We use a `live_file_input` and will append the code server side.
+We also let the user listen to his audio by adding an embedded audio element `<audio>` in the HTML. Its source is the audio blob as an URL object.
+
+We also add a spinner to display that the transcription process is running, in the same way as we did for the captioning process. We introduce a Phoenix component to avoid code duplication.
 
 ```html
 # /lib/app_web/live/page_live.html.heex
@@ -3233,9 +3236,16 @@ We use a form to capture the audio and use the MediaRecorder API. The Javascript
 </p>
 <audio id="audio" controls></audio>
 <AppWeb.Spinner.spin spin="{@speech_spin}" />
+<p id="output"><%= @transcription %></p>
 ```
 
-where we used the component:
+The Spinner component takes a socket attribute. You can also use it to display the spinner when the captioning task is running, with:
+
+```elixir
+<AppWeb.Spinner.spin spin={@running?} />
+```
+
+The component is:
 
 ```elixir
 # /lib/app_web/components/spinner.ex
@@ -3447,8 +3457,51 @@ We will add the Elixir binding `HNSWLib`:
 #### Transformer model and HNSWLib Index setup
 
 We will encode every caption as a vector with the appropriate serving that runs the "sentence-transformers/paraphrase-MiniLM-L6-v2" model.
-This will be done in a GenServer since we also want to load the embedding model. We endow the vector space with a _cosine_ pseudo-metric. We also load the model.
-In the GenServer, we will also instantiate the HNSWLib Index struct which is saved into a file. When the app starts, we whether read the existing file or create a new one.
+The model will be loaded via a GenServer.
+We instantiate the Index struct via a file needed by HNSWLib in another GenServer. We endow the vector space with a _cosine_ pseudo-metric. When the app starts, we whether read the existing file or create a new one.
+
+```elixir
+defmodule App.KnnIndex do
+  use GenServer
+
+  @indexes "indexes.bin"
+
+  def start_link(_) do
+    GenServer.start_link(__MODULE__, {}, name: __MODULE__)
+  end
+
+  def init(_) do
+    upload_dir = Application.app_dir(:app, ["priv", "static", "uploads"])
+    File.mkdir_p!(upload_dir)
+
+    path = Path.join([upload_dir, @indexes])
+    space = :cosine
+
+    require Logger
+
+    {:ok, index} =
+      case File.exists?(path) do
+        false ->
+          Logger.info("New Index")
+          HNSWLib.Index.new(_space = space, _dim = 384, _max_elements = 200)
+
+        true ->
+          Logger.info("Existing Index")
+          HNSWLib.Index.load_index(space, 384, path)
+      end
+
+    {:ok, index}
+  end
+
+  def load_index do
+    GenServer.call(__MODULE__, :load)
+  end
+
+  def handle_call(:load, _from, state) do
+    {:reply, state, state}
+  end
+end
+```
 
 ```elixir
 # /lib/app/text_embedding.ex
@@ -3516,6 +3569,8 @@ The GenServer is started in the Application module.
 children = [
   ...,
   App.TextEmbedding,
+  App.KnnIndex,
+  ...
 ]
 ```
 
@@ -3525,11 +3580,13 @@ We firstly append the Liveview socket with the index and the serving of the tran
 
 ```elixir
 def mount(_, _, socket) do
-  {serving, index} = App.TextEmbedding.serve()
+  serving = App.TextEmbedding.serve()
+  index = App.KnnIndex.load_index()
   ...
   {:ok,
     socket
     |> assign(
+      ...,
       serve_embedding: serving,
       index: index,
       db_img: nil,
@@ -3651,7 +3708,6 @@ def handle_knn(index, input) do
 
       case HNSWLib.Index.knn_query(index, input, k: 1) do
         {:ok, label, distance} ->
-          dbg(distance)
 
           label[0]
           |> Nx.to_flat_list()
@@ -3663,6 +3719,16 @@ def handle_knn(index, input) do
   end
 end
 
+```
+
+We finally display the found image since we got an `App.Image` struct back from the database through the index:
+
+```elixir
+# /lib/app_web/live/page_live.html.heex
+
+<div :if={@search_result}>
+  <img src={@search_result.url} alt="found_image" />
+</div>
 ```
 
 #### Alter schema
