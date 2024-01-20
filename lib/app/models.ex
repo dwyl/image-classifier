@@ -23,10 +23,6 @@ defmodule App.Models do
     cache_path: Path.join(@models_folder_path, "resnet-50"),
     load_featurizer: true
   }
-  def extract_captioning_test_label(result) do
-    %{predictions: [%{label: label}]} = result
-    label
-  end
 
   @captioning_prod_model %ModelInfo{
     name: "Salesforce/blip-image-captioning-base",
@@ -44,6 +40,11 @@ defmodule App.Models do
     load_generation_config: true
   }
 
+  def extract_captioning_test_label(result) do
+    %{predictions: [%{label: label}]} = result
+    label
+  end
+
   def extract_captioning_prod_label(result) do
     %{results: [%{text: label}]} = result
     label
@@ -53,8 +54,8 @@ defmodule App.Models do
   Verifies and downloads the models according to configuration
   and if they are already cached locally or not.
   """
-  def verify_and_download_models() do
-    force_models_download = Application.get_env(:app, :force_models_download, false)
+  def verify_and_download_models(model) do
+    force_models_download = Application.get_env(:app, :force_models_download, true)
     use_test_models = Application.get_env(:app, :use_test_models, false)
 
     case {force_models_download, use_test_models} do
@@ -62,21 +63,21 @@ defmodule App.Models do
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
         # Download test models
-        download_model(@captioning_test_model)
+        download_model(model)
 
       {true, false} ->
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
         # Download prod models
-        download_model(@captioning_prod_model)
+        download_model(model)
 
       {false, false} ->
         # Check if the prod model cache directory exists or if it's not empty.
         # If so, we download the prod model.
-        model_location = Path.join(@captioning_prod_model.cache_path, "huggingface")
+        model_location = Path.join(model.cache_path, "huggingface")
 
         if not File.exists?(model_location) or File.ls!(model_location) == [] do
-          download_model(@captioning_prod_model)
+          download_model(model)
         end
 
       # unless File.exists?(Path.join(@captioning_prod_model.cache_path, "huggingface")) or
@@ -156,7 +157,7 @@ defmodule App.Models do
     Logger.info("Loading #{model.name}...")
 
     # Loading model
-    loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: true} |> dbg()
+    loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: false} |> dbg()
     {:ok, model_info} = Bumblebee.load_model(loading_settings)
 
     info = %{model_info: model_info}

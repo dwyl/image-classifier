@@ -5,9 +5,29 @@ defmodule App.Application do
   require Logger
   use Application
 
+  @models_folder_path Application.compile_env!(:app, :models_cache_dir)
+
   @impl true
   def start(_type, _args) do
-    App.Models.verify_and_download_models()
+    [
+      %{
+        name: "blip-image-captioning-base",
+        cache_path: Path.join(@models_folder_path, "blip-image-captioning-base")
+      },
+      %{
+        name: "openai/whisper-small",
+        cache_path: Path.join(@models_folder_path, "whisper-small")
+      },
+      %{name: "microsoft/resnet-50", cache_path: Path.join(@models_folder_path, "resnet-50")}
+    ]
+    |> Task.async_stream(
+      fn model ->
+        dbg(model)
+        App.Models.verify_and_download_models(model)
+      end,
+      timeout: :infinity
+    )
+    |> Enum.to_list()
 
     children = [
       # Start the Telemetry supervisor
