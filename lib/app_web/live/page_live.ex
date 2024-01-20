@@ -292,11 +292,11 @@ defmodule AppWeb.PageLive do
     label =
       case Application.get_env(:app, :use_test_models, false) do
         true ->
-          App.Models.extract_test_label(result)
+          App.Models.extract_captioning_test_label(result)
 
         # coveralls-ignore-start
         false ->
-          App.Models.extract_prod_label(result)
+          App.Models.extract_captioning_prod_label(result)
           # coveralls-ignore-stop
       end
 

@@ -19,7 +19,7 @@ defmodule App.Application do
       # Nx serving for the embedding
       # App.TextEmbedding,
       # Nx serving for Speech-to-Text
-      {Nx.Serving, serving: App.Whisper.serving(), name: Whisper},
+      {Nx.Serving, serving: App.Models.whisper_serving(), name: Whisper},
       # Nx serving for image classifier
       {Nx.Serving,
        serving:
