@@ -3213,25 +3213,23 @@ and then use an approximation algorithm to find the closest neighbours.
 Embeddings are basically **vector representations** of certain inputs,
 which in our case, are audio files.
 
-Our next steps will be:
+Our next steps will be to prepare the [symmetric semantic search](https://www.sbert.net/examples/applications/semantic-search/README.html#symmetric-vs-asymmetric-semantic-search). We will use the [transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>) with the [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) pre-trained system available in [Huggingface](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
 
 - we transform a text into a vector.
-  We use the transformer
+  We use the sentence-transformer model
   [`sentence-transformers/paraphrase-MiniLM-L6-v2` ](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2)
-  with the help of the
+  because of its small size. We will run it with the help of the
   [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function.
   This encoding is done for each image caption.
 
 - after this, we then run a [**knn_neighbour**](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) search.
   The idea is to work in the embeddings vector space
   and find the image vectors that are close to the target vector.
-  We'll be using the [HNSWLib library](https://github.com/elixir-nx/hnswlib)
-  , an Elixir binding for this.
+  We'll be using an Elixir binding of the [HNSWLib library](https://github.com/elixir-nx/hnswlib).
   It works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**: this struct will allow us to efficiently retrieve
   vector data.
-  We will incrementally append the `index struct` - saved into a file -
-  the embedded captions,
-  and then run a "knn\*search" algorithm on this `index`
+  We will incrementally append the the embedded captions to the `index struct` - saved into a file -
+  , and then run a "knn\*search" algorithm on this `index`
   with the audio transcription as an input.
   This algorithm will return the most relevant position(s) - `indices` -
   among the `index` struct indices.
