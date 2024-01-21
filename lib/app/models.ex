@@ -155,7 +155,7 @@ defmodule App.Models do
     Logger.info("Loading #{model.name}...")
 
     # Loading model
-    loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: false} |> dbg()
+    loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: true}
     {:ok, model_info} = Bumblebee.load_model(loading_settings)
 
     info = %{model_info: model_info}
