@@ -55,15 +55,18 @@ defmodule App.Models do
   and if they are already cached locally or not.
   """
   def verify_and_download_models(model) do
-    force_models_download = Application.get_env(:app, :force_models_download, true)
+    dbg(model)
+    force_models_download = Application.get_env(:app, :force_models_download, false)
     use_test_models = Application.get_env(:app, :use_test_models, false)
 
     case {force_models_download, use_test_models} do
       {true, true} ->
         # Delete any cached pre-existing models
-        File.rm_rf!(@models_folder_path)
+        file = Path.join(@models_folder_path, model)
+        if File.exists?(file), do: File.rm_rf!(file)
+        # File.rm_rf!(@models_folder_path)
         # Download test models
-        download_model(model)
+        download_model(@captioning_test_model)
 
       {true, false} ->
         # Delete any cached pre-existing models
@@ -79,11 +82,6 @@ defmodule App.Models do
         if not File.exists?(model_location) or File.ls!(model_location) == [] do
           download_model(model)
         end
-
-      # unless File.exists?(Path.join(@captioning_prod_model.cache_path, "huggingface")) or
-      #          File.ls!(model_location) != [] do
-      #   download_model(@captioning_prod_model)
-      # end
 
       {false, true} ->
         # Check if the test model cache directory exists or if it's not empty.

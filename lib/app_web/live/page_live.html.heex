@@ -136,20 +136,21 @@
         <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
           <span>Description: </span>
           <!-- Spinner -->
-          <%= if @running? do %>
+          <AppWeb.Spinner.spin spin={@running?} />
+          <%!-- <%= if @running? do %>
             <div role="status">
               <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
                 <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
                 </div>
               </div>
             </div>
+          <% else %> --%>
+          <%= if @label do %>
+            <span class="text-gray-700 font-light"><%= @label %></span>
           <% else %>
-            <%= if @label do %>
-              <span class="text-gray-700 font-light"><%= @label %></span>
-            <% else %>
-              <span class="text-gray-300 font-light">Waiting for image input.</span>
-            <% end %>
+            <span class="text-gray-300 font-light">Waiting for image input.</span>
           <% end %>
+          <%!-- <% end %> --%>
         </div>
       </div>
     </div>
@@ -181,14 +182,15 @@
       </form>
       <p class="flex flex-col items-center">
         <audio id="audio" controls></audio>
-        <%= if @speech_spin do %>
+        <AppWeb.Spinner.spin spin={@speech_spin} />
+        <%!-- <%= if @speech_spin do %>
           <div role="status">
             <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
               <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
               </div>
             </div>
           </div>
-        <% end %>
+        <% end %> --%>
         <span id="output"><%= @transcription %></span>
       </p>
 

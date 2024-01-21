@@ -3267,15 +3267,38 @@ We firstly capture the audio and upload it to the server.
 The process is quite similar to the image upload except that we
 use a special Javascript hook to record the audio and upload it to the Phoenix Liveview.
 
-We use a form to capture the audio and use the `MediaRecorder API`.
+We use an `live_file_input` in a form to capture the audio and use the Javascript `MediaRecorder API`.
 The Javascript code is triggered by an attached hook `Audio` declared in the HTML.
-We use a `live_file_input` and will append the code server side.
-We also let the user listen to his audio by adding an [embedded audio element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) `<audio>`
-in the HTML. Its source is the audio blob as an URL object.
+We also let the user listen to his audio by adding an [embedded audio element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) `<audio>` in the HTML.
+Its source is the audio blob as an URL object.
 
 We also add a spinner to display that the transcription process is running,
 in the same way as we did for the captioning process.
-We introduce a Phoenix component to avoid code duplication.
+To avoid code duplication, we introduce a Phoenix component "Spinner".
+Create the file
+`spinner.ex` in `lib/app_web/components/`
+and create the `Spinner` component,
+like so:
+
+```elixir
+# /lib/app_web/components/spinner.ex
+defmodule AppWeb.Spinner do
+  use Phoenix.Component
+
+  attr :spin, :boolean, default: false
+
+  def spin(assigns) do
+    ~H"""
+    <div :if={@spin} role="status">
+      <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
+        </div>
+      </div>
+    </div>
+    """
+  end
+end
+```
 
 In `page_live_html.heex`, add the following snippet of code.
 
@@ -3303,46 +3326,27 @@ In `page_live_html.heex`, add the following snippet of code.
 </p>
 ```
 
-The `Spinner` component takes a socket attribute.
-You can also use it to display the spinner when the captioning task is running,
-with:
+You can also use this component to display the spinner when the captioning task is running,
+so this part of your code will shrink to:
 
 ```elixir
+<!-- Spinner -->
 <AppWeb.Spinner.spin spin={@running?} />
+
+<%= if @label do %>
+  <span class="text-gray-700 font-light"><%= @label %></span>
+<% else %>
+  <span class="text-gray-300 font-light">Waiting for image input.</span>
+<% end %>
 ```
 
-Create the file
-`spinner.ex` in `lib/app_web/components/`
-and create the `Spinner` component,
-like so:
-
-```elixir
-# /lib/app_web/components/spinner.ex
-defmodule AppWeb.Spinner do
-  use Phoenix.Component
-
-  attr :spin, :boolean, default: false
-
-  def spin(assigns) do
-    ~H"""
-    <div :if={@spin} role="status">
-      <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
-        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
-        </div>
-      </div>
-    </div>
-    """
-  end
-end
-```
-
-We define the new JS file below in the `assets/js` folder.
+We next define the hook in a new JS file, located in the `assets/js` folder.
 The important part is the `Phoenix.js` function `upload`,
 to which we pass an identifier `"speech"`
 and a list that contains the audio as a `Blob`.
 We use an action button in the HTML,
 and attach Javascript listeners to it on the `"click"`, `"dataavailable"` and `"stop"` events.
-We also play with the CSS classes to modify the appearance of the recording action button.
+We also play with the CSS classes to modify the appearance of the action button when recording or not.
 
 Create a file called `assets/js/micro.js`
 and use the code below.
@@ -3408,7 +3412,7 @@ export default {
 };
 ```
 
-Now let's add this code to our `hook` object in our `livesocket` object.
+Now let's import this file and declare our `hook` object in our `livesocket` object.
 In our `assets/js/app.js` file, let's do:
 
 ```js
@@ -3522,21 +3526,35 @@ end
 
 As you can see, this is a serving function
 similar to what we've done with image captioning.
-Don't forget to add this serving function named `Whisper` in the
+We also add the model `Whisper` in the
 `lib/app/application.ex`
 so it's available throughout the application in runtime.
 
 ```elixir
 # lib/app/application.ex
-  def start(_type, _args) do
-    App.Models.verify_and_download_models()
 
-    children = [
-      [...]
-      # Nx serving for Speech-to-Text
-      {Nx.Serving, serving: App.Models.whisper_serving(), name: Whisper},
-      [...]
+@whisper_model %ModelInfo{
+  name: "openai/whisper-small",
+  cache_path: Path.join(@models_folder_path, "whisper-small"),
+  load_featurizer: true,
+  load_tokenizer: true,
+  load_generation_config: true
+}
+
+def start(_type, _args) do
+  children = [
+    [
+      @captioning_prod_model,
+      @captioning_test_model,
+      @whisper_model
     ]
+    |> Enum.each(&App.Models.verify_and_download_models/1)
+
+    [...]
+    # Nx serving for Speech-to-Text
+    {Nx.Serving, serving: App.Models.whisper_serving(), name: Whisper},
+    [...]
+  ]
 ```
 
 The response of this task is in the following form:
