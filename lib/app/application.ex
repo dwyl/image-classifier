@@ -19,6 +19,7 @@ defmodule App.Application do
       {Phoenix.PubSub, name: App.PubSub},
       # Nx serving for the embedding
       # App.TextEmbedding,
+
       # Nx serving for Speech-to-Text
       {Nx.Serving,
       serving:
@@ -38,6 +39,7 @@ defmodule App.Application do
          end,
        name: ImageClassifier},
       {GenMagic.Server, name: :gen_magic},
+      
       # Adding a supervisor
       {Task.Supervisor, name: App.TaskSupervisor},
       # Start the Endpoint (http/https)
