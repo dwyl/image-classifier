@@ -183,20 +183,12 @@
       <p class="flex flex-col items-center">
         <audio id="audio" controls></audio>
         <AppWeb.Spinner.spin spin={@speech_spin} />
-        <%!-- <%= if @speech_spin do %>
-          <div role="status">
-            <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
-              <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
-              </div>
-            </div>
-          </div>
-        <% end %> --%>
         <span id="output"><%= @transcription %></span>
       </p>
 
-      <%!-- <div :if={@search_result}>
+      <div :if={@search_result}>
         <img src={@search_result.url} alt="found_image" />
-      </div> --%>
+      </div>
     </div>
     <!-- Examples -->
     <%= if @display_list? do %>

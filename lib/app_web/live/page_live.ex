@@ -19,13 +19,14 @@ defmodule AppWeb.PageLive do
   """
   @image_width 640
   @accepted_mime ~w(image/jpeg image/jpg image/png image/webp)
-  @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
+  # @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
   @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
   @impl true
   def mount(_params, _session, socket) do
-    File.mkdir_p!(@upload_dir)
-    # {_serving, index} = App.TextEmbedding.serve()
+    # File.mkdir_p!(@upload_dir)
+    embedding_serving = App.TextEmbedding.serve()
+    index = App.KnnIndex.load_index()
 
     {:ok,
      socket
@@ -45,8 +46,10 @@ defmodule AppWeb.PageLive do
        # Related to the Audio
        transcription: nil,
        micro_off: false,
-       speech_spin: false
-       #  search_result: nil
+       speech_spin: false,
+       search_result: nil,
+       embedding_serving: embedding_serving,
+       index: index
      )
      |> allow_upload(:image_list,
        accept: ~w(image/*),
@@ -217,7 +220,6 @@ defmodule AppWeb.PageLive do
     end
   end
 
-
   # This function is called whenever a user records their voice.
   #
   # It saves the file to disk and sends it to the model to be transcribed.
@@ -256,50 +258,52 @@ defmodule AppWeb.PageLive do
     Process.demonitor(ref, [:flush])
     File.rm!(@tmp_wav)
 
-    # %{serve_embedding: serving, index: index} = assigns
+    %{embedding_serving: embedding_serving, index: index} = assigns
     # compute an normed embedding (cosine case only) on the text result
     # and returns an App.Image{} as the result of a "knn_search"
-    # with %{embedding: data} <- Nx.Serving.run(serving, text),
-    #  normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
-    #  %App.Image{} = result <- handle_knn(normed_data, index) do
-    {:noreply,
-     assign(socket,
-       transcription: String.trim(text),
-       micro_off: false,
-       speech_spin: false,
-       #  search_result: result,
-       audio_ref: nil
-     )}
+    with %{embedding: input_embedding} <- Nx.Serving.run(embedding_serving, text),
+         normed_input_embedding <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
+         %App.Image{} = result <- handle_knn(index, normed_input_embedding) do
+      dbg(result)
 
-    # else
-    #   # record without entries
-    #   {:error, "no entries in index"} ->
-    #     {:noreply,
-    #      assign(socket,
-    #        micro_off: false,
-    #        search_result: nil,
-    #        speech_spin: false,
-    #        audio_ref: nil
-    #      )}
+      {:noreply,
+       assign(socket,
+         transcription: String.trim(text),
+         micro_off: false,
+         speech_spin: false,
+         search_result: result,
+         audio_ref: nil
+       )}
+    else
+      # record without entries
+      {:error, "no entries in index"} ->
+        {:noreply,
+         assign(socket,
+           micro_off: false,
+           search_result: nil,
+           speech_spin: false,
+           audio_ref: nil
+         )}
 
-    #   nil ->
-    #     {:noreply,
-    #      assign(socket,
-    #        transcription: String.trim(text),
-    #        micro_off: false,
-    #        search_result: nil,
-    #        speech_spin: false,
-    #        audio_ref: nil
-    #      )}
-    # end
+      nil ->
+        {:noreply,
+         assign(socket,
+           transcription: String.trim(text),
+           micro_off: false,
+           search_result: nil,
+           speech_spin: false,
+           audio_ref: nil
+         )}
+    end
   end
-
 
   # This function is invoked after the async task for captioning models is completed.
   # It flushes the async call and destructures the output of the captioning model.
+
   def handle_info({ref, result}, %{assigns: assigns} = socket) do
     # Flush async call
     Process.demonitor(ref, [:flush])
+    %{embedding_serving: embedding_serving, index: index} = assigns
 
     # You need to change how you destructure the output of the model depending
     # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
@@ -317,18 +321,32 @@ defmodule AppWeb.PageLive do
     cond do
       # If the upload task has finished executing, we update the socket assigns.
       Map.get(assigns, :task_ref) == ref ->
-        # Insert image to database
-        image = %{
-          url: assigns.image_info.url,
-          width: assigns.image_info.width,
-          height: assigns.image_info.height,
-          description: label
-        }
+        image =
+          %{
+            url: assigns.image_info.url,
+            width: assigns.image_info.width,
+            height: assigns.image_info.height,
+            description: label
+          }
+          |> dbg()
 
-        Image.insert(image)
+        saved_index = Path.expand("priv/static/uploads/indexes.bin")
 
-        # Update socket assigns
-        {:noreply, assign(socket, label: label, running?: false)}
+        with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
+             # compute a normed embedding (cosine case only) on the text result
+             normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
+             :ok <- HNSWLib.Index.add_items(index, normed_data),
+             {:ok, idx} <- HNSWLib.Index.get_current_count(index),
+             :ok <- HNSWLib.Index.save_index(index, saved_index) do
+          # Insert image to database
+          Map.merge(image, %{idx: idx, description: label})
+          |> App.Image.insert()
+          |> dbg()
+
+          {:noreply,
+           socket
+           |> assign(running?: false, index: index, task_ref: nil, label: label)}
+        end
 
       # If the example task has finished executing, we upload the socket assigns.
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
@@ -352,6 +370,36 @@ defmodule AppWeb.PageLive do
            running?: false,
            display_list?: true
          )}
+    end
+  end
+
+  def handle_knn(nil, _), do: {:error, "no index found"}
+
+  def handle_knn(index, input) do
+    case HNSWLib.Index.get_current_count(index) do
+      {:ok, 0} ->
+        {:error, "no entries in index"}
+
+      {:ok, _c} ->
+        # check the embeddings
+        # {:ok, l} = HNSWLib.Index.get_current_count(index) |> dbg()
+
+        # for i <- 0..(l - 1) do
+        #   {:ok, dt} = HNSWLib.Index.get_items(index, [i])
+        #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
+        # end
+
+        case HNSWLib.Index.knn_query(index, input, k: 1) do
+          {:ok, labels, distances} ->
+            dbg(distances)
+
+            labels[0]
+            |> Nx.to_flat_list()
+            |> hd()
+            |> then(fn idx ->
+              App.Repo.get_by(App.Image, %{idx: idx + 1})
+            end)
+        end
     end
   end
 

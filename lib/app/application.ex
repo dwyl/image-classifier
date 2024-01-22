@@ -7,7 +7,6 @@ defmodule App.Application do
 
   @impl true
   def start(_type, _args) do
-
     App.Models.verify_and_download_models()
 
     children = [
@@ -18,17 +17,18 @@ defmodule App.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
       # Nx serving for the embedding
-      # App.TextEmbedding,
+      App.TextEmbedding,
+      App.KnnIndex,
 
       # Nx serving for Speech-to-Text
       {Nx.Serving,
-      serving:
-        if Application.get_env(:app, :use_test_models) == true do
-          App.Models.audio_serving_test()
-        else
-          App.Models.audio_serving()
-        end,
-      name: Whisper},
+       serving:
+         if Application.get_env(:app, :use_test_models) == true do
+           App.Models.audio_serving_test()
+         else
+           App.Models.audio_serving()
+         end,
+       name: Whisper},
       # Nx serving for image classifier
       {Nx.Serving,
        serving:
@@ -39,7 +39,7 @@ defmodule App.Application do
          end,
        name: ImageClassifier},
       {GenMagic.Server, name: :gen_magic},
-      
+
       # Adding a supervisor
       {Task.Supervisor, name: App.TaskSupervisor},
       # Start the Endpoint (http/https)
