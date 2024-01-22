@@ -69,6 +69,31 @@ defmodule AppWeb.PageLiveTest do
     refute render(lv) =~ "Waiting for image input."
   end
 
+  test "uploading an audio file", %{conn: conn} do
+    {:ok, lv, html} = live(conn, ~p"/")
+    assert html =~ "Caption your image!"
+
+    # Get file and add it to the form
+    file =
+      [:code.priv_dir(:app), "static", "audio", "itwillallbeok.mp3"]
+      |> Path.join()
+      |> build_upload("audio/mp3")
+
+    audio = file_input(lv, "#audio-upload-form", :speech, [file])
+
+    # The transcription should be empty
+    assert render(lv) |> Floki.find("#output") |> Floki.text == ""
+
+    # Should show an uploaded local file
+    assert render_upload(audio, file.name)
+
+    # Wait for the audio prediction to end
+    AppWeb.SupervisorSupport.wait_for_completion()
+
+    # A prediction should have occurred and the label should be shown with the audio transcription
+    assert render(lv) |> Floki.find("#output") |> Floki.text =~ "Sometimes, the inner voice is encouraging"
+  end
+
   test "error should be shown if size is bigger than limit", %{conn: conn} do
     {:ok, lv, html} = live(conn, ~p"/")
     assert html =~ "Caption your image!"

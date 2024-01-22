@@ -117,6 +117,7 @@ defmodule AppWeb.PageLive do
   #   end
   # end
 
+  # Performs magic evaluation to the image MIME type.
   def magic_check(path) do
     App.Image.gen_magic_eval(path, @accepted_mime)
     |> case do
@@ -128,6 +129,10 @@ defmodule AppWeb.PageLive do
     end
   end
 
+  @doc """
+  Checks if the MIME type of the uploaded file is the same as the
+  expected MIME type.
+  """
   def check_mime(magic_mime, info_mime) do
     if magic_mime == info_mime, do: :ok, else: :error
   end
@@ -136,7 +141,7 @@ defmodule AppWeb.PageLive do
   This function is called whenever an image is uploaded by the user.
 
   It reads the file, processes it and sends it to the model for classification.
-  It updates the socket assigns
+  It updates the socket assigns.
   """
   def handle_progress(:image_list, entry, socket) when entry.done? do
     # We consume the entry only if the entry is done uploading from the image
@@ -212,6 +217,12 @@ defmodule AppWeb.PageLive do
     end
   end
 
+
+  # This function is called whenever a user records their voice.
+  #
+  # It saves the file to disk and sends it to the model to be transcribed.
+  # It updates the socket assigns.
+  #
   def handle_progress(:speech, entry, socket) when entry.done? do
     socket
     |> consume_uploaded_entry(entry, fn %{path: path} ->
@@ -283,6 +294,9 @@ defmodule AppWeb.PageLive do
     # end
   end
 
+
+  # This function is invoked after the async task for captioning models is completed.
+  # It flushes the async call and destructures the output of the captioning model.
   def handle_info({ref, result}, %{assigns: assigns} = socket) do
     # Flush async call
     Process.demonitor(ref, [:flush])

@@ -164,7 +164,7 @@
         Please record a phrase. You can listen to your audio. It will automatically be transcripted into a text and appear below. The search for matching images will run automatically and the found image appear below
       </p>
       <br />
-      <form phx-change="noop" class="flex flex-col items-center">
+      <form id="audio-upload-form" phx-change="noop" class="flex flex-col items-center">
         <.live_file_input upload={@uploads.speech} class="hidden" />
         <button
           id="record"
