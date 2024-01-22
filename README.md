@@ -3200,7 +3200,7 @@ Here's an overview of how semantic search usually works
 Firtly, we will:
 
 - record an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API.
-- runn a **Speech-To-Text** process to produce a text transcription
+- run a **Speech-To-Text** process to produce a text transcription
   from the audio.
 
 We will use - thus load - the _pre-trained_ model
@@ -3234,8 +3234,8 @@ Our next steps will be to prepare the [symmetric semantic search](https://www.sb
   We'll be using an Elixir binding of the [HNSWLib library](https://github.com/elixir-nx/hnswlib).
   It works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**: this struct will allow us to efficiently retrieve
   vector data.
-  We will incrementally append the the embedded captions to the `index struct` - saved into a file -
-  , and then run a "knn\*search" algorithm on this `index`
+  We will incrementally append the embedded captions to the `index struct` - saved into a file -
+  and then run a "knn\*search" algorithm on this `index`
   with the audio transcription as an input.
   This algorithm will return the most relevant position(s) - `indices` -
   among the `index` struct indices.
@@ -3246,7 +3246,6 @@ Our next steps will be to prepare the [symmetric semantic search](https://www.sb
   used by the embedding model.
   Because the model we've chosen was trained with **_cosine_similarity_**,
   that's what we'll use.
-
 
 #### Pre-requisites
 
@@ -3511,7 +3510,6 @@ end
 
 And that's it for the Liveview portion!
 
-
 #### 1.4 Serving the `Whisper` model
 
 We now add the model `Whisper` in the
@@ -3539,13 +3537,13 @@ def start(_type, _args) do
 
 As you can see, we're doing a similar serving
 to the captioning model we've implemented earlier.
-For this to work, we need to make some changes to the 
+For this to work, we need to make some changes to the
 `models.ex` module.
-To recall, this module simply manages the models that are 
+Recall that this module simply manages the models that are
 downloaded locally and used in our application.
 
-Because we need to implement the functions above.
-So change the `lib/app/models.ex` module so it looks like so.
+To implement the functions above,
+we change the `lib/app/models.ex` module so it looks like so.
 
 ```elixir
 defmodule ModelInfo do
@@ -3808,21 +3806,20 @@ end
 ```
 
 That's a lot! But we just need to focus on some new parts we've added:
-- we've created **`audio_serving_test/1`** and 
-**`audio_serving/1`**, our audio serving functions
-that are used in the `application.ex` file.
-- added `@audio_prod_model` and `@audio_test_model`,
-the `Whisper` model definitions to be used to download the models locally.
-- refactored the image captioning model definitions to be more clear.
 
+- we've created **`audio_serving_test/1`** and
+  **`audio_serving/1`**, our audio serving functions
+  that are used in the `application.ex` file.
+- added `@audio_prod_model` and `@audio_test_model`,
+  the `Whisper` model definitions to be used to download the models locally.
+- refactored the image captioning model definitions to be more clear.
 
 Now we're successfully serving audio-to-text capabilities
 in our application!
 
-
 #### 1.5 Handling the model's response and updating elements in the view
 
-We expect the response of this task to be 
+We expect the response of this task to be
 in the following form:
 
 ```elixir
@@ -3861,7 +3858,7 @@ end
 
 And that's it for this section!
 Our application is now able to **record audio**
-and **transcribe it**.  🎉
+and **transcribe it**. 🎉
 
 ## _Please_ star the repo! ⭐️
 
