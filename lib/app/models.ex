@@ -53,44 +53,43 @@ defmodule App.Models do
   @doc """
   Verifies and downloads the models according to configuration
   and if they are already cached locally or not.
+
+  The models that are downloaded are hardcoded in this function.
   """
-  def verify_and_download_models(model) do
-    dbg(model)
+  def verify_and_download_models() do
     force_models_download = Application.get_env(:app, :force_models_download, false)
     use_test_models = Application.get_env(:app, :use_test_models, false)
 
     case {force_models_download, use_test_models} do
       {true, true} ->
-        # Delete any cached pre-existing models
-        file = Path.join(@models_folder_path, model)
-        if File.exists?(file), do: File.rm_rf!(file)
-        # File.rm_rf!(@models_folder_path)
-        # Download test models
-        download_model(@captioning_test_model)
+        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
+        download_model(@captioning_test_model)      # Download captioning test model model
+        download_model(@whisper_model)              # Download whisper model
 
       {true, false} ->
-        # Delete any cached pre-existing models
-        File.rm_rf!(@models_folder_path)
-        # Download prod models
-        download_model(model)
+        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
+        download_model(@captioning_prod_model)      # Download captioning prod model
+        download_model(@whisper_model)              # Download whisper model
 
       {false, false} ->
         # Check if the prod model cache directory exists or if it's not empty.
-        # If so, we download the prod model.
-        model_location = Path.join(model.cache_path, "huggingface")
+        # If so, we download the prod models.
 
-        if not File.exists?(model_location) or File.ls!(model_location) == [] do
-          download_model(model)
-        end
+        # Captioning test model
+        check_folder_and_download(@captioning_prod_model)
+
+        # Audio capture model
+        check_folder_and_download(@whisper_model)
 
       {false, true} ->
         # Check if the test model cache directory exists or if it's not empty.
-        # If so, we download the test model.
-        model_location = Path.join(@captioning_test_model.cache_path, "huggingface")
+        # If so, we download the test models.
 
-        if not File.exists?(model_location) or File.ls!(model_location) == [] do
-          download_model(@captioning_test_model)
-        end
+        # Captioning test model
+        check_folder_and_download(@captioning_test_model)
+
+        # Audio capture model
+        check_folder_and_download(@whisper_model)
     end
   end
 
@@ -212,6 +211,15 @@ defmodule App.Models do
 
     if Map.get(model, :load_generation_config) do
       Bumblebee.load_generation_config(downloading_settings)
+    end
+  end
+
+
+  # Checks if the folder exists and downloads the model if it doesn't.
+  defp check_folder_and_download(model) do
+    model_location = Path.join(model.cache_path, "huggingface")
+    if not File.exists?(model_location) or File.ls!(model_location) == [] do
+      download_model(model)
     end
   end
 end

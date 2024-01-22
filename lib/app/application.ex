@@ -5,39 +5,10 @@ defmodule App.Application do
   require Logger
   use Application
 
-  @models_folder_path Application.compile_env!(:app, :models_cache_dir)
-  @captioning_test_model %ModelInfo{
-    name: "microsoft/resnet-50",
-    cache_path: Path.join(@models_folder_path, "resnet-50"),
-    load_featurizer: true
-  }
-
-  @captioning_prod_model %ModelInfo{
-    name: "Salesforce/blip-image-captioning-base",
-    cache_path: Path.join(@models_folder_path, "blip-image-captioning-base"),
-    load_featurizer: true,
-    load_tokenizer: true,
-    load_generation_config: true
-  }
-
-  @whisper_model %ModelInfo{
-    name: "openai/whisper-small",
-    cache_path: Path.join(@models_folder_path, "whisper-small"),
-    load_featurizer: true,
-    load_tokenizer: true,
-    load_generation_config: true
-  }
-
   @impl true
   def start(_type, _args) do
-    # Bumblebee cache dir is /user/name/Library/Caches/bumblebee as ":filename.basedir(:user_cache, "bumblebee")" shows
 
-    [
-      @whisper_model,
-      @captioning_prod_model,
-      @captioning_test_model
-    ]
-    |> Enum.each(&App.Models.verify_and_download_models/1)
+    App.Models.verify_and_download_models()
 
     children = [
       # Start the Telemetry supervisor
