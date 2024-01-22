@@ -20,14 +20,21 @@ defmodule App.Application do
       # Nx serving for the embedding
       # App.TextEmbedding,
       # Nx serving for Speech-to-Text
-      {Nx.Serving, serving: App.Models.whisper_serving(), name: Whisper},
+      {Nx.Serving,
+      serving:
+        if Application.get_env(:app, :use_test_models) == true do
+          App.Models.audio_serving_test()
+        else
+          App.Models.audio_serving()
+        end,
+      name: Whisper},
       # Nx serving for image classifier
       {Nx.Serving,
        serving:
          if Application.get_env(:app, :use_test_models) == true do
-           App.Models.serving_test()
+           App.Models.caption_serving_test()
          else
-           App.Models.serving()
+           App.Models.caption_serving()
          end,
        name: ImageClassifier},
       {GenMagic.Server, name: :gen_magic},

@@ -17,7 +17,9 @@ defmodule App.Models do
   # where the models will be downloaded into.
   @models_folder_path Application.compile_env!(:app, :models_cache_dir)
 
-  # Test and prod models information
+  # Test and prod models information -------
+
+  # Captioning --
   @captioning_test_model %ModelInfo{
     name: "microsoft/resnet-50",
     cache_path: Path.join(@models_folder_path, "resnet-50"),
@@ -32,7 +34,16 @@ defmodule App.Models do
     load_generation_config: true
   }
 
-  @whisper_model %ModelInfo{
+  # Audio transcription --
+  @audio_test_model %ModelInfo{
+    name: "openai/whisper-small",
+    cache_path: Path.join(@models_folder_path, "whisper-small"),
+    load_featurizer: true,
+    load_tokenizer: true,
+    load_generation_config: true
+  }
+
+  @audio_prod_model %ModelInfo{
     name: "openai/whisper-small",
     cache_path: Path.join(@models_folder_path, "whisper-small"),
     load_featurizer: true,
@@ -64,12 +75,12 @@ defmodule App.Models do
       {true, true} ->
         File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
         download_model(@captioning_test_model)      # Download captioning test model model
-        download_model(@whisper_model)              # Download whisper model
+        download_model(@audio_test_model)           # Download whisper model
 
       {true, false} ->
         File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
         download_model(@captioning_prod_model)      # Download captioning prod model
-        download_model(@whisper_model)              # Download whisper model
+        download_model(@audio_prod_model)              # Download whisper model
 
       {false, false} ->
         # Check if the prod model cache directory exists or if it's not empty.
@@ -79,7 +90,7 @@ defmodule App.Models do
         check_folder_and_download(@captioning_prod_model)
 
         # Audio capture model
-        check_folder_and_download(@whisper_model)
+        check_folder_and_download(@audio_prod_model)
 
       {false, true} ->
         # Check if the test model cache directory exists or if it's not empty.
@@ -89,17 +100,17 @@ defmodule App.Models do
         check_folder_and_download(@captioning_test_model)
 
         # Audio capture model
-        check_folder_and_download(@whisper_model)
+        check_folder_and_download(@audio_test_model)
     end
   end
 
   @doc """
-  Serving function that serves the `Bumblebee` models used throughout the app.
+  Serving function that serves the `Bumblebee` captioning model used throughout the app.
   This function is meant to be called and served by `Nx` in `lib/app/application.ex`.
 
   This assumes the models that are being used exist locally, in the @models_folder_path.
   """
-  def serving do
+  def caption_serving do
     model = load_offline_model(@captioning_prod_model)
 
     Bumblebee.Vision.image_to_text(
@@ -114,8 +125,29 @@ defmodule App.Models do
     )
   end
 
-  def whisper_serving do
-    model = load_offline_model(@whisper_model)
+  @doc """
+  Serving function that serves the `Bumblebee` audio transcription model used throughout the app.
+  """
+  def audio_serving do
+    model = load_offline_model(@audio_prod_model)
+
+    Bumblebee.Audio.speech_to_text_whisper(
+      model.model_info,
+      model.featurizer,
+      model.tokenizer,
+      model.generation_config,
+      chunk_num_seconds: 30,
+      task: :transcribe,
+      defn_options: [compiler: EXLA],
+      preallocate_params: true
+    )
+  end
+
+    @doc """
+  Serving function for tests only. It uses a test audio transcription model.
+  """
+  def audio_serving_test do
+    model = load_offline_model(@audio_test_model)
 
     Bumblebee.Audio.speech_to_text_whisper(
       model.model_info,
@@ -130,12 +162,12 @@ defmodule App.Models do
   end
 
   @doc """
-  Serving function for tests only.
+  Serving function for tests only. It uses a test captioning model.
   This function is meant to be called and served by `Nx` in `lib/app/application.ex`.
 
   This assumes the models that are being used exist locally, in the @models_folder_path.
   """
-  def serving_test do
+  def caption_serving_test do
     model = load_offline_model(@captioning_test_model)
 
     Bumblebee.Vision.image_classification(model.model_info, model.featurizer,
