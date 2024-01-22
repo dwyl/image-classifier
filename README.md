@@ -66,6 +66,11 @@ with your voice! 🎙️
     - [Overview of the process](#overview-of-the-process)
       - [Pre-requisites](#pre-requisites)
     - [1. Transcribe an audio recording](#1-transcribe-an-audio-recording)
+      - [1.1 Adding a loading spinner](#11-adding-a-loading-spinner)
+      - [1.2 Defining `Javascript` hook](#12-defining-javascript-hook)
+      - [1.3 Handling audio upload in `LiveView`](#13-handling-audio-upload-in-liveview)
+      - [1.4 Serving the `Whisper` model](#14-serving-the-whisper-model)
+      - [1.5 Handling the model's response and updating elements in the view](#15-handling-the-models-response-and-updating-elements-in-the-view)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -3267,17 +3272,20 @@ And run `mix deps.get`.
 
 ### 1. Transcribe an audio recording
 
-`Source: <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>`
+> **Source:** <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>
 
-We firstly capture the audio and upload it to the server.
+We firstly need capture the audio and upload it to the server.
 
-The process is quite similar to the image upload except that we
-use a special Javascript hook to record the audio and upload it to the Phoenix Liveview.
+The process is quite similar to the image upload, except that we
+use a special Javascript hook to record the audio
+and upload it to the Phoenix Liveview.
 
 We use an `live_file_input` in a form to capture the audio and use the Javascript `MediaRecorder API`.
 The Javascript code is triggered by an attached hook `Audio` declared in the HTML.
 We also let the user listen to his audio by adding an [embedded audio element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) `<audio>` in the HTML.
 Its source is the audio blob as an URL object.
+
+#### 1.1 Adding a loading spinner
 
 We also add a spinner to display that the transcription process is running,
 in the same way as we did for the captioning process.
@@ -3346,6 +3354,8 @@ so this part of your code will shrink to:
   <span class="text-gray-300 font-light">Waiting for image input.</span>
 <% end %>
 ```
+
+#### 1.2 Defining `Javascript` hook
 
 We next define the hook in a new JS file, located in the `assets/js` folder.
 The important part is the `Phoenix.js` function `upload`,
@@ -3433,6 +3443,8 @@ let liveSocket = new LiveSocket("/live", Socket, {
 });
 ```
 
+#### 1.3 Handling audio upload in `LiveView`
+
 We now need to add some server-side code.
 
 The uploaded audio file will be saved on disk as a temporary file
@@ -3497,14 +3509,83 @@ def handle_progress(:speech, entry, socket) when entry.done? do
 end
 ```
 
-We now create the serving for this model.
-In the new file `lib/app/app_models.ex`, let's add the module attribute and the dedicated serving:
+And that's it for the Liveview portion!
+
+
+#### 1.4 Serving the `Whisper` model
+
+We now add the model `Whisper` in the
+`lib/app/application.ex`
+so it's available throughout the application in runtime.
 
 ```elixir
-# /lib/app/app_models.ex
+# lib/app/application.ex
+
+def start(_type, _args) do
+
+    [...]
+    # Nx serving for Speech-to-Text
+    {Nx.Serving,
+      serving:
+        if Application.get_env(:app, :use_test_models) == true do
+          App.Models.audio_serving_test()
+        else
+          App.Models.audio_serving()
+        end,
+      name: Whisper},
+    [...]
+  ]
+```
+
+As you can see, we're doing a similar serving
+to the captioning model we've implemented earlier.
+For this to work, we need to make some changes to the 
+`models.ex` module.
+To recall, this module simply manages the models that are 
+downloaded locally and used in our application.
+
+Because we need to implement the functions above.
+So change the `lib/app/models.ex` module so it looks like so.
+
+```elixir
+defmodule ModelInfo do
+  @doc """
+  Information regarding the model being loaded.
+  It holds the name of the model repository and the directory it will be saved into.
+  It also has booleans to load each model parameter at will - this is because some models (like BLIP) require featurizer, tokenizations and generation configuration.
+  """
+  defstruct [:name, :cache_path, :load_featurizer, :load_tokenizer, :load_generation_config]
+end
+
 defmodule App.Models do
-  [...]
-  @whisper_model %ModelInfo{
+  @moduledoc """
+  Manages loading the modules and their location according to env.
+  """
+  require Logger
+
+  # IMPORTANT: This should be the same directory as defined in the `Dockerfile`
+  # where the models will be downloaded into.
+  @models_folder_path Application.compile_env!(:app, :models_cache_dir)
+
+  # Test and prod models information -------
+
+  # Captioning --
+  @captioning_test_model %ModelInfo{
+    name: "microsoft/resnet-50",
+    cache_path: Path.join(@models_folder_path, "resnet-50"),
+    load_featurizer: true
+  }
+
+  @captioning_prod_model %ModelInfo{
+    name: "Salesforce/blip-image-captioning-base",
+    cache_path: Path.join(@models_folder_path, "blip-image-captioning-base"),
+    load_featurizer: true,
+    load_tokenizer: true,
+    load_generation_config: true
+  }
+
+  # Audio transcription --
+  @audio_test_model %ModelInfo{
     name: "openai/whisper-small",
     cache_path: Path.join(@models_folder_path, "whisper-small"),
     load_featurizer: true,
@@ -3512,9 +3593,93 @@ defmodule App.Models do
     load_generation_config: true
   }
 
-  [...]
-  def whisper_serving do
-    model = load_offline_model(@whisper_model)
+  @audio_prod_model %ModelInfo{
+    name: "openai/whisper-small",
+    cache_path: Path.join(@models_folder_path, "whisper-small"),
+    load_featurizer: true,
+    load_tokenizer: true,
+    load_generation_config: true
+  }
+
+  def extract_captioning_test_label(result) do
+    %{predictions: [%{label: label}]} = result
+    label
+  end
+
+  def extract_captioning_prod_label(result) do
+    %{results: [%{text: label}]} = result
+    label
+  end
+
+  @doc """
+  Verifies and downloads the models according to configuration
+  and if they are already cached locally or not.
+
+  The models that are downloaded are hardcoded in this function.
+  """
+  def verify_and_download_models() do
+    force_models_download = Application.get_env(:app, :force_models_download, false)
+    use_test_models = Application.get_env(:app, :use_test_models, false)
+
+    case {force_models_download, use_test_models} do
+      {true, true} ->
+        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
+        download_model(@captioning_test_model)      # Download captioning test model model
+        download_model(@audio_test_model)           # Download whisper model
+
+      {true, false} ->
+        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
+        download_model(@captioning_prod_model)      # Download captioning prod model
+        download_model(@audio_prod_model)              # Download whisper model
+
+      {false, false} ->
+        # Check if the prod model cache directory exists or if it's not empty.
+        # If so, we download the prod models.
+
+        # Captioning test model
+        check_folder_and_download(@captioning_prod_model)
+
+        # Audio capture model
+        check_folder_and_download(@audio_prod_model)
+
+      {false, true} ->
+        # Check if the test model cache directory exists or if it's not empty.
+        # If so, we download the test models.
+
+        # Captioning test model
+        check_folder_and_download(@captioning_test_model)
+
+        # Audio capture model
+        check_folder_and_download(@audio_test_model)
+    end
+  end
+
+  @doc """
+  Serving function that serves the `Bumblebee` captioning model used throughout the app.
+  This function is meant to be called and served by `Nx` in `lib/app/application.ex`.
+
+  This assumes the models that are being used exist locally, in the @models_folder_path.
+  """
+  def caption_serving do
+    model = load_offline_model(@captioning_prod_model)
+
+    Bumblebee.Vision.image_to_text(
+      model.model_info,
+      model.featurizer,
+      model.tokenizer,
+      model.generation_config,
+      compile: [batch_size: 10],
+      defn_options: [compiler: EXLA],
+      # needed to run on `Fly.io`
+      preallocate_params: true
+    )
+  end
+
+  @doc """
+  Serving function that serves the `Bumblebee` audio transcription model used throughout the app.
+  """
+  def audio_serving do
+    model = load_offline_model(@audio_prod_model)
 
     Bumblebee.Audio.speech_to_text_whisper(
       model.model_info,
@@ -3527,44 +3692,138 @@ defmodule App.Models do
       preallocate_params: true
     )
   end
-  [...]
+
+    @doc """
+  Serving function for tests only. It uses a test audio transcription model.
+  """
+  def audio_serving_test do
+    model = load_offline_model(@audio_test_model)
+
+    Bumblebee.Audio.speech_to_text_whisper(
+      model.model_info,
+      model.featurizer,
+      model.tokenizer,
+      model.generation_config,
+      chunk_num_seconds: 30,
+      task: :transcribe,
+      defn_options: [compiler: EXLA],
+      preallocate_params: true
+    )
+  end
+
+  @doc """
+  Serving function for tests only. It uses a test captioning model.
+  This function is meant to be called and served by `Nx` in `lib/app/application.ex`.
+
+  This assumes the models that are being used exist locally, in the @models_folder_path.
+  """
+  def caption_serving_test do
+    model = load_offline_model(@captioning_test_model)
+
+    Bumblebee.Vision.image_classification(model.model_info, model.featurizer,
+      top_k: 1,
+      compile: [batch_size: 10],
+      defn_options: [compiler: EXLA],
+      # needed to run on `Fly.io`
+      preallocate_params: true
+    )
+  end
+
+  # Loads the models from the cache folder.
+  # It will load the model and the respective the featurizer, tokenizer and generation config if needed,
+  # and return a map with all of these at the end.
+  defp load_offline_model(model) do
+    Logger.info("Loading #{model.name}...")
+
+    # Loading model
+    loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: true}
+    {:ok, model_info} = Bumblebee.load_model(loading_settings)
+
+    info = %{model_info: model_info}
+
+    # Load featurizer, tokenizer and generation config if needed
+
+    info =
+      if Map.get(model, :load_featurizer) do
+        {:ok, featurizer} = Bumblebee.load_featurizer(loading_settings)
+        Map.put(info, :featurizer, featurizer)
+      else
+        info
+      end
+
+    info =
+      if Map.get(model, :load_tokenizer) do
+        {:ok, tokenizer} = Bumblebee.load_tokenizer(loading_settings)
+        Map.put(info, :tokenizer, tokenizer)
+      else
+        info
+      end
+
+    info =
+      if Map.get(model, :load_generation_config) do
+        {:ok, generation_config} =
+          Bumblebee.load_generation_config(loading_settings)
+
+        Map.put(info, :generation_config, generation_config)
+      else
+        info
+      end
+
+    # Return a map with the model and respective parameters.
+    info
+  end
+
+  # Downloads the models according to a given %ModelInfo struct.
+  # It will load the model and the respective the featurizer, tokenizer and generation config if needed.
+  defp download_model(model) do
+    Logger.info("Downloading #{model.name}...")
+
+    # Download model
+    downloading_settings = {:hf, model.name, cache_dir: model.cache_path}
+    Bumblebee.load_model(downloading_settings)
+
+    # Download featurizer, tokenizer and generation config if needed
+    if Map.get(model, :load_featurizer) do
+      Bumblebee.load_featurizer(downloading_settings)
+    end
+
+    if Map.get(model, :load_tokenizer) do
+      Bumblebee.load_tokenizer(downloading_settings)
+    end
+
+    if Map.get(model, :load_generation_config) do
+      Bumblebee.load_generation_config(downloading_settings)
+    end
+  end
+
+
+  # Checks if the folder exists and downloads the model if it doesn't.
+  defp check_folder_and_download(model) do
+    model_location = Path.join(model.cache_path, "huggingface")
+    if not File.exists?(model_location) or File.ls!(model_location) == [] do
+      download_model(model)
+    end
+  end
 end
 ```
 
-As you can see, this is a serving function
-similar to what we've done with image captioning.
-We also add the model `Whisper` in the
-`lib/app/application.ex`
-so it's available throughout the application in runtime.
+That's a lot! But we just need to focus on some new parts we've added:
+- we've created **`audio_serving_test/1`** and 
+**`audio_serving/1`**, our audio serving functions
+that are used in the `application.ex` file.
+- added `@audio_prod_model` and `@audio_test_model`,
+the `Whisper` model definitions to be used to download the models locally.
+- refactored the image captioning model definitions to be more clear.
 
-```elixir
-# lib/app/application.ex
 
-@whisper_model %ModelInfo{
-  name: "openai/whisper-small",
-  cache_path: Path.join(@models_folder_path, "whisper-small"),
-  load_featurizer: true,
-  load_tokenizer: true,
-  load_generation_config: true
-}
+Now we're successfully serving audio-to-text capabilities
+in our application!
 
-def start(_type, _args) do
-  children = [
-    [
-      @captioning_prod_model,
-      @captioning_test_model,
-      @whisper_model
-    ]
-    |> Enum.each(&App.Models.verify_and_download_models/1)
 
-    [...]
-    # Nx serving for Speech-to-Text
-    {Nx.Serving, serving: App.Models.whisper_serving(), name: Whisper},
-    [...]
-  ]
-```
+#### 1.5 Handling the model's response and updating elements in the view
 
-The response of this task is in the following form:
+We expect the response of this task to be 
+in the following form:
 
 ```elixir
 %{
@@ -3599,6 +3858,10 @@ def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns}
     )}
 end
 ```
+
+And that's it for this section!
+Our application is now able to **record audio**
+and **transcribe it**.  🎉
 
 ## _Please_ star the repo! ⭐️
 
