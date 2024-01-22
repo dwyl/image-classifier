@@ -64,6 +64,7 @@ with your voice! 🎙️
     - [11. Benchmarking image captioning models](#11-benchmarking-image-captioning-models)
   - [🔍 Semantic search](#-semantic-search)
     - [Overview of the process](#overview-of-the-process)
+      - [Pre-requisites](#pre-requisites)
     - [1. Transcribe an audio recording](#1-transcribe-an-audio-recording)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
@@ -3241,6 +3242,9 @@ Our next steps will be to prepare the [symmetric semantic search](https://www.sb
   Because the model we've chosen was trained with **_cosine_similarity_**,
   that's what we'll use.
 
+
+#### Pre-requisites
+
 Before starting, let's install some dependencies that we'll need.
 Add these to the `deps` section in `mix.exs`.
 
@@ -3257,6 +3261,9 @@ end
   in `Elixir`.
 
 And run `mix deps.get`.
+
+**You will also need to install [`ffmpeg`](https://ffmpeg.org/)**.
+`Bumblebee` uses `ffmpeg` under the hood to process audio files into tensors.
 
 ### 1. Transcribe an audio recording
 
