@@ -4042,7 +4042,7 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
              normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
              :ok <- HNSWLib.Index.add_items(index, normed_data),
              {:ok, idx} <- HNSWLib.Index.get_current_count(index),
-             :ok <- HNSWLib.Index.save_index(index, saved_index) do
+             {:ok, _int} <- HNSWLib.Index.save_index(index, saved_index) do
 
           Map.merge(image, %{idx: idx, caption: label})
           |> App.Image.insert()
@@ -4050,6 +4050,12 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
           {:noreply,
            socket
            |> assign(running?: false, index: index, task_ref: nil, label: label)}
+        else
+          {:error, msg} ->
+            {:noreply,
+             socket
+             |> put_flash(:error, msg)
+             |> assign(running?: false, index: index, task_ref: nil, label: nil)}
         end
       [...]
     end
@@ -4063,7 +4069,6 @@ Modify the following handler:
 def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} = socket)
       when assigns.audio_ref == ref do
   Process.demonitor(ref, [:flush])
-  dbg(result)
   File.rm!(@tmp_wav)
 
   require Logger
@@ -4074,7 +4079,6 @@ def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} 
   with %{embedding: input_embedding} <- Nx.Serving.run(serving, text),
         normed_input <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
         %App.Image{} = result <- handle_knn(index, normed_input) do
-    {text, input_embedding, normed_input, result} |> dbg()
 
     {:noreply,
       assign(socket,
