@@ -328,7 +328,6 @@ defmodule AppWeb.PageLive do
             height: assigns.image_info.height,
             description: label
           }
-          |> dbg()
 
         saved_index = Path.expand("priv/static/uploads/indexes.bin")
 
@@ -337,15 +336,20 @@ defmodule AppWeb.PageLive do
              normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
              :ok <- HNSWLib.Index.add_items(index, normed_data),
              {:ok, idx} <- HNSWLib.Index.get_current_count(index),
-             :ok <- HNSWLib.Index.save_index(index, saved_index) do
+             {:ok, _int} <- HNSWLib.Index.save_index(index, saved_index) do
           # Insert image to database
           Map.merge(image, %{idx: idx, description: label})
           |> App.Image.insert()
-          |> dbg()
 
           {:noreply,
            socket
            |> assign(running?: false, index: index, task_ref: nil, label: label)}
+        else
+          {:error, msg} ->
+            {:noreply,
+             socket
+             |> put_flash(:error, msg)
+             |> assign(running?: false, index: index, task_ref: nil, label: nil)}
         end
 
       # If the example task has finished executing, we upload the socket assigns.
@@ -371,6 +375,16 @@ defmodule AppWeb.PageLive do
            display_list?: true
          )}
     end
+  end
+
+  def handle_info({:ok, int}, socket) do
+    int |> dbg()
+    {:noreply, socket}
+  end
+
+  def handle_info({:error, msg}, socket) do
+    msg |> dbg()
+    {:noreply, socket}
   end
 
   def handle_knn(nil, _), do: {:error, "no index found"}
