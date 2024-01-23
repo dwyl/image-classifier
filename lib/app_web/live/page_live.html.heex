@@ -182,9 +182,16 @@
       </form>
       <p class="flex flex-col items-center">
         <audio id="audio" controls></audio>
-        <AppWeb.Spinner.spin spin={@speech_spin} />
-        <span id="output"><%= @transcription %></span>
       </p>
+      <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
+        <span>Transcription: </span>
+        <AppWeb.Spinner.spin spin={@speech_spin} />
+        <%= if @transcription do %>
+          <span id="output" class="text-gray-700 font-light"><%= @transcription %></span>
+        <% else %>
+          <span class="text-gray-300 font-light">Waiting for image input.</span>
+        <% end %>
+      </div>
 
       <div :if={@search_result}>
         <img src={@search_result.url} alt="found_image" />

@@ -240,7 +240,14 @@ defmodule AppWeb.PageLive do
         end
       )
 
-    {:noreply, assign(socket, audio_ref: audio_task.ref, micro_off: true, speech_spin: true)}
+    {:noreply,
+     assign(socket,
+       audio_ref: audio_task.ref,
+       micro_off: true,
+       speech_spin: true,
+       search_result: nil,
+       transcription: nil
+     )}
   end
 
   # intermediate chunk consumption
