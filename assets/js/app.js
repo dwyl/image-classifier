@@ -20,10 +20,11 @@ import "phoenix_html";
 // Establish Phoenix Socket and LiveView configuration.
 import { Socket } from "phoenix";
 import { LiveSocket } from "phoenix_live_view";
-import Toastify from 'toastify-js'
+import Toastify from "toastify-js";
+import Audio from "./micro.js";
 import topbar from "../vendor/topbar";
 
-let Hooks = {};
+let Hooks = { Audio };
 
 // Hook to track inactivity
 Hooks.ActivityTracker = {
@@ -36,7 +37,7 @@ Hooks.ActivityTracker = {
     let processHasBeenSent = false;
 
     // We use the `mounted()` context to push the event. This is used in the `setTimeout` function below.
-    let ctx = this
+    let ctx = this;
 
     // Function to reset the timer
     function resetInactivityTimer() {
@@ -66,7 +67,7 @@ Hooks.ActivityTracker = {
 // Hook to show message toast
 Hooks.MessageToaster = {
   mounted() {
-    this.handleEvent('toast', (payload) => {
+    this.handleEvent("toast", (payload) => {
       Toastify({
         text: payload.message,
         gravity: "bottom",
@@ -74,14 +75,19 @@ Hooks.MessageToaster = {
         style: {
           background: "linear-gradient(to right, #f27474, #ed87b5)",
         },
-        duration: 4000
-        }).showToast();        
-    })
-  }
-}
+        duration: 4000,
+      }).showToast();
+    });
+  },
+};
 
-let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content");
-let liveSocket = new LiveSocket("/live", Socket, { hooks: Hooks, params: { _csrf_token: csrfToken } });
+let csrfToken = document
+  .querySelector("meta[name='csrf-token']")
+  .getAttribute("content");
+let liveSocket = new LiveSocket("/live", Socket, {
+  hooks: Hooks,
+  params: { _csrf_token: csrfToken },
+});
 
 // Show progress bar on live navigation and form submits
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });

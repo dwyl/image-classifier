@@ -5,7 +5,7 @@ defmodule App.MixProject do
     [
       app: :app,
       version: "0.1.0",
-      elixir: "~> 1.14",
+      elixir: "~> 1.16",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -69,6 +69,7 @@ defmodule App.MixProject do
       {:bumblebee, "~> 0.4.2"},
       {:exla, "~> 0.6.4"},
       {:nx, "~> 0.6.4 "},
+      {:hnswlib, "~> 0.1.4"},
 
       # Image
       {:vix, "~> 0.26.0"},
