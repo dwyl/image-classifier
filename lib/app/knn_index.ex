@@ -9,26 +9,30 @@ defmodule App.KnnIndex do
   end
 
   def init(_) do
-    upload_dir = Application.app_dir(:app, ["priv", "static", "uploads"])
-    File.mkdir_p!(upload_dir)
+    File.mkdir_p!(@upload_dir)
 
-    path = Path.join([@upload_dir, @indexes])
+    path = get_index_path()
     space = :cosine
+    dim = 384
+    max_elements = 200
 
     require Logger
 
-    {:ok, index} =
+    {:ok, _index} =
       case File.exists?(path) do
         false ->
-          Logger.info("New Index")
-          HNSWLib.Index.new(_space = space, _dim = 384, _max_elements = 200)
+          App.HnswlibIndex.maybe_load_index_from_db(space, dim, max_elements)
 
         true ->
           Logger.info("Existing Index")
-          HNSWLib.Index.load_index(space, 384, path)
+          HNSWLib.Index.load_index(space, dim, path)
       end
 
-    {:ok, index}
+    # {:ok, index}
+  end
+
+  def get_index_path do
+    Path.join([@upload_dir, @indexes])
   end
 
   def load_index do

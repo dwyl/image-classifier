@@ -4227,13 +4227,13 @@ Add this to "page_live.html.heex":
 We will save the index found We will add a column to the :images table. We run a Mix task to generate a timestamped file:
 
 ```bash
-mix ecto.gen.migration add_column_idx
+mix ecto.gen.migration add_idx_to_images
 ```
 
 In the "/priv/repo" folder, open the newly created file and add:
 
 ```elixir
-defmodule App.Repo.Migrations.AddIndex do
+defmodule App.Repo.Migrations.AddIdxToImages do
   use Ecto.Migration
 
   def change do

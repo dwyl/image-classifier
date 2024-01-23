@@ -26,7 +26,12 @@ defmodule AppWeb.PageLive do
   def mount(_params, _session, socket) do
     # File.mkdir_p!(@upload_dir)
     embedding_serving = App.TextEmbedding.serve()
-    index = App.KnnIndex.load_index()
+
+    index =
+      App.KnnIndex.load_index()
+      |> dbg()
+
+    # {:ok, index} = App.HnswlibIndex.load()
 
     {:ok,
      socket
@@ -338,13 +343,16 @@ defmodule AppWeb.PageLive do
 
         saved_index = Path.expand("priv/static/uploads/indexes.bin")
 
-        with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
+        with %{embedding: data} <- Nx.Serving.run(embedding_serving, label) |> dbg(),
              # compute a normed embedding (cosine case only) on the text result
-             normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
-             :ok <- HNSWLib.Index.add_items(index, normed_data),
-             {:ok, idx} <- HNSWLib.Index.get_current_count(index),
-             {:ok, _int} <- HNSWLib.Index.save_index(index, saved_index) do
+             normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)) |> dbg(),
+             :ok <- HNSWLib.Index.add_items(index, normed_data) |> dbg(),
+             {:ok, idx} <- HNSWLib.Index.get_current_count(index) |> dbg(),
+             :ok <- HNSWLib.Index.save_index(index, saved_index) |> dbg() do
           # Insert image to database
+          HNSWLib.Index.get_current_count(index) |> dbg()
+          App.HnswlibIndex.save(index) |> dbg()
+
           Map.merge(image, %{idx: idx, description: label})
           |> App.Image.insert()
 
