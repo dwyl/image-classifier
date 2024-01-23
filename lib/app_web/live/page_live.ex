@@ -377,16 +377,6 @@ defmodule AppWeb.PageLive do
     end
   end
 
-  def handle_info({:ok, int}, socket) do
-    int |> dbg()
-    {:noreply, socket}
-  end
-
-  def handle_info({:error, msg}, socket) do
-    msg |> dbg()
-    {:noreply, socket}
-  end
-
   def handle_knn(nil, _), do: {:error, "no index found"}
 
   def handle_knn(index, input) do
