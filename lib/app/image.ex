@@ -24,10 +24,22 @@ defmodule App.Image do
   and adds the image information to the database.
   """
   def insert(image) do
-    %Image{}
-    |> changeset(image)
-    |> Repo.insert!()
+    {:ok,
+     %Image{}
+     |> changeset(image)
+     |> Repo.insert!()}
   end
+
+  # def check_sha_and_insert(image) do
+  #   App.Repo.get_by(App.Image, %{sha1: image.sha1})
+  #   |> case do
+  #     nil ->
+  #       insert(image)
+
+  #     _ ->
+  #       image
+  #   end
+  # end
 
   @doc """
   Uploads the given image to S3.

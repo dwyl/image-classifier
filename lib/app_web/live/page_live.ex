@@ -9,7 +9,7 @@ defmodule AppWeb.PageLive do
     General information for the image that is being analysed.
     This information is useful when persisting the image to the database.
     """
-    defstruct [:mimetype, :width, :height, :url, :file_binary]
+    defstruct [:mimetype, :width, :height, :url, :file_binary, :sha1]
   end
 
   @doc """
@@ -154,6 +154,7 @@ defmodule AppWeb.PageLive do
              with {:magic, {:ok, %{mime_type: mime}}} <-
                     {:magic, magic_check(path)},
                   file_binary <- File.read!(path),
+                  # sha1 <- :crypto.hash(:sha, file_binary) |> Base.encode16() |> dbg(),
                   {:image_info, {mimetype, width, height, _variant}} <-
                     {:image_info, ExImageInfo.info(file_binary)},
                   {:check_mime, :ok} <-
@@ -174,6 +175,7 @@ defmodule AppWeb.PageLive do
                      height: height,
                      file_binary: file_binary,
                      url: url
+                     #  sha1: sha1
                    }
 
                    {:ok, %{tensor: tensor, image_info: image_info}}
@@ -334,6 +336,7 @@ defmodule AppWeb.PageLive do
             width: assigns.image_info.width,
             height: assigns.image_info.height,
             description: label
+            # sha: assigns.image_info.sha1
           }
 
         saved_index = Path.expand("priv/static/uploads/indexes.bin")
@@ -344,12 +347,20 @@ defmodule AppWeb.PageLive do
              :ok <- HNSWLib.Index.add_items(index, normed_data),
              {:ok, idx} <- HNSWLib.Index.get_current_count(index),
              :ok <- HNSWLib.Index.save_index(index, saved_index) do
+          Ecto.Multi.new()
           # save Index file to DB
-          App.HnswlibIndex.save() |> dbg()
+          |> Ecto.Multi.run(:save_index, fn _, _ ->
+            App.HnswlibIndex.save()
+          end)
+          # save updated Image to DB
+          |> Ecto.Multi.run(:update_image, fn _, _ ->
+            Map.put(image, :idx, idx)
+            |> App.Image.insert()
 
-          # Insert image to database
-          Map.merge(image, %{idx: idx, description: label})
-          |> App.Image.insert()
+            # if we decide to use a SHA per file, then instead we can use:
+            # |> App.Image.check_sha_and_insert()
+          end)
+          |> App.Repo.transaction()
 
           {:noreply,
            socket

@@ -29,6 +29,7 @@ defmodule App.HnswlibIndex do
     Repo.get_by(HnswlibIndex, id: 1)
     |> case do
       nil ->
+        # create a singleton row
         HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
         |> Repo.insert()
 
@@ -38,7 +39,9 @@ defmodule App.HnswlibIndex do
       index_file ->
         Logger.info("Loading Index from DB")
         path = App.KnnIndex.get_index_path()
+        # save on disk
         File.write!(path, index_file.file)
+        # load the index file
         HNSWLib.Index.load_index(space, dim, path)
     end
   end
