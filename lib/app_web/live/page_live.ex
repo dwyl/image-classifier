@@ -19,19 +19,14 @@ defmodule AppWeb.PageLive do
   """
   @image_width 640
   @accepted_mime ~w(image/jpeg image/jpg image/png image/webp)
-  # @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
   @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
   @impl true
   def mount(_params, _session, socket) do
-    # File.mkdir_p!(@upload_dir)
     embedding_serving = App.TextEmbedding.serve()
 
     index =
       App.KnnIndex.load_index()
-      |> dbg()
-
-    # {:ok, index} = App.HnswlibIndex.load()
 
     {:ok,
      socket
@@ -343,16 +338,16 @@ defmodule AppWeb.PageLive do
 
         saved_index = Path.expand("priv/static/uploads/indexes.bin")
 
-        with %{embedding: data} <- Nx.Serving.run(embedding_serving, label) |> dbg(),
+        with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
              # compute a normed embedding (cosine case only) on the text result
-             normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)) |> dbg(),
-             :ok <- HNSWLib.Index.add_items(index, normed_data) |> dbg(),
-             {:ok, idx} <- HNSWLib.Index.get_current_count(index) |> dbg(),
-             :ok <- HNSWLib.Index.save_index(index, saved_index) |> dbg() do
-          # Insert image to database
-          HNSWLib.Index.get_current_count(index) |> dbg()
-          App.HnswlibIndex.save(index) |> dbg()
+             normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
+             :ok <- HNSWLib.Index.add_items(index, normed_data),
+             {:ok, idx} <- HNSWLib.Index.get_current_count(index),
+             :ok <- HNSWLib.Index.save_index(index, saved_index) do
+          # save Index file to DB
+          App.HnswlibIndex.save() |> dbg()
 
+          # Insert image to database
           Map.merge(image, %{idx: idx, description: label})
           |> App.Image.insert()
 

@@ -3268,7 +3268,8 @@ Add these to the `deps` section in `mix.exs`.
 ```elixir
 def deps do
   [
-    {:hnswlib, "~> 0.1.4"}
+    {:hnswlib, git: "https://github.com/elixir-nx/hnswlib", override: true},
+
   ]
 end
 ```

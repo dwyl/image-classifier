@@ -13,28 +13,45 @@ defmodule App.HnswlibIndex do
     |> Ecto.Changeset.validate_required([:id])
   end
 
-  def save(index) do
-    bin =
-      index
-      |> :erlang.term_to_binary()
+  def save() do
+    path = App.KnnIndex.get_index_path()
+    file = File.read!(path)
 
     App.Repo.get!(App.HnswlibIndex, 1)
-    |> App.HnswlibIndex.changeset(%{file: bin})
+    |> App.HnswlibIndex.changeset(%{file: file})
     |> App.Repo.update()
   end
 
   def maybe_load_index_from_db(space, dim, max_elements) do
     App.Repo.get_by(App.HnswlibIndex, id: 1)
+    |> dbg()
     |> case do
       nil ->
         App.HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
         |> App.Repo.insert()
 
         Logger.info("New Index")
+
         HNSWLib.Index.new(_space = space, _dim = dim, _max_elements = max_elements)
 
       index_file ->
-        {:ok, :erlang.binary_to_term(index_file)}
+        Logger.info("Loading Index from DB")
+        path = App.KnnIndex.get_index_path()
+
+        File.write!(path, index_file.file)
+        |> dbg()
+
+        HNSWLib.Index.load_index(space, dim, path)
+        |> dbg()
+
+        # |> :erlang.binary_to_term()
+        # |> then(fn content ->
+        #   dbg(content)
+        #   File.write!(content, path)
+        # end)
+        # |> dbg()
+
+        HNSWLib.Index.load_index(space, dim, path)
     end
   end
 

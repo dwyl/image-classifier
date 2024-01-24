@@ -69,7 +69,8 @@ defmodule App.MixProject do
       {:bumblebee, "~> 0.4.2"},
       {:exla, "~> 0.6.4"},
       {:nx, "~> 0.6.4 "},
-      {:hnswlib, "~> 0.1.4"},
+      # {:hnswlib, "~> 0.1.4"},
+      {:hnswlib, git: "https://github.com/elixir-nx/hnswlib", override: true},
 
       # Image
       {:vix, "~> 0.26.0"},
