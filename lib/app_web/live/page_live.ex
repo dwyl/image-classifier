@@ -9,7 +9,7 @@ defmodule AppWeb.PageLive do
     General information for the image that is being analysed.
     This information is useful when persisting the image to the database.
     """
-    defstruct [:mimetype, :width, :height, :url, :file_binary, :sha1]
+    defstruct [:mimetype, :width, :height, :url, :file_binary, :description, :sha1]
   end
 
   @doc """
@@ -155,6 +155,7 @@ defmodule AppWeb.PageLive do
                     {:magic, magic_check(path)},
                   file_binary <- File.read!(path),
                   sha1 <- :crypto.hash(:sha, file_binary) |> Base.encode16() |> dbg(),
+                  {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)} |> dbg(),
                   {:image_info, {mimetype, width, height, _variant}} <-
                     {:image_info, ExImageInfo.info(file_binary)},
                   {:check_mime, :ok} <-
@@ -175,6 +176,7 @@ defmodule AppWeb.PageLive do
                      height: height,
                      file_binary: file_binary,
                      url: url,
+                     description: nil,
                      sha1: sha1
                    }
 
@@ -185,6 +187,7 @@ defmodule AppWeb.PageLive do
                    {:ok, %{error: reason}}
                end
              else
+               {:sha_check, nil} -> {:postpone, %{error: "Image already uploaded"}}
                {:magic, {:error, msg}} -> {:postpone, %{error: msg}}
                {:check_mime, :error} -> {:postpone, %{error: "bad check"}}
                {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
@@ -341,8 +344,7 @@ defmodule AppWeb.PageLive do
 
         saved_index = Path.expand("priv/static/uploads/indexes.bin")
 
-        with {:ok, %{}} <- App.Image.check_sha(image),
-             %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
+        with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
              # compute a normed embedding (cosine case only) on the text result
              normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
              :ok <- HNSWLib.Index.add_items(index, normed_data),
@@ -364,15 +366,11 @@ defmodule AppWeb.PageLive do
            socket
            |> assign(running?: false, index: index, task_ref: nil, label: label)}
         else
-          {:ok, nil} ->
-            {:noreply,
-             socket
-             |> assign(running?: false, index: index, task_ref: nil, label: nil)}
-
           {:error, msg} ->
             {:noreply,
              socket
-             |> put_flash(:error, msg)
+             |> push_event("toast", %{message: msg})
+             #  |> put_flash(:error, msg)
              |> assign(running?: false, index: index, task_ref: nil, label: nil)}
         end
 

@@ -32,18 +32,28 @@ defmodule App.Image do
      |> Repo.insert!()}
   end
 
-  def check_sha(image) do
-    {:ok,
-     App.Repo.get_by(App.Image, %{sha1: image.sha1})
-     |> case do
-       nil ->
-         image
+  def check_sha1(sha1) do
+    App.Repo.get_by(App.Image, %{sha1: sha1})
+    |> case do
+      nil ->
+        :ok
 
-       _ ->
-         nil
-     end
-     |> dbg()}
+      _ ->
+        nil
+    end
   end
+
+  # def check_sha(image) do
+  #   {:ok,
+  #    App.Repo.get_by(App.Image, %{sha1: image.sha1})
+  #    |> case do
+  #      nil ->
+  #        image
+
+  #      _ ->
+  #        nil
+  #    end}
+  # end
 
   @doc """
   Uploads the given image to S3.
