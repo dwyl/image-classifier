@@ -18,17 +18,14 @@ defmodule App.KnnIndex do
 
     require Logger
 
-    {:ok, index} =
-      case File.exists?(path) do
-        false ->
-          App.HnswlibIndex.maybe_load_index_from_db(space, dim, max_elements)
+    case File.exists?(path) do
+      false ->
+        {:ok, _index} = App.HnswlibIndex.maybe_load_index_from_db(space, dim, max_elements)
 
-        true ->
-          Logger.info("Existing Index")
-          HNSWLib.Index.load_index(space, dim, path)
-      end
-
-    {:ok, index}
+      true ->
+        Logger.info("Existing Index")
+        {:ok, _index} = HNSWLib.Index.load_index(space, dim, path)
+    end
   end
 
   def get_index_path do
