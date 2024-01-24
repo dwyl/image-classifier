@@ -154,7 +154,7 @@ defmodule AppWeb.PageLive do
              with {:magic, {:ok, %{mime_type: mime}}} <-
                     {:magic, magic_check(path)},
                   file_binary <- File.read!(path),
-                  # sha1 <- :crypto.hash(:sha, file_binary) |> Base.encode16() |> dbg(),
+                  sha1 <- :crypto.hash(:sha, file_binary) |> Base.encode16() |> dbg(),
                   {:image_info, {mimetype, width, height, _variant}} <-
                     {:image_info, ExImageInfo.info(file_binary)},
                   {:check_mime, :ok} <-
@@ -174,8 +174,8 @@ defmodule AppWeb.PageLive do
                      width: width,
                      height: height,
                      file_binary: file_binary,
-                     url: url
-                     #  sha1: sha1
+                     url: url,
+                     sha1: sha1
                    }
 
                    {:ok, %{tensor: tensor, image_info: image_info}}
@@ -335,17 +335,18 @@ defmodule AppWeb.PageLive do
             url: assigns.image_info.url,
             width: assigns.image_info.width,
             height: assigns.image_info.height,
-            description: label
-            # sha: assigns.image_info.sha1
+            description: label,
+            sha1: assigns.image_info.sha1
           }
 
         saved_index = Path.expand("priv/static/uploads/indexes.bin")
 
-        with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
+        with {:ok, %{}} <- App.Image.check_sha(image),
+             %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
              # compute a normed embedding (cosine case only) on the text result
              normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
              :ok <- HNSWLib.Index.add_items(index, normed_data),
-             {:ok, idx} <- HNSWLib.Index.get_current_count(index),
+             {:ok, idx} <- HNSWLib.Index.get_current_count(index) |> dbg(),
              :ok <- HNSWLib.Index.save_index(index, saved_index) do
           Ecto.Multi.new()
           # save Index file to DB
@@ -356,9 +357,6 @@ defmodule AppWeb.PageLive do
           |> Ecto.Multi.run(:update_image, fn _, _ ->
             Map.put(image, :idx, idx)
             |> App.Image.insert()
-
-            # if we decide to use a SHA per file, then instead we can use:
-            # |> App.Image.check_sha_and_insert()
           end)
           |> App.Repo.transaction()
 
@@ -366,6 +364,11 @@ defmodule AppWeb.PageLive do
            socket
            |> assign(running?: false, index: index, task_ref: nil, label: label)}
         else
+          {:ok, nil} ->
+            {:noreply,
+             socket
+             |> assign(running?: false, index: index, task_ref: nil, label: nil)}
+
           {:error, msg} ->
             {:noreply,
              socket

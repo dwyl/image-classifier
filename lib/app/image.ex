@@ -9,13 +9,14 @@ defmodule App.Image do
     field(:url, :string)
     field(:height, :integer)
     field(:idx, :integer)
+    field(:sha1, :string)
 
     timestamps(type: :utc_datetime)
   end
 
   def changeset(image, params \\ %{}) do
     image
-    |> Ecto.Changeset.cast(params, [:url, :description, :width, :height, :idx])
+    |> Ecto.Changeset.cast(params, [:url, :description, :width, :height, :idx, :sha1])
     |> Ecto.Changeset.validate_required([:url, :description, :width, :height])
   end
 
@@ -30,16 +31,18 @@ defmodule App.Image do
      |> Repo.insert!()}
   end
 
-  # def check_sha_and_insert(image) do
-  #   App.Repo.get_by(App.Image, %{sha1: image.sha1})
-  #   |> case do
-  #     nil ->
-  #       insert(image)
+  def check_sha(image) do
+    {:ok,
+     App.Repo.get_by(App.Image, %{sha1: image.sha1})
+     |> case do
+       nil ->
+         image
 
-  #     _ ->
-  #       image
-  #   end
-  # end
+       _ ->
+         nil
+     end
+     |> dbg()}
+  end
 
   @doc """
   Uploads the given image to S3.
