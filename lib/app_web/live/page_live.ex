@@ -351,20 +351,34 @@ defmodule AppWeb.PageLive do
              {:ok, idx} <- HNSWLib.Index.get_current_count(index) |> dbg(),
              :ok <- HNSWLib.Index.save_index(index, saved_index) do
           Ecto.Multi.new()
-          # save Index file to DB
-          |> Ecto.Multi.run(:save_index, fn _, _ ->
-            App.HnswlibIndex.save()
-          end)
           # save updated Image to DB
           |> Ecto.Multi.run(:update_image, fn _, _ ->
             Map.put(image, :idx, idx)
             |> App.Image.insert()
           end)
+          # save Index file to DB
+          |> Ecto.Multi.run(:save_index, fn _, _ ->
+            App.HnswlibIndex.save()
+          end)
           |> App.Repo.transaction()
+          |> case do
+            {:error, :update_image, _changeset, _} ->
+              {:noreply,
+               socket
+               |> push_event("toast", %{message: "Invalid entry"})
+               |> assign(running?: false, index: index, task_ref: nil, label: nil)}
 
-          {:noreply,
-           socket
-           |> assign(running?: false, index: index, task_ref: nil, label: label)}
+            {:error, :save_index, _, _} ->
+              {:noreply,
+               socket
+               |> push_event("toast", %{message: "Please retry"})
+               |> assign(running?: false, index: index, task_ref: nil, label: nil)}
+
+            {:ok, _} ->
+              {:noreply,
+               socket
+               |> assign(running?: false, index: index, task_ref: nil, label: label)}
+          end
         else
           {:error, msg} ->
             {:noreply,

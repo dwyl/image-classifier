@@ -27,10 +27,12 @@ defmodule App.Image do
   and adds the image information to the database.
   """
   def insert(image) do
-    {:ok,
-     %Image{}
-     |> changeset(image)
-     |> Repo.insert!()}
+    changeset = changeset(%Image{}, image)
+
+    case changeset.valid? do
+      true -> Repo.insert(changeset)
+      false -> {:error, changeset.errors}
+    end
   end
 
   @doc """

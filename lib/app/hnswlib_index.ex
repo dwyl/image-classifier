@@ -8,11 +8,13 @@ defmodule App.HnswlibIndex do
 
   schema "hnswlib_index" do
     field(:file, :binary)
+    field(:lock_version, :integer, default: 1)
   end
 
   def changeset(struct \\ %__MODULE__{}, params \\ %{}) do
     struct
     |> Ecto.Changeset.cast(params, [:id, :file])
+    |> Ecto.Changeset.optimistic_lock(:lock_version)
     |> Ecto.Changeset.validate_required([:id])
   end
 
