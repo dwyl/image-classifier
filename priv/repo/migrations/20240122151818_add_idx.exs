@@ -8,5 +8,6 @@ defmodule App.Repo.Migrations.AddIdx do
     end
 
     create unique_index(:images, [:sha1])
+    create unique_index(:images, [:idx])
   end
 end

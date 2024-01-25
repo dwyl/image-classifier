@@ -19,6 +19,7 @@ defmodule App.Image do
     |> Ecto.Changeset.cast(params, [:url, :description, :width, :height, :idx, :sha1])
     |> Ecto.Changeset.validate_required([:url, :description, :width, :height])
     |> Ecto.Changeset.unique_constraint(:sha1, name: :images_sha1_index)
+    |> Ecto.Changeset.unique_constraint(:idx, name: :images_idx_index)
   end
 
   @doc """
