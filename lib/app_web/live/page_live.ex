@@ -154,8 +154,8 @@ defmodule AppWeb.PageLive do
              with {:magic, {:ok, %{mime_type: mime}}} <-
                     {:magic, magic_check(path)},
                   file_binary <- File.read!(path),
-                  sha1 <- :crypto.hash(:sha, file_binary) |> Base.encode16() |> dbg(),
-                  {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)} |> dbg(),
+                  sha1 <- App.Image.calc_sha1(file_binary),
+                  {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)},
                   {:image_info, {mimetype, width, height, _variant}} <-
                     {:image_info, ExImageInfo.info(file_binary)},
                   {:check_mime, :ok} <-

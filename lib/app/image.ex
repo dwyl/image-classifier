@@ -32,6 +32,17 @@ defmodule App.Image do
      |> Repo.insert!()}
   end
 
+  @doc """
+  Calculates the SHA1 of a given binary
+  """
+  def calc_sha1(file_binary) do
+    :crypto.hash(:sha, file_binary)
+    |> Base.encode16()
+  end
+
+  @doc """
+  Returns `:ok` or `nil` if the given sha1 is saved into the database Image table.
+  """
   def check_sha1(sha1) do
     App.Repo.get_by(App.Image, %{sha1: sha1})
     |> case do
@@ -42,18 +53,6 @@ defmodule App.Image do
         nil
     end
   end
-
-  # def check_sha(image) do
-  #   {:ok,
-  #    App.Repo.get_by(App.Image, %{sha1: image.sha1})
-  #    |> case do
-  #      nil ->
-  #        image
-
-  #      _ ->
-  #        nil
-  #    end}
-  # end
 
   @doc """
   Uploads the given image to S3.
