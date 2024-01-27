@@ -220,8 +220,8 @@ defmodule AppWeb.PageLive do
          )}
 
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
-      %{error: reason} ->
-        Logger.info("Error uploading image. #{inspect(reason)}")
+      %{error: errors} ->
+        Logger.info("Error uploading image. #{inspect(errors)}")
 
         {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
 
