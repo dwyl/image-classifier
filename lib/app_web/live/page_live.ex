@@ -37,6 +37,7 @@ defmodule AppWeb.PageLive do
        task_ref: nil,
        image_info: nil,
        image_preview_base64: nil,
+       db_image: nil,
 
        # Related to the list of image examples
        example_list_tasks: [],
@@ -153,45 +154,69 @@ defmodule AppWeb.PageLive do
            consume_uploaded_entry(socket, entry, fn %{path: path} ->
              with {:magic, {:ok, %{mime_type: mime}}} <-
                     {:magic, magic_check(path)},
-                  file_binary <- File.read!(path),
-                  sha1 <- App.Image.calc_sha1(file_binary),
-                  {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)},
+                  {:read, {:ok, file_binary}} <- {:read, File.read(path)},
                   {:image_info, {mimetype, width, height, _variant}} <-
                     {:image_info, ExImageInfo.info(file_binary)},
                   {:check_mime, :ok} <-
                     {:check_mime, check_mime(mime, mimetype)},
+                  sha1 <- App.Image.calc_sha1(file_binary),
+                  {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)},
                   # Get image and resize
                   {:ok, thumbnail_vimage} <-
                     Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
                   # Pre-process it
                   {:ok, tensor} <-
                     pre_process_image(thumbnail_vimage) do
-               # Upload image to S3
-               Image.upload_image_to_s3(path, mimetype)
+               image_info = %{
+                 mimetype: mimetype,
+                 width: width,
+                 height: height,
+                 sha1: sha1,
+                 description: nil,
+                 url: nil
+               }
+
+               # save partial image
+               changeset =
+                 App.Image.changeset(%App.Image{}, image_info)
+
+               case changeset.valid? do
+                 true ->
+                   App.Repo.insert(changeset)
+
+                 false ->
+                   {:error, changeset.errors}
+               end
                |> case do
-                 {:ok, url} ->
-                   image_info = %ImageInfo{
-                     mimetype: mimetype,
-                     width: width,
-                     height: height,
-                     file_binary: file_binary,
-                     url: url,
-                     description: nil,
-                     sha1: sha1
-                   }
+                 {:ok, _image} ->
+                   # if success, Upload image to S3
+                   Image.upload_image_to_s3(path, mimetype)
+                   |> case do
+                     {:ok, url} ->
+                       image_info =
+                         struct(
+                           %ImageInfo{},
+                           Map.merge(image_info, %{url: url, file_binary: file_binary})
+                         )
 
-                   {:ok, %{tensor: tensor, image_info: image_info}}
+                       {:ok, %{tensor: tensor, image_info: image_info}}
 
-                 # If S3 upload fails, we return error
-                 {:error, reason} ->
-                   {:ok, %{error: reason}}
+                     # If S3 upload fails, we return error
+                     {:error, reason} ->
+                       Logger.warning(inspect(reason))
+                       {:ok, {:postpone, "Bucket error"}}
+                   end
+
+                 {:error, changeset} ->
+                   {:ok, %{error: changeset.errors}}
                end
              else
-               {:sha_check, nil} -> {:postpone, %{error: "Image already uploaded"}}
                {:magic, {:error, msg}} -> {:postpone, %{error: msg}}
-               {:check_mime, :error} -> {:postpone, %{error: "bad check"}}
+               {:read, msg} -> {:postpone, %{error: inspect(msg)}}
                {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
-               {:error, reason} -> {:postpone, %{error: reason}}
+               {:check_mime, :error} -> {:postpone, %{error: "Bad mime type"}}
+               {:sha_check, %App.Image{}} -> {:postpone, %{error: "Image already uploaded"}}
+               {:error, reason} -> {:postpone, %{error: inspect(reason)}}
              end
            end) do
       # If consuming the entry was successful, we spawn a task to classify the image
@@ -347,14 +372,20 @@ defmodule AppWeb.PageLive do
         with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
              # compute a normed embedding (cosine case only) on the text result
              normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
+             {:check_used, {:ok, pending_image}} <-
+               {:check_used, App.Image.check_before_append_to_index(image.sha1)},
              :ok <- HNSWLib.Index.add_items(index, normed_data),
              {:ok, idx} <- HNSWLib.Index.get_current_count(index) |> dbg(),
              :ok <- HNSWLib.Index.save_index(index, saved_index) do
           Ecto.Multi.new()
           # save updated Image to DB
           |> Ecto.Multi.run(:update_image, fn _, _ ->
-            Map.put(image, :idx, idx)
-            |> App.Image.insert()
+            Ecto.Changeset.change(pending_image, %{
+              idx: idx,
+              description: image.description,
+              url: image.url
+            })
+            |> App.Repo.update()
           end)
           # save Index file to DB
           |> Ecto.Multi.run(:save_index, fn _, _ ->
@@ -380,6 +411,10 @@ defmodule AppWeb.PageLive do
                |> assign(running?: false, index: index, task_ref: nil, label: label)}
           end
         else
+          {:check_used, msg} ->
+            Logger.debug(inspect(msg))
+            {:noreply, socket |> push_event("toast", %{message: inspect(msg)})}
+
           {:error, msg} ->
             {:noreply,
              socket

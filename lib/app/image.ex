@@ -17,7 +17,7 @@ defmodule App.Image do
   def changeset(image, params \\ %{}) do
     image
     |> Ecto.Changeset.cast(params, [:url, :description, :width, :height, :idx, :sha1])
-    |> Ecto.Changeset.validate_required([:url, :description, :width, :height])
+    |> Ecto.Changeset.validate_required([:width, :height])
     |> Ecto.Changeset.unique_constraint(:sha1, name: :images_sha1_index)
     |> Ecto.Changeset.unique_constraint(:idx, name: :images_idx_index)
   end
@@ -26,12 +26,53 @@ defmodule App.Image do
   Uploads the given image to S3
   and adds the image information to the database.
   """
-  def insert(image) do
+  def insert(image_info) do
+    image = Map.take(image_info, [:mimetype, :width, :height, :url, :description, :sha1])
     changeset = changeset(%Image{}, image)
 
     case changeset.valid? do
       true -> Repo.insert(changeset)
       false -> {:error, changeset.errors}
+    end
+  end
+
+  def update(sha1, %AppWeb.PageLive.ImageInfo{} = params) do
+    image =
+      App.Repo.get_by(App.Image, sha1: sha1)
+
+    params = Map.take(params, [:mimetype, :width, :height, :url, :description, :sha1])
+
+    changeset =
+      changeset(image, params)
+
+    require Logger
+
+    case changeset.valid? do
+      true ->
+        Logger.info(image)
+        {:ok, _img} = App.Repo.update(image, changeset)
+
+      false ->
+        {:error, inspect(changeset.errors)}
+    end
+  end
+
+  def check_before_append_to_index(sha1) do
+    App.Repo.get_by(App.Image, sha1: sha1)
+    |> case do
+      %App.Image{} = img ->
+        case img.idx do
+          0 ->
+            {:ok, img}
+
+          i ->
+            require Logger
+            Logger.info(inspect(i))
+            {:error, "Already in use"}
+        end
+
+      res ->
+        IO.inspect(res)
     end
   end
 
@@ -52,8 +93,8 @@ defmodule App.Image do
       nil ->
         :ok
 
-      _ ->
-        nil
+      %App.Image{} = image ->
+        image
     end
   end
 

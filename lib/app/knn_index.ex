@@ -8,6 +8,29 @@ defmodule App.KnnIndex do
     GenServer.start_link(__MODULE__, {}, name: __MODULE__)
   end
 
+  def get_index_path do
+    Path.join([@upload_dir, @indexes])
+  end
+
+  def load_index do
+    GenServer.call(__MODULE__, :load)
+  end
+
+  @doc """
+  Debugging function to check the Idnex current count
+  """
+  def get_count do
+    GenServer.call(__MODULE__, :get_count)
+  end
+
+  @doc """
+  Debugging function to print the Index
+  """
+  def get_index do
+    GenServer.call(__MODULE__, :get_index)
+  end
+
+  @impl true
   def init(_) do
     File.mkdir_p!(@upload_dir)
 
@@ -28,15 +51,17 @@ defmodule App.KnnIndex do
     end
   end
 
-  def get_index_path do
-    Path.join([@upload_dir, @indexes])
-  end
-
-  def load_index do
-    GenServer.call(__MODULE__, :load)
-  end
-
+  @impl true
   def handle_call(:load, _from, state) do
+    {:reply, state, state}
+  end
+
+  def handle_call(:get_count, _, state) do
+    {:ok, count} = HNSWLib.Index.get_current_count(state)
+    {:reply, count, state}
+  end
+
+  def handle_call(:get_index, _, state) do
     {:reply, state, state}
   end
 end
