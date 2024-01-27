@@ -81,7 +81,7 @@ defmodule AppWeb.PageLive do
   """
   def handle_event("show_examples", _data, socket) do
     # Only run if the user hasn't uploaded anything
-    if(is_nil(socket.assigns.task_ref)) do
+    if is_nil(socket.assigns.task_ref) do
       # Retrieves a random image from Unsplash with a given `image_width` dimension
       random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
 
@@ -150,100 +150,80 @@ defmodule AppWeb.PageLive do
   def handle_progress(:image_list, entry, socket) when entry.done? do
     # We consume the entry only if the entry is done uploading from the image
     # and if consuming the entry was successful.
-    with %{tensor: tensor, image_info: image_info} <-
-           consume_uploaded_entry(socket, entry, fn %{path: path} ->
-             with {:magic, {:ok, %{mime_type: mime}}} <-
-                    {:magic, magic_check(path)},
-                  {:read, {:ok, file_binary}} <- {:read, File.read(path)},
-                  {:image_info, {mimetype, width, height, _variant}} <-
-                    {:image_info, ExImageInfo.info(file_binary)},
-                  {:check_mime, :ok} <-
-                    {:check_mime, check_mime(mime, mimetype)},
-                  sha1 <- App.Image.calc_sha1(file_binary),
-                  {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)},
-                  # Get image and resize
-                  {:ok, thumbnail_vimage} <-
-                    Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
-                  # Pre-process it
-                  {:ok, tensor} <-
-                    pre_process_image(thumbnail_vimage) do
-               image_info = %{
-                 mimetype: mimetype,
-                 width: width,
-                 height: height,
-                 sha1: sha1,
-                 description: nil,
-                 url: nil
-               }
+    consume_uploaded_entry(socket, entry, fn %{path: path} ->
+      with {:magic, {:ok, %{mime_type: mime}}} <-
+             {:magic, magic_check(path)},
+           {:read, {:ok, file_binary}} <- {:read, File.read(path)},
+           {:image_info, {mimetype, width, height, _variant}} <-
+             {:image_info, ExImageInfo.info(file_binary)},
+           {:check_mime, :ok} <-
+             {:check_mime, check_mime(mime, mimetype)},
+           sha1 <- App.Image.calc_sha1(file_binary),
+           {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)},
+           # Get image and resize
+           {:ok, thumbnail_vimage} <-
+             Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
+           # Pre-process it
+           {:ok, tensor} <-
+             pre_process_image(thumbnail_vimage) do
+        image_info = %{
+          mimetype: mimetype,
+          width: width,
+          height: height,
+          sha1: sha1,
+          description: nil,
+          url: nil
+        }
 
-               # save partial image
-               changeset =
-                 App.Image.changeset(%App.Image{}, image_info)
+        # save partial image
+        App.Image.insert(image_info)
+        |> case do
+          {:ok, _} ->
+            image_info =
+              Map.merge(image_info, %{
+                file_binary: file_binary
+              })
 
-               case changeset.valid? do
-                 true ->
-                   App.Repo.insert(changeset)
+            {:ok, %{tensor: tensor, path: path, image_info: image_info}}
 
-                 false ->
-                   {:error, changeset.errors}
-               end
-               |> case do
-                 {:ok, _image} ->
-                   # if success, Upload image to S3
-                   Image.upload_image_to_s3(path, mimetype)
-                   |> case do
-                     {:ok, url} ->
-                       image_info =
-                         struct(
-                           %ImageInfo{},
-                           Map.merge(image_info, %{url: url, file_binary: file_binary})
-                         )
-
-                       {:ok, %{tensor: tensor, image_info: image_info}}
-
-                     # If S3 upload fails, we return error
-                     {:error, reason} ->
-                       Logger.warning(inspect(reason))
-                       {:ok, {:postpone, "Bucket error"}}
-                   end
-
-                 {:error, changeset} ->
-                   {:ok, %{error: changeset.errors}}
-               end
-             else
-               {:magic, {:error, msg}} -> {:postpone, %{error: msg}}
-               {:read, msg} -> {:postpone, %{error: inspect(msg)}}
-               {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
-               {:check_mime, :error} -> {:postpone, %{error: "Bad mime type"}}
-               {:sha_check, %App.Image{}} -> {:postpone, %{error: "Image already uploaded"}}
-               {:error, reason} -> {:postpone, %{error: inspect(reason)}}
-             end
-           end) do
+          {:error, changeset} ->
+            {:error, changeset.errors}
+        end
+        |> handle_upload()
+      else
+        {:magic, {:error, msg}} -> {:postpone, %{error: msg}}
+        {:read, msg} -> {:postpone, %{error: inspect(msg)}}
+        {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
+        {:check_mime, :error} -> {:postpone, %{error: "Bad mime type"}}
+        {:sha_check, %App.Image{}} -> {:postpone, %{error: "Image already uploaded"}}
+        {:error, reason} -> {:postpone, %{error: inspect(reason)}}
+      end
+    end)
+    |> case do
       # If consuming the entry was successful, we spawn a task to classify the image
       # and update the socket assigns
-      task =
-        Task.Supervisor.async(App.TaskSupervisor, fn ->
-          Nx.Serving.batched_run(ImageClassifier, tensor)
-        end)
+      %{tensor: tensor, image_info: image_info} ->
+        task =
+          Task.Supervisor.async(App.TaskSupervisor, fn ->
+            Nx.Serving.batched_run(ImageClassifier, tensor)
+          end)
 
-      # Encode the image to base64
-      base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
+        # Encode the image to base64
+        base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
 
-      {:noreply,
-       assign(socket,
-         running?: true,
-         task_ref: task.ref,
-         image_preview_base64: base64,
-         image_info: image_info
-       )}
+        {:noreply,
+         assign(socket,
+           running?: true,
+           task_ref: task.ref,
+           image_preview_base64: base64,
+           image_info: image_info
+         )}
 
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
-    else
       %{error: reason} ->
         Logger.info("Error uploading image. #{inspect(reason)}")
 
-        {:noreply,
-         push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
+        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
 
       _ ->
         {:noreply, socket}
@@ -284,6 +264,35 @@ defmodule AppWeb.PageLive do
   def handle_progress(_, _, socket), do: {:noreply, socket}
 
   @doc """
+  Called in `handle_progress` to Handle the upload to the bucket and returns the format `{:ok, map}` or {:postpone, message}`
+  as demanded by the signature of callback function used `consume_uploaded_entry`
+  """
+  def handle_upload({:ok, map}) do
+    %{path: path, tensor: tensor, image_info: image_info} = map
+    # if success, Upload image to S3
+    Image.upload_image_to_s3(path, image_info.mimetype)
+    |> case do
+      {:ok, url} ->
+        image_info =
+          struct(
+            %ImageInfo{},
+            Map.merge(image_info, %{url: url})
+          )
+
+        {:ok, %{tensor: tensor, image_info: image_info}}
+
+      # If S3 upload fails, we return error
+      {:error, reason} ->
+        Logger.warning(inspect(reason))
+        {:postpone, "Bucket error"}
+    end
+  end
+
+  def handle_upload({:error, errors}) do
+    {:postpone, %{error: errors}}
+  end
+
+  @doc """
   Every time an `async task` is created, this function is called.
   We destructure the output of the task and update the socket assigns.
 
@@ -300,9 +309,9 @@ defmodule AppWeb.PageLive do
     # and returns an App.Image{} as the result of a "knn_search"
     with %{embedding: input_embedding} <- Nx.Serving.run(embedding_serving, text),
          normed_input_embedding <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
+         {:not_empty_index, :ok} <-
+           {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
          %App.Image{} = result <- handle_knn(index, normed_input_embedding) do
-      dbg(result)
-
       {:noreply,
        assign(socket,
          transcription: String.trim(text),
@@ -313,7 +322,9 @@ defmodule AppWeb.PageLive do
        )}
     else
       # record without entries
-      {:error, "no entries in index"} ->
+      {:not_empty_index, :error} ->
+        Logger.debug("No entries in Index")
+
         {:noreply,
          assign(socket,
            micro_off: false,
@@ -375,7 +386,7 @@ defmodule AppWeb.PageLive do
              {:check_used, {:ok, pending_image}} <-
                {:check_used, App.Image.check_before_append_to_index(image.sha1)},
              :ok <- HNSWLib.Index.add_items(index, normed_data),
-             {:ok, idx} <- HNSWLib.Index.get_current_count(index) |> dbg(),
+             {:ok, idx} <- HNSWLib.Index.get_current_count(index),
              :ok <- HNSWLib.Index.save_index(index, saved_index) do
           Ecto.Multi.new()
           # save updated Image to DB
@@ -426,18 +437,7 @@ defmodule AppWeb.PageLive do
       # If the example task has finished executing, we upload the socket assigns.
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
         # Update the element in the `example_list` enum to turn "predicting?" to `false`
-        updated_example_list =
-          Map.get(assigns, :example_list)
-          |> Enum.map(fn obj ->
-            if obj.ref == img.ref do
-              obj
-              |> Map.put(:url, img.url)
-              |> Map.put(:label, label)
-              |> Map.put(:predicting?, false)
-            else
-              obj
-            end
-          end)
+        updated_example_list = update_example_list(assigns, img, label)
 
         {:noreply,
          assign(socket,
@@ -448,34 +448,53 @@ defmodule AppWeb.PageLive do
     end
   end
 
+  def update_example_list(assigns, image, label) do
+    Map.get(assigns, :example_list)
+    |> Enum.map(fn obj ->
+      if obj.ref == image.ref do
+        obj
+        |> Map.put(:url, image.url)
+        |> Map.put(:label, label)
+        |> Map.put(:predicting?, false)
+      else
+        obj
+      end
+    end)
+  end
+
   def handle_knn(nil, _), do: {:error, "no index found"}
 
   def handle_knn(index, input) do
-    case HNSWLib.Index.get_current_count(index) do
-      {:ok, 0} ->
-        {:error, "no entries in index"}
+    # refactored to denest function as per Credo
+    # case HNSWLib.Index.get_current_count(index) do
+    # {:ok, 0} ->
+    # {:error, "no entries in index"}
 
-      {:ok, _c} ->
-        # check the embeddings
-        # {:ok, l} = HNSWLib.Index.get_current_count(index) |> dbg()
+    # {:ok, _c} ->
+    # check the embeddings
+    # {:ok, l} = HNSWLib.Index.get_current_count(index) |> dbg()
 
-        # for i <- 0..(l - 1) do
-        #   {:ok, dt} = HNSWLib.Index.get_items(index, [i])
-        #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
-        # end
+    # for i <- 0..(l - 1) do
+    #   {:ok, dt} = HNSWLib.Index.get_items(index, [i])
+    #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
+    # end
 
-        case HNSWLib.Index.knn_query(index, input, k: 1) do
-          {:ok, labels, distances} ->
-            dbg(distances)
+    case HNSWLib.Index.knn_query(index, input, k: 1) do
+      {:ok, labels, distances} ->
+        dbg(distances)
 
-            labels[0]
-            |> Nx.to_flat_list()
-            |> hd()
-            |> then(fn idx ->
-              App.Repo.get_by(App.Image, %{idx: idx + 1})
-            end)
-        end
+        labels[0]
+        |> Nx.to_flat_list()
+        |> hd()
+        |> then(fn idx ->
+          App.Repo.get_by(App.Image, %{idx: idx + 1})
+        end)
+
+      {:error, msg} ->
+        {:error, msg}
     end
+
+    # end
   end
 
   @doc """

@@ -1,6 +1,9 @@
 defmodule App.TextEmbedding do
   use GenServer
 
+  @moduledoc """
+  Genserver to load asynchronously the embedding model.
+  """
   def start_link(_) do
     GenServer.start_link(__MODULE__, {}, name: __MODULE__)
   end

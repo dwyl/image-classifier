@@ -1,6 +1,6 @@
 defmodule App.Image do
   use Ecto.Schema
-  alias App.{Image, Repo}
+  # alias App.{Image, Repo}
 
   @primary_key {:id, :id, autogenerate: true}
   schema "images" do
@@ -22,40 +22,46 @@ defmodule App.Image do
     |> Ecto.Changeset.unique_constraint(:idx, name: :images_idx_index)
   end
 
+  def insert(params) do
+    App.Image.changeset(%App.Image{}, params)
+    |> App.Repo.insert()
+  end
+
   @doc """
   Uploads the given image to S3
   and adds the image information to the database.
   """
-  def insert(image_info) do
-    image = Map.take(image_info, [:mimetype, :width, :height, :url, :description, :sha1])
-    changeset = changeset(%Image{}, image)
 
-    case changeset.valid? do
-      true -> Repo.insert(changeset)
-      false -> {:error, changeset.errors}
-    end
-  end
+  # def insert(image_info) do
+  #   image = Map.take(image_info, [:mimetype, :width, :height, :url, :description, :sha1])
+  #   changeset = changeset(%Image{}, image)
 
-  def update(sha1, %AppWeb.PageLive.ImageInfo{} = params) do
-    image =
-      App.Repo.get_by(App.Image, sha1: sha1)
+  #   case changeset.valid? do
+  #     true -> Repo.insert(changeset)
+  #     false -> {:error, changeset.errors}
+  #   end
+  # end
 
-    params = Map.take(params, [:mimetype, :width, :height, :url, :description, :sha1])
+  # def update(sha1, %AppWeb.PageLive.ImageInfo{} = params) do
+  #   image =
+  #     App.Repo.get_by(App.Image, sha1: sha1)
 
-    changeset =
-      changeset(image, params)
+  #   params = Map.take(params, [:mimetype, :width, :height, :url, :description, :sha1])
 
-    require Logger
+  #   changeset =
+  #     changeset(image, params)
 
-    case changeset.valid? do
-      true ->
-        Logger.info(image)
-        {:ok, _img} = App.Repo.update(image, changeset)
+  #   require Logger
 
-      false ->
-        {:error, inspect(changeset.errors)}
-    end
-  end
+  #   case changeset.valid? do
+  #     true ->
+  #       Logger.info(image)
+  #       {:ok, _img} = App.Repo.update(image, changeset)
+
+  #     false ->
+  #       {:error, inspect(changeset.errors)}
+  #   end
+  # end
 
   def check_before_append_to_index(sha1) do
     App.Repo.get_by(App.Image, sha1: sha1)
@@ -72,7 +78,7 @@ defmodule App.Image do
         end
 
       res ->
-        IO.inspect(res)
+        res
     end
   end
 

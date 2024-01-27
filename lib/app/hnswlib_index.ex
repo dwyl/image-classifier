@@ -47,4 +47,14 @@ defmodule App.HnswlibIndex do
         HNSWLib.Index.load_index(space, dim, path)
     end
   end
+
+  def not_empty_index(index) do
+    case HNSWLib.Index.get_current_count(index) do
+      {:ok, 0} ->
+        :error
+
+      {:ok, _} ->
+        :ok
+    end
+  end
 end
