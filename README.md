@@ -3232,7 +3232,9 @@ and then use an approximation algorithm to find the closest neighbours.
 Embeddings are basically **vector representations** of certain inputs,
 which in our case, are audio files.
 
-Our next steps will be to prepare the [symmetric semantic search](https://www.sbert.net/examples/applications/semantic-search/README.html#symmetric-vs-asymmetric-semantic-search). We will use the [transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>) with the [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) pre-trained system available in [Huggingface](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
+Our next steps will be to prepare the [symmetric semantic search](https://www.sbert.net/examples/applications/semantic-search/README.html#symmetric-vs-asymmetric-semantic-search).
+
+We will use the [transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>) with the [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) pre-trained system available in [Huggingface](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
 
 - we transform a text into a vector.
   We use the sentence-transformer model
@@ -3244,21 +3246,37 @@ Our next steps will be to prepare the [symmetric semantic search](https://www.sb
 - after this, we then run a [**knn_neighbour**](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) search.
   The idea is to work in the embeddings vector space
   and find the image vectors that are close to the target vector.
-  We'll be using an Elixir binding of the [HNSWLib library](https://github.com/elixir-nx/hnswlib).
+
+  There are several ways to do this.
+
+  We can use the `pgvector`, a vector extension of Postgres. We can then run:
+
+  - a full exact search with the [cosine similarity](https://github.com/pgvector/pgvector#distances) operator `<=>`, or
+  - or use an Approximate Nearest Neighbour seach with the indexing algorithms. The extension proposes [IVFFLAT](https://github.com/pgvector/pgvector#ivfflat) or `[HNSWLIB](https://github.com/pgvector/pgvector#hnsw) algorithms. You can find some explanations on both algorithms [here](https://tembo.io/blog/vector-indexes-in-pgvector) and [there](https://neon.tech/blog/understanding-vector-search-and-hnsw-index-with-pgvector).
+
+  This requires the `pgvector` extension to be installed in Fly.io. We lacked of resources to do so.
+  Note that you need to save the embeddings (as vectors) into the database, so the database will be intensively used. This may lead to scaling problems and race conditions.
+
+  We can alternatively use the `hnswlib` library and its Elixir binding [HNSWLib](https://github.com/elixir-nx/hnswlib).
+  This "externalises" the ANN search from the database as it uses an in-memory file that needs to be persisted on disk, thus at the expense of using the filesystem with again potential race conditions.
   It works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**: this struct will allow us to efficiently retrieve
   vector data.
-  We will incrementally append the embedded captions to the `index struct` - saved into a file -
-  and then run a "knn\*search" algorithm on this `index`
-  with the audio transcription as an input.
+
+  We will use this last option.
+
+  We will incrementally append the embedding computed from the captions to the Index. We will get an indice that is the order of this embedding in the Index.
+  We then run a "knn\*search" algorithm; the input will be the embedding of the audio transcript.
   This algorithm will return the most relevant position(s) - `indices` -
-  among the `index` struct indices.
+  among the `Index` indices that minimize the choosen distance between this input and the existing vectors.
   This is where we'll need to save
-  whether the index or the embedding to look-up for the corresponding image(s).
-  Do note that all of this process is dependant on the
+  whether the index or the embedding to look-up for the corresponding image(s), depending upon if you append items one by one or by batch.
+  In our case, you will append items one by one so we will use the indice to uniquely recover the nearest image whose caption is close semantically to our audio.
+
+  Do note that the measured distance is dependant on the
   [similarity metric](https://www.pinecone.io/learn/vector-similarity/)
   used by the embedding model.
-  Because the model we've chosen was trained with **_cosine_similarity_**,
-  that's what we'll use.
+  Because the "sentence-transformer" model we've chosen was trained with **_cosine_similarity_**,
+  so that's what we'll use. Bumblebee may have options to correctly use this metric, but we used a normalisation process which fits our needs.
 
 #### Pre-requisites
 
@@ -3281,7 +3299,7 @@ end
 And run `mix deps.get`.
 
 **You will also need to install [`ffmpeg`](https://ffmpeg.org/)**.
-`Bumblebee` uses `ffmpeg` under the hood to process audio files into tensors.
+Indeed, `Bumblebee` uses `ffmpeg` under the hood to process audio files into tensors.
 
 ### 1. Transcribe an audio recording
 

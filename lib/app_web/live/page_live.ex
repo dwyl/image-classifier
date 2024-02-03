@@ -168,6 +168,7 @@ defmodule AppWeb.PageLive do
           sha1: sha1,
           description: nil,
           url: nil,
+          # set a random big int to the "idx" field
           idx: :rand.uniform(1_000_000_000_000) * 1_000
         }
 

@@ -38,9 +38,10 @@ defmodule App.HnswlibIndex do
   end
 
   def maybe_load_index_from_db(space, dim, max_elements) do
+    # check if the table has an entry
     Repo.get_by(HnswlibIndex, id: 1)
-    |> dbg()
     |> case do
+      # table empty
       nil ->
         # create a singleton row
         Logger.info("New Index")
@@ -55,6 +56,7 @@ defmodule App.HnswlibIndex do
             {:error, msg}
         end
 
+      # table is not empty but has no file
       response when response.file == nil ->
         Logger.info("Recreate Index")
 
@@ -70,6 +72,7 @@ defmodule App.HnswlibIndex do
             {:error, msg}
         end
 
+      # table is not empty and has a file
       index_file ->
         Logger.info("Loading Index from DB")
 
