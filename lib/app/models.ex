@@ -82,6 +82,7 @@ defmodule App.Models do
       {true, true} ->
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
+
         # Download captioning test model model
         download_model(@captioning_test_model)
         # Download whisper model
@@ -90,6 +91,10 @@ defmodule App.Models do
       {true, false} ->
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
+
+        # download embedding model
+        download_model(@embedding_model)
+
         # Download captioning prod model
         download_model(@captioning_prod_model)
         # Download whisper model
@@ -99,6 +104,8 @@ defmodule App.Models do
         # Check if the prod model cache directory exists or if it's not empty.
         # If so, we download the prod models.
 
+        # Embedding model
+        check_folder_and_download(@embedding_model)
         # Captioning test model
         check_folder_and_download(@captioning_prod_model)
 
@@ -124,7 +131,8 @@ defmodule App.Models do
       model.model_info,
       model.tokenizer,
       compile: [batch_size: 16, sequence_length: 130],
-      defn_options: [compiler: EXLA, lazy_transfers: :never]
+      defn_options: [compiler: EXLA, lazy_transfers: :never],
+      preallocate_params: true
     )
   end
 

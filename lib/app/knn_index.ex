@@ -58,7 +58,6 @@ defmodule App.KnnIndex do
   @impl true
   def handle_call(:load, _, {:error, :badarg} = state) do
     App.HnswlibIndex.maybe_load_index_from_db(:cosine, 384, 200)
-    |> dbg()
     |> case do
       {:ok, index} ->
         {:reply, index, state}
@@ -66,7 +65,6 @@ defmodule App.KnnIndex do
       _ ->
         {:stop, {:error, :badarg}, state}
     end
-    |> dbg()
   end
 
   def handle_call(:load, _from, state) do

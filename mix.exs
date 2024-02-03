@@ -43,7 +43,7 @@ defmodule App.MixProject do
       {:phoenix, "~> 1.7.10"},
       {:phoenix_html, "~> 4.0.0"},
       {:phoenix_live_reload, "~> 1.4.1", only: :dev},
-      {:phoenix_live_view, "~> 0.20.1"},
+      {:phoenix_live_view, "~> 0.20.4"},
       {:heroicons, "~> 0.5.3"},
       {:floki, ">= 0.35.2", only: :test},
       {:esbuild, "~> 0.8.1", runtime: Mix.env() == :dev},
@@ -68,6 +68,7 @@ defmodule App.MixProject do
       # Bumblebee imports
       {:bumblebee, "~> 0.4.2"},
       {:exla, "~> 0.6.4"},
+      # {:xla, "~> 0.6.0"},
       {:nx, "~> 0.6.4 "},
       # {:hnswlib, "~> 0.1.4"},
       {:hnswlib, git: "https://github.com/elixir-nx/hnswlib", override: true},

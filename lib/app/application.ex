@@ -16,9 +16,9 @@ defmodule App.Application do
       App.Repo,
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
-      # Nx serving for the embedding
+      # Start the HNSWLib Index from localstorage or from DB
       {App.KnnIndex, :cosine},
-      # App.TextEmbedding,
+      # Nx serving for the embedding
       {Nx.Serving, serving: App.Models.embedding(), name: Embedding},
       # Nx serving for Speech-to-Text
       {Nx.Serving,

@@ -321,7 +321,7 @@ defmodule AppWeb.PageLive do
          speech_spin: false,
          search_result: result,
          audio_ref: nil,
-         tmp_wave: nil
+         tmp_wave: @tmp_wav
        )}
     else
       # record without entries
@@ -333,7 +333,8 @@ defmodule AppWeb.PageLive do
            micro_off: false,
            search_result: nil,
            speech_spin: false,
-           audio_ref: nil
+           audio_ref: nil,
+           tmp_wave: @tmp_wav
          )}
 
       nil ->
@@ -343,7 +344,8 @@ defmodule AppWeb.PageLive do
            micro_off: false,
            search_result: nil,
            speech_spin: false,
-           audio_ref: nil
+           audio_ref: nil,
+           tmp_wave: @tmp_wav
          )}
     end
   end
