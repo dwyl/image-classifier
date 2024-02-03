@@ -3249,13 +3249,16 @@ We will use the [transformer](<https://en.wikipedia.org/wiki/Transformer_(machin
 
   There are several ways to do this.
 
-  We can use the `pgvector`, a vector extension of Postgres. We can then run:
+  We can use the `pgvector`, a vector extension of Postgres. It is used to store vectors (the embeddings) and to run similarity searches. We can then run:
 
   - a full exact search with the [cosine similarity](https://github.com/pgvector/pgvector#distances) operator `<=>`, or
   - or use an Approximate Nearest Neighbour seach with the indexing algorithms. The extension proposes [IVFFLAT](https://github.com/pgvector/pgvector#ivfflat) or `[HNSWLIB](https://github.com/pgvector/pgvector#hnsw) algorithms. You can find some explanations on both algorithms [here](https://tembo.io/blog/vector-indexes-in-pgvector) and [there](https://neon.tech/blog/understanding-vector-search-and-hnsw-index-with-pgvector).
 
   This requires the `pgvector` extension to be installed in Fly.io. We lacked of resources to do so.
-  Note that you need to save the embeddings (as vectors) into the database, so the database will be intensively used. This may lead to scaling problems and race conditions.
+
+  > Note that [Supabase](https://supabase.com/docs/guides/database/extensions/pgvector) can use the pgvector extension, and you can use [Supabase with Fly.io](https://fly.io/docs/reference/supabase/).
+
+  > Note that you need to save the embeddings (as vectors) into the database, so the database will be intensively used. This may lead to scaling problems and potential race conditions.
 
   We can alternatively use the `hnswlib` library and its Elixir binding [HNSWLib](https://github.com/elixir-nx/hnswlib).
   This "externalises" the ANN search from the database as it uses an in-memory file that needs to be persisted on disk, thus at the expense of using the filesystem with again potential race conditions.
