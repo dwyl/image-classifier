@@ -23,11 +23,6 @@ defmodule AppWeb.PageLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    embedding_serving = App.TextEmbedding.serve()
-
-    index =
-      App.KnnIndex.load_index()
-
     {:ok,
      socket
      |> assign(
@@ -49,8 +44,8 @@ defmodule AppWeb.PageLive do
        micro_off: false,
        speech_spin: false,
        search_result: nil,
-       embedding_serving: embedding_serving,
-       index: index
+       tmp_wave: @tmp_wav,
+       index: App.KnnIndex.load_index()
      )
      |> allow_upload(:image_list,
        accept: ~w(image/*),
@@ -172,7 +167,8 @@ defmodule AppWeb.PageLive do
           height: height,
           sha1: sha1,
           description: nil,
-          url: nil
+          url: nil,
+          idx: :rand.uniform(1_000_000_000_000) * 1_000
         }
 
         # save partial image
@@ -226,6 +222,7 @@ defmodule AppWeb.PageLive do
         {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
 
       _ ->
+        IO.puts("ERROR --------------")
         {:noreply, socket}
     end
   end
@@ -235,18 +232,20 @@ defmodule AppWeb.PageLive do
   # It saves the file to disk and sends it to the model to be transcribed.
   # It updates the socket assigns.
   #
-  def handle_progress(:speech, entry, socket) when entry.done? do
-    socket
-    |> consume_uploaded_entry(entry, fn %{path: path} ->
-      :ok = File.cp!(path, @tmp_wav)
-      {:ok, @tmp_wav}
-    end)
+  def handle_progress(:speech, entry, %{assigns: assigns} = socket) when entry.done? do
+    tmp_wave =
+      socket
+      |> consume_uploaded_entry(entry, fn %{path: path} ->
+        tmp_wave = assigns.tmp_wave <> Ecto.UUID.generate() <> ".wav"
+        :ok = File.cp!(path, tmp_wave)
+        {:ok, tmp_wave}
+      end)
 
     audio_task =
       Task.Supervisor.async(
         App.TaskSupervisor,
         fn ->
-          Nx.Serving.batched_run(Whisper, {:file, @tmp_wav})
+          Nx.Serving.batched_run(Whisper, {:file, tmp_wave})
         end
       )
 
@@ -254,6 +253,7 @@ defmodule AppWeb.PageLive do
      assign(socket,
        audio_ref: audio_task.ref,
        micro_off: true,
+       tmp_wave: tmp_wave,
        speech_spin: true,
        search_result: nil,
        transcription: nil
@@ -302,12 +302,14 @@ defmodule AppWeb.PageLive do
   def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
       when assigns.audio_ref == ref do
     Process.demonitor(ref, [:flush])
-    File.rm!(@tmp_wav)
+    File.rm!(assigns.tmp_wave)
 
-    %{embedding_serving: embedding_serving, index: index} = assigns
+    # %{embedding_serving: embedding_serving, index: index} = assigns
+    %{index: index} = assigns
     # compute an normed embedding (cosine case only) on the text result
     # and returns an App.Image{} as the result of a "knn_search"
-    with %{embedding: input_embedding} <- Nx.Serving.run(embedding_serving, text),
+    # with %{embedding: input_embedding} <- Nx.Serving.run(embedding_serving, text),
+    with %{embedding: input_embedding} <- Nx.Serving.batched_run(Embedding, text),
          normed_input_embedding <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
          {:not_empty_index, :ok} <-
            {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
@@ -318,7 +320,8 @@ defmodule AppWeb.PageLive do
          micro_off: false,
          speech_spin: false,
          search_result: result,
-         audio_ref: nil
+         audio_ref: nil,
+         tmp_wave: nil
        )}
     else
       # record without entries
@@ -351,8 +354,8 @@ defmodule AppWeb.PageLive do
   def handle_info({ref, result}, %{assigns: assigns} = socket) do
     # Flush async call
     Process.demonitor(ref, [:flush])
-    %{embedding_serving: embedding_serving, index: index} = assigns
-
+    # %{embedding_serving: embedding_serving, index: index} = assigns
+    %{index: index} = assigns
     # You need to change how you destructure the output of the model depending
     # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
     label =
@@ -378,9 +381,10 @@ defmodule AppWeb.PageLive do
             sha1: assigns.image_info.sha1
           }
 
-        saved_index = Path.expand("priv/static/uploads/indexes.bin")
+        saved_index = App.HnswlibIndex.index_file()
 
-        with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
+        # with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
+        with %{embedding: data} <- Nx.Serving.batched_run(Embedding, label),
              # compute a normed embedding (cosine case only) on the text result
              normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
              {:check_used, {:ok, pending_image}} <-
@@ -422,9 +426,9 @@ defmodule AppWeb.PageLive do
                |> assign(running?: false, index: index, task_ref: nil, label: label)}
           end
         else
-          {:check_used, msg} ->
-            Logger.debug(inspect(msg))
-            {:noreply, socket |> push_event("toast", %{message: inspect(msg)})}
+          {:check_used, {:error, msg}} ->
+            Logger.debug(msg)
+            {:noreply, socket |> push_event("toast", %{message: msg})}
 
           {:error, msg} ->
             {:noreply,

@@ -19,6 +19,13 @@ defmodule App.Models do
 
   # Test and prod models information -------
 
+  @embedding_model %ModelInfo{
+    name: "sentence-transformers/paraphrase-MiniLM-L6-v2",
+    cache_path: Path.join(@models_folder_path, "paraphrase-MiniLM-L6-v2"),
+    load_featurizer: false,
+    load_tokenizer: true,
+    load_generation_config: true
+  }
   # Captioning --
   @captioning_test_model %ModelInfo{
     name: "microsoft/resnet-50",
@@ -73,14 +80,20 @@ defmodule App.Models do
 
     case {force_models_download, use_test_models} do
       {true, true} ->
-        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
-        download_model(@captioning_test_model)      # Download captioning test model model
-        download_model(@audio_test_model)           # Download whisper model
+        # Delete any cached pre-existing models
+        File.rm_rf!(@models_folder_path)
+        # Download captioning test model model
+        download_model(@captioning_test_model)
+        # Download whisper model
+        download_model(@audio_test_model)
 
       {true, false} ->
-        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
-        download_model(@captioning_prod_model)      # Download captioning prod model
-        download_model(@audio_prod_model)              # Download whisper model
+        # Delete any cached pre-existing models
+        File.rm_rf!(@models_folder_path)
+        # Download captioning prod model
+        download_model(@captioning_prod_model)
+        # Download whisper model
+        download_model(@audio_prod_model)
 
       {false, false} ->
         # Check if the prod model cache directory exists or if it's not empty.
@@ -102,6 +115,17 @@ defmodule App.Models do
         # Audio capture model
         check_folder_and_download(@audio_test_model)
     end
+  end
+
+  def embedding() do
+    model = load_offline_model(@embedding_model)
+
+    Bumblebee.Text.TextEmbedding.text_embedding(
+      model.model_info,
+      model.tokenizer,
+      compile: [batch_size: 16, sequence_length: 130],
+      defn_options: [compiler: EXLA, lazy_transfers: :never]
+    )
   end
 
   @doc """
@@ -143,7 +167,7 @@ defmodule App.Models do
     )
   end
 
-    @doc """
+  @doc """
   Serving function for tests only. It uses a test audio transcription model.
   """
   def audio_serving_test do
@@ -246,10 +270,10 @@ defmodule App.Models do
     end
   end
 
-
   # Checks if the folder exists and downloads the model if it doesn't.
   defp check_folder_and_download(model) do
     model_location = Path.join(model.cache_path, "huggingface")
+
     if not File.exists?(model_location) or File.ls!(model_location) == [] do
       download_model(model)
     end

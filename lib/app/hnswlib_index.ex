@@ -6,6 +6,8 @@ defmodule App.HnswlibIndex do
 
   require Logger
 
+  @saved_index Path.expand("priv/static/uploads/indexes.bin")
+
   schema "hnswlib_index" do
     field(:file, :binary)
     field(:lock_version, :integer, default: 1)
@@ -19,32 +21,66 @@ defmodule App.HnswlibIndex do
   end
 
   def save() do
-    path = App.KnnIndex.get_index_path()
-    file = File.read!(path)
+    try do
+      path = App.KnnIndex.get_index_path()
+      file = File.read!(path)
 
-    Repo.get!(HnswlibIndex, 1)
-    |> HnswlibIndex.changeset(%{file: file})
-    |> Repo.update()
+      Repo.get!(HnswlibIndex, 1)
+      |> HnswlibIndex.changeset(%{file: file})
+      |> Repo.update()
+    rescue
+      e in Ecto.StaleEntryError ->
+        require Logger
+        Logger.warning(inspect(e))
+        Process.sleep(10)
+        save()
+    end
   end
 
   def maybe_load_index_from_db(space, dim, max_elements) do
     Repo.get_by(HnswlibIndex, id: 1)
+    |> dbg()
     |> case do
       nil ->
         # create a singleton row
+        Logger.info("New Index")
+
         HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
         |> Repo.insert()
+        |> case do
+          {:ok, _index} ->
+            HNSWLib.Index.new(space, dim, max_elements)
 
-        Logger.info("New Index")
-        HNSWLib.Index.new(space, dim, max_elements)
+          {:error, msg} ->
+            {:error, msg}
+        end
+
+      response when response.file == nil ->
+        Logger.info("Recreate Index")
+
+        App.Repo.delete_all(App.HnswlibIndex)
+
+        HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
+        |> Repo.insert()
+        |> case do
+          {:ok, _index} ->
+            HNSWLib.Index.new(space, dim, max_elements)
+
+          {:error, msg} ->
+            {:error, msg}
+        end
 
       index_file ->
         Logger.info("Loading Index from DB")
-        path = App.KnnIndex.get_index_path()
-        # save on disk
-        File.write!(path, index_file.file)
-        # load the index file
-        HNSWLib.Index.load_index(space, dim, path)
+
+        with path <- App.KnnIndex.get_index_path(),
+             # save on disk
+             :ok <- File.write(path, index_file.file) do
+          # load the index file
+          HNSWLib.Index.load_index(space, dim, path)
+        else
+          {:error, msg} -> {:error, msg}
+        end
     end
   end
 
@@ -56,5 +92,9 @@ defmodule App.HnswlibIndex do
       {:ok, _} ->
         :ok
     end
+  end
+
+  def index_file do
+    @saved_index
   end
 end

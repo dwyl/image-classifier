@@ -67,18 +67,12 @@ defmodule App.Image do
     App.Repo.get_by(App.Image, sha1: sha1)
     |> case do
       %App.Image{} = img ->
-        case img.idx do
-          0 ->
-            {:ok, img}
-
-          i ->
-            require Logger
-            Logger.info(inspect(i))
-            {:error, "Already in use"}
-        end
+        {:ok, img}
 
       res ->
-        res
+        require Logger
+        Logger.warning(inspect(res))
+        {:error, "Already uploaded"}
     end
   end
 

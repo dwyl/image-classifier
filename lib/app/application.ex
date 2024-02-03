@@ -17,9 +17,9 @@ defmodule App.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
       # Nx serving for the embedding
-      App.TextEmbedding,
-      App.KnnIndex,
-
+      {App.KnnIndex, :cosine},
+      # App.TextEmbedding,
+      {Nx.Serving, serving: App.Models.embedding(), name: Embedding},
       # Nx serving for Speech-to-Text
       {Nx.Serving,
        serving:

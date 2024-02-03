@@ -4,8 +4,9 @@ defmodule App.KnnIndex do
   @indexes "indexes.bin"
   @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
 
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, {}, name: __MODULE__)
+  def start_link(space) do
+    :ok = File.mkdir_p!(@upload_dir)
+    GenServer.start_link(__MODULE__, space, name: __MODULE__)
   end
 
   def get_index_path do
@@ -31,11 +32,10 @@ defmodule App.KnnIndex do
   end
 
   @impl true
-  def init(_) do
+  def init(space) do
     File.mkdir_p!(@upload_dir)
 
     path = get_index_path()
-    space = :cosine
     dim = 384
     max_elements = 200
 
@@ -43,7 +43,11 @@ defmodule App.KnnIndex do
 
     case File.exists?(path) do
       false ->
-        {:ok, _index} = App.HnswlibIndex.maybe_load_index_from_db(space, dim, max_elements)
+        App.HnswlibIndex.maybe_load_index_from_db(space, dim, max_elements)
+        |> case do
+          {:ok, index} -> {:ok, index}
+          {:error, msg} -> {:ok, {:error, msg}}
+        end
 
       true ->
         Logger.info("Existing Index")
@@ -52,6 +56,19 @@ defmodule App.KnnIndex do
   end
 
   @impl true
+  def handle_call(:load, _, {:error, :badarg} = state) do
+    App.HnswlibIndex.maybe_load_index_from_db(:cosine, 384, 200)
+    |> dbg()
+    |> case do
+      {:ok, index} ->
+        {:reply, index, state}
+
+      _ ->
+        {:stop, {:error, :badarg}, state}
+    end
+    |> dbg()
+  end
+
   def handle_call(:load, _from, state) do
     {:reply, state, state}
   end
