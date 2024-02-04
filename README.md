@@ -75,14 +75,7 @@ with your voice! 🎙️
       - [The HNSWLib Index set-up](#the-hnswlib-index-set-up)
       - [The embeding model](#the-embeding-model)
     - [Using the Index and embedding](#using-the-index-and-embedding)
-      - [Notes on how to use HNSWLib, the Elixir binding for the hnswlib library](#notes-on-how-to-use-hnswlib-the-elixir-binding-for-the-hnswlib-library)
-        - [Create an Index struct](#create-an-index-struct)
-        - [Add vectors to the Index struct](#add-vectors-to-the-index-struct)
-        - [Query nearest vector(s) in the index](#query-nearest-vectors-in-the-index)
-        - [Save an Index to file](#save-an-index-to-file)
-        - [Load an Index from file](#load-an-index-from-file)
-        - [How to use `knn_query`](#how-to-use-knn_query)
-        - [Example](#example)
+      - [Worked example on how to use HNSWLib, the Elixir binding for the hnswlib library](#worked-example-on-how-to-use-hnswlib-the-elixir-binding-for-the-hnswlib-library)
         - [Notes on vector spaces](#notes-on-vector-spaces)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
@@ -3899,10 +3892,13 @@ and **transcribe it**. 🎉
 
 We want to encode every caption and the input text into a specific vector space.
 In other words, we encode a string into a list of numbers.
-We use a transformer-based pre-trained model SBERT to compute an embedding for each caption. We picked-up the transformer sentence-transformers/paraphrase-MiniLM-L6-v2 model.
-The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function once we load the model.
-We instantiate the HNSWLib index with a GenServer and also the tokenizing (which produces embeddings). The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use [cosine_similarity](https://en.wikipedia.org/wiki/Cosine_similarity).
+We use a transformer-based pre-trained model SBERT to compute an embedding for each caption. We picked-up the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" model.
+The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function.
+The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use [cosine_similarity](https://en.wikipedia.org/wiki/Cosine_similarity).
 If you are curious, you can read further down on this.
+This model is loaded and served by an `Nx.Serving` started in the Application modeule like all other models.
+
+We instantiate the HNSWLib index with a `GenServer`, and is also started in the Application module.
 
 #### The HNSWLib Index set-up
 
@@ -3921,17 +3917,14 @@ defmodule App.KnnIndex do
   @indexes "indexes.bin"
   @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
 
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, {}, name: __MODULE__)
+  def start_link(space) do
+    GenServer.start_link(__MODULE__, space, name: __MODULE__)
   end
 
-  def init(_) do
-    File.mkdir_p!(upload_dir)
+  def init(space) do
+    :ok = File.mkdir_p!(upload_dir)
 
     path = Path.join([upload_dir, @indexes])
-    space = :cosine
-
-    require Logger
 
     {:ok, index} =
       case File.exists?(path) do
@@ -3959,72 +3952,93 @@ end
 
 #### The embeding model
 
-We load asynchronously the model with a GenServer process.
-The reason we do this is because all processes are started synchronously in the "Application" module, so we want to speed-up the load process.
-The `handle_continue` callback used in this GenServer will continue the load process asynchronously and guaranties that this GenServer will not accept any messages until this task is finished.
-
-Add the following file:
+We provide a serving for the embedding model in the "App.Models" module. It should look like this:
 
 ```elixir
-# /lib/app/text_embedding.ex
-defmodule App.TextEmbedding do
-  use GenServer
+#App.Models
+@embedding_model %ModelInfo{
+    name: "sentence-transformers/paraphrase-MiniLM-L6-v2",
+    cache_path: Path.join(@models_folder_path, "paraphrase-MiniLM-L6-v2"),
+    load_featurizer: false,
+    load_tokenizer: true,
+    load_generation_config: true
+  }
 
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, {}, name: __MODULE__)
-  end
+def embedding() do
+  model = load_offline_model(@embedding_model)
 
-  # upload or create a new index file
-  def init(_) do
-    model_info = nil
-    tokenizer = nil
-    {:ok, {model_info, tokenizer}, {:continue, :load}}
-  end
-
-  def handle_continue(:load, {_, _}) do
-    transformer = "sentence-transformers/paraphrase-MiniLM-L6-v2"
-
-    {:ok, %{model: _model, params: _params} = model_info} =
-      Bumblebee.load_model({:hf, transformer})
-
-    {:ok, tokenizer} =
-      Bumblebee.load_tokenizer({:hf, transformer})
-
-    {:noreply, {model_info, tokenizer}}
-  end
-
-  # called in Liveview `mount`
-  def serve() do
-    GenServer.call(__MODULE__, :serve)
-  end
-
-  def handle_call(:serve, _from, {model_info, tokenizer} = state) do
-    serving = Bumblebee.Text.TextEmbedding.text_embedding
-    {:reply, serving, state}
-  end
+  Bumblebee.Text.TextEmbedding.text_embedding(
+    model.model_info,
+    model.tokenizer,
+    compile: [batch_size: 16, sequence_length: 130],
+    defn_options: [compiler: EXLA],
+    preallocate_params: true
+  )
 end
+
+
+def verify_and_download_models() do
+    force_models_download = Application.get_env(:app, :force_models_download, false)
+    use_test_models = Application.get_env(:app, :use_test_models, false)
+
+    case {force_models_download, use_test_models} do
+      {true, true} ->
+        File.rm_rf!(@models_folder_path)
+        download_model(@captioning_test_model)
+        download_model(@audio_test_model)
+
+      {true, false} ->
+        File.rm_rf!(@models_folder_path)
+        download_model(@embedding_model)
+        ^^^
+        download_model(@captioning_prod_model)
+        download_model(@audio_prod_model)
+
+      {false, false} ->
+        check_folder_and_download(@embedding_model)
+        ^^
+        check_folder_and_download(@captioning_prod_model)
+        check_folder_and_download(@audio_prod_model)
+
+      {false, true} ->
+        check_folder_and_download(@captioning_test_model)
+        check_folder_and_download(@audio_test_model)
+    end
+  end
+```
+
+You then add the `Nx.Serving` for the embeddings:
+
+```elixir
+#Application.ex
+
+children = [
+  ...,
+  {Nx.Serving, serving: App.Models.embedding(), name: Embedding},
+  ...
+]
 ```
 
 ### Using the Index and embedding
 
-We firstly append the Liveview socket assigns with the index and the serving of the transformer. We can further use them in our callbacks.
+We firstly append the index to the Liveview socket assigns so we work with an in-memory copy of it.
+This means this app works only with a **single node**.
 
 ```elixir
-def mount(_, _, socket) do
-  embedding_serving = App.TextEmbedding.serve()
-  index = App.KnnIndex.load_index()
-  [...]
+@tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
+def mount(_, _, socket) do
   {:ok,
     socket
     |> assign(
     ...,
+    # Related to the Audio
     transcription: nil,
     micro_off: false,
     speech_spin: false,
-    search_result: nil
-    serve_embedding: embedding_serving,
-    index: index
+    search_result: nil,
+    tmp_wave: @tmp_wav,
+    index: App.KnnIndex.load_index()
     )
     |> alow_upload(:speech,...)
     [...]
@@ -4042,7 +4056,7 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
   # Flush async call
     Process.demonitor(ref, [:flush])
     # collect the "serving" and index
-    %{embedding_serving: embedding_serving, index: index} = assigns
+    %{index: index} = assigns
     [...]
 
     cond do
@@ -4057,9 +4071,8 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
           }
 
         saved_index = Path.expand("priv/static/uploads/indexes.bin")
-        File.ls!(Path.expand("priv/static/uploads/"))
 
-        with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
+        with %{embedding: data} <- Nx.Serving.run(Embedding, label),
              # compute a normed embedding (cosine case only) on the text result
              normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
              :ok <- HNSWLib.Index.add_items(index, normed_data),
@@ -4084,7 +4097,11 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
 end
 ```
 
-We then compute the embedding of the audio input.
+Every time we produce an audio file, we transcribe it into a text.
+We then compute the embedding of the audio input transcription and run an ANN search.
+The last step should return a (possibly) populated `%App.Image{}` struct with a look-up in the database.
+We then update the "search_result" assign with it and display the transcription.
+
 Modify the following handler:
 
 ```elixir
@@ -4093,54 +4110,59 @@ def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} 
   Process.demonitor(ref, [:flush])
   File.rm!(@tmp_wav)
 
-  require Logger
 
-  %{serve_embedding: serving, index: index} = assigns
+  %{index: index} = assigns
   # compute an normed embedding (cosine case only) on the text result
   # and returns an App.Image{} as the result of a "knn_search"
-  with %{embedding: input_embedding} <- Nx.Serving.run(serving, text),
-        normed_input <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
-        %App.Image{} = result <- handle_knn(index, normed_input) do
+  with %{embedding: input_embedding} <- Nx.Serving.batched_run(Embedding, text),
+        normed_input_embedding <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
+         {:not_empty_index, :ok} <-
+           {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
+         %App.Image{} = result <- handle_knn(index, normed_input_embedding) do
 
     {:noreply,
-      assign(socket,
-        transcription: String.trim(text),
-        micro_off: false,
-        speech_spin: false,
-        search_result: result,
-        audio_ref: nil
-      )}
-  else
-    # record without entries
-    {:error, "no entries in Index"} ->
-      Logger.warning("No entries in Index")
+       assign(socket,
+         transcription: String.trim(text),
+         micro_off: false,
+         speech_spin: false,
+         search_result: result,
+         audio_ref: nil,
+         tmp_wave: @tmp_wav
+       )}
+  # record without entries
+      {:not_empty_index, :error} ->
+        Logger.debug("No entries in Index")
 
-      {:noreply,
-        assign(socket,
-          micro_off: false,
-          search_result: nil,
-          speech_spin: false,
-          audio_ref: nil
-        )}
+        {:noreply,
+         assign(socket,
+           micro_off: false,
+           search_result: nil,
+           speech_spin: false,
+           audio_ref: nil,
+           tmp_wave: @tmp_wav
+         )}
 
-    nil ->
-      Logger.warning("No entries")
-
-      {:noreply,
-        assign(socket,
-          transcription: String.trim(text),
-          micro_off: false,
-          search_result: nil,
-          speech_spin: false,
-          audio_ref: nil
-        )}
-  end
+      nil ->
+        {:noreply,
+         assign(socket,
+           transcription: String.trim(text),
+           micro_off: false,
+           search_result: nil,
+           speech_spin: false,
+           audio_ref: nil,
+           tmp_wave: @tmp_wav
+         )}
+    end
 end
 ```
 
 We next define the `handle_knn` function.
-The "nearest neighbour" search function calls the function HNSWLib.Index.knn_query(index, input, k: 1). It returns a tuple {:ok, indices, distances} where "indices" and "distances" are the responses as lists whose length depends on the k parameter used: it is the number of neighbours you want to find. We ask for a single neighbour for simplicity. If the Index is not empty, then you get a unique response with k=1.
-You may further use a cut-off distance to exclude responses that might not be meaningful.
+The "approximate nearest neighbour" search function uses the function `HNSWLib.Index.knn_query/3`.
+It returns a tuple `{:ok, indices, distances}` where "indices" and "distances" are lists.
+The length is the number of neighbours you want to find parametrized by the `k` parameter.
+With `k=1`, we ask for a single neighbour.
+
+> You may further use a cut-off distance to exclude responses that might not be meaningful.
 
 ```elixir
 def handle_knn(_, nil), do: {:error, "no index found"}
@@ -4173,68 +4195,7 @@ def handle_knn(index, input) do
 end
 ```
 
-Every time we produce an audio file, we transcribe it into a text.
-We will compute an embedding from this text.
-We will then find the nearest neighbour of this embedding among the current set of embeddings (from your images).
-To do so, we use the function `handle_knn` (see further below).
-It returns a (possibly) populated `%App.Image{}` struct.
-We update the "search_result" assign with it and display the transcription.
-We also turn off some assigns for the UI.
-
-Add the following callback:
-
-```elixir
-def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} = socket)
-      when assigns.audio_ref == ref do
-  Process.demonitor(ref, [:flush])
-  File.rm!(@tmp_wav)
-
-  require Logger
-
-  %{serve_embedding: serving, index: index} = assigns
-  # compute an normed embedding (cosine case only) on the text result
-  # and returns an App.Image{} as the result of a "knn_search"
-  with %{embedding: input_embedding} <- Nx.Serving.run(serving, text),
-        normed_input <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
-        %App.Image{} = result <- handle_knn(index, normed_input) do
-
-    {:noreply,
-      assign(socket,
-        transcription: String.trim(text),
-        micro_off: false,
-        speech_spin: false,
-        search_result: result,
-        audio_ref: nil
-      )}
-  else
-    # record without entries
-    {:error, "no entries in Index"} ->
-      Logger.warning("No entries in Index")
-
-      {:noreply,
-        assign(socket,
-          micro_off: false,
-          search_result: nil,
-          speech_spin: false,
-          audio_ref: nil
-        )}
-
-    nil ->
-      Logger.warning("No entries")
-
-      {:noreply,
-        assign(socket,
-          transcription: String.trim(text),
-          micro_off: false,
-          search_result: nil,
-          speech_spin: false,
-          audio_ref: nil
-        )}
-  end
-end
-```
-
-We will display the found image with the URL field of the `%App.Image{}` struct.
+We will now display the found image with the URL field of the `%App.Image{}` struct.
 
 Add this to "page_live.html.heex":
 
@@ -4246,7 +4207,7 @@ Add this to "page_live.html.heex":
 </div>
 ```
 
-We will save the index found We will add a column to the :images table. We run a Mix task to generate a timestamped file:
+We will save the index found We will add a column to the `:images` table. We run a Mix task to generate a timestamped file:
 
 ```bash
 mix ecto.gen.migration add_idx_to_images
@@ -4289,13 +4250,7 @@ end
 
 [TODO]: give some explanations on this normalization, the handle_knn etc...
 
-#### Notes on how to use HNSWLib, the Elixir binding for the [hnswlib](https://github.com/nmslib/hnswlib) library
-
-We added some comments on the library HNSWLib. The intention is to clarify when you can use a look-up by index and/or by embedding, and secondly why you need to normalise for `cosine`.
-
-> Note: the package is currently in development, alpha software.
-
-##### Create an Index struct
+#### Worked example on how to use HNSWLib, the Elixir binding for the [hnswlib](https://github.com/nmslib/hnswlib) library
 
 You can endow the vector space with the following metrics by setting the `space` argument from the list:
 
@@ -4303,218 +4258,153 @@ You can endow the vector space with the following metrics by setting the `space`
 
 The first is the standard euclidean metric, the second the inner product, and the third the pseudo-metric "cosine similarity".
 
+We use the small model "sentence-transformers/paraphrase-MiniLM-L6-v2" to compute embeddings from text.
+We then use it with `Nx.Serving` to run the model.
+You get embeddings, save them into the Index.
+
 ```elixir
-space = :cosine
+Mix.install([
+{:bumblebee, "~> 0.4.2"},
+{:exla, "~> 0.6.4"},
+{:nx, "~> 0.6.4 "},
+{:hnswlib, "~> 0.1.4"}
+])
+
+Nx.global_default_backend(EXLA.Backend)
+
+{:ok, index} = HNSWLib.Index.new(_space = :cosine, _dim = 384, _max_elements = 200)
+
+transformer = "sentence-transformers/paraphrase-MiniLM-L6-v2"
+
+{:ok, %{model: _model, params: _params} = model_info} =
+      Bumblebee.load_model({:hf, transformer})
+
+{:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, transformer})
+
+serving = Bumblebee.Text.TextEmbedding.text_embedding(
+      model_info,
+      tokenizer,
+      defn_options: [compiler: EXLA],
+      output_pool: :mean_pooling,
+      output_attribute: :hidden_state,
+      embedding_processor: :l2_norm
+    )
+
+HNSWLib.Index.get_current_count(index)
+#{:ok, 0}
+```
+
+You compute an embedding for the words "small" and "tall":
+
+```elixir
+input = "short"
+# you get an embedding
+%{embedding: data} =
+    Nx.Serving.run(serving, input)
 ```
 
 ```elixir
-iex> space = :l2
-:l2
-# each vector is a 2D-vec
-iex> dim = 2
-2
-# limit the maximum elements to 200
-iex> max_elements = 200
-200
-# create Index
-iex> {:ok, index} = HNSWLib.Index.new(space, dim, max_elements)
-{:ok,
- %HNSWLib.Index{
-   space: :l2,
-   dim: 2,
-   reference: #Reference<0.2548668725.3381002243.154990>
- }}
+%{
+  embedding: #Nx.Tensor<
+    f32[384]
+    [-0.03144503012299538, 0.12630629539489746, 0.018703147768974304,...]
+}
 ```
 
-##### Add vectors to the Index struct
-
-The Index struct is incrementally build. Let's add 5 vectors of length 2:
+You then append the embedding to your Index:
 
 ```elixir
-iex> data =
-  Nx.tensor(
-    [
-      [42, 42],
-      [43, 43],
-      [0, 0],
-      [200, 200],
-      [200, 220]
-    ],
-    type: :f32
-  )
-#Nx.Tensor<
-  f32[5][2]
-  [
-    [42.0, 42.0],
-    [43.0, 43.0],
-    [0.0, 0.0],
-    [200.0, 200.0],
-    [200.0, 220.0]
-  ]
->
+:ok = HNSWLib.Index.add_items(index, data)
+HNSWLib.Index.save_index(index, "my_index.bin")
+#{:ok, 1}
 ```
 
-We get the number of elements in the Index struct:
+When you append an entry one by one, you can get the final indice of the Index with:
 
 ```elixir
-iex> HNSWLib.Index.get_current_count(index)
-{:ok, 0}
+HNSWLib.Index.get_current_count(index)
 ```
 
-We can add the 5 previous elements altogether to the index struct, or one by one:
+This means to can persist the indice to uniquely identity an item.
+
+You can also enter a batch of items. You will only get back the last indice.
+This means that if you may need to persist the embedding if you want to identify the input in this case.
+
+Let's enter another entry:
 
 ```elixir
-iex> HNSWLib.Index.add_items(index, data)
-:ok
+input = "tall"
+# you get an embedding
+%{embedding: data} =
+    Nx.Serving.run(serving, input)
+
+# you build your Index struct
+:ok = HNSWLib.Index.add_items(index, data)
+HNSWLib.Index.save_index(index, "my_index.bin")
+HNSWLib.Index.get_current_count(index)
+#{:ok, 2}
 ```
 
-We check the current count of the index struct:
+You now run a `knn_query`from a text input - converted into an embedding - to look for the closest element present in the Index.
+
+Let's look for the closest item close the "small". We expect to get "short", the first item.
 
 ```elixir
-iex> HNSWLib.Index.get_current_count(index)
-{:ok, 5}
+input = "small"
+# you normalise your query data
+%{embedding: query_data} =
+  Nx.Serving.run(serving, input)
+
+{:ok, labels, _d} =
+    HNSWLib.Index.knn_query(index, query_data, k: 1)
 ```
 
-##### Query nearest vector(s) in the index
-
-The function `knn_query` returns a tuple `(:ok, labels, distances}`.
-The "labels" tensor contains the indices in the Index struct of the `k` closest elements.
-The "distances" tensor contains the corresponding distance between these closest elements and the query input.
+You should get:
 
 ```elixir
-# query
-iex> query = Nx.tensor([1, 2], type: :f32)
-#Nx.Tensor<
-  f32[2]
-  [1.0, 2.0]
->
-iex> {:ok, labels, dists} = HNSWLib.Index.knn_query(index, query)
 {:ok,
  #Nx.Tensor<
    u64[1][1]
+   EXLA.Backend<host:0, 0.968243412.4269146128.215737>
    [
-     [2]
+     [0]
    ]
  >,
  #Nx.Tensor<
    f32[1][1]
+   EXLA.Backend<host:0, 0.968243412.4269146128.215739>
    [
-     [5.0]
+     [0.3143616318702698]
    ]
  >}
 ```
 
-We look for the 3 closest neighbours:
+This means that the nearest neighbour of the given input has the indice "0" in the Index.
+This corresponds to the entry "short".
+
+We can recover the embedding to compare:
 
 ```elixir
-iex> {:ok, labels, dists} = HNSWLib.Index.knn_query(index, query, k: 3)
-{:ok,
- #Nx.Tensor<
-   u64[1][3]
-   [
-     [2, 0, 1]
-   ]
- >,
- #Nx.Tensor<
-   f32[1][3]
-   [
-     [5.0, 3281.0, 3445.0]
-   ]
- >}
-```
-
-##### Save an Index to file
-
-```elixir
-iex> HNSWLib.Index.save_index(index, "my_index.bin")
-:ok
-```
-
-##### Load an Index from file
-
-```elixir
-iex> {:ok, saved_index} = HNSWLib.Index.load_index(space, dim, "my_index.bin")
-{:ok,
- %HNSWLib.Index{
-   space: :l2,
-   dim: 2,
-   reference: #Reference<0.2105700569.2629697564.236704>
- }}
-iex> HNSWLib.Index.get_current_count(saved_index)
-{:ok, 5}
-iex> {:ok, data} = HNSWLib.Index.get_items(saved_index, [2, 0, 1])
-{:ok,
- [
-   <<0, 0, 0, 0, 0, 0, 0, 0>>,
-   <<0, 0, 40, 66, 0, 0, 40, 66>>,
-   <<0, 0, 44, 66, 0, 0, 44, 66>>
- ]}
-iex> tensors = Nx.stack(Enum.map(data, fn d -> Nx.from_binary(d, :f32) end))
-#Nx.Tensor<
-  f32[3][2]
-  [
-    [0.0, 0.0],
-    [42.0, 42.0],
-    [43.0, 43.0]
-  ]
->
-```
-
-##### How to use `knn_query`
-
-If you add a single vector to the Index struct at a time, you can save the current index count. With the response of `knn_query`, you can then look up for the closest elements.
-
-```elixir
-:ok  = HNSWLib.Index.add_items(index, normed_data)
-{:ok, idx}  =  HNSWLib.Index.get_current_count(index)
-App.Repo.insert(%Data{}, idx: idx)
-:ok =  HNSWLib.Index.save_index(index, saved_index)
-```
-
-If you add multiple vectors to the Index struct, you won't get each individual index but you can only look up with the embeddings. Then use `get_items` as above and transform the binaries into embeddings for your look up.
-
-When you endow the vector space with the `cosine` distance, you need to normalise the embeddings (see note below)
-
-##### Example
-
-Suppose you have an `Nx.Serving` that runs a model. You get embeddings, save them and build your Index struct with them.
-
-```elixir
-# you get an embedding
-%{embedding: data} =
-    Nx.Serving.run(my_serving(), input)
-# you normalise the embedding
-data =
-    Nx.divide(data, Nx.LinAlg.norm(data))
-# you save the embedding for the look up
-{:ok, _input} =
-    App.Input.save(%Input{}, %{embedding: data})
-# you build your Index struct
-:ok = HNSWLib.Index.add_items(index, data)
-HNSWLib.Index.save_index(index, "my_index.bin")
-```
-
-You run a `knn_query` with a given embedding (from the same serving) for the closest element.
-
-```elixir
-# you normalise your query data
-%{embedding: query_data} =
-    Nx.Serving.run(my_serving(), input_embedding)
-
-query_data =
-    Nx.divide(query_data, Nx.LinAlg.norm(query_data))
-{:ok, labels, _d} =
-    HNSWLib.Index.knn_query(index, query_data, k: 1)
-
 {:ok, data} = HNSWLib.Index.get_items(index, Nx.to_flat_list(labels[0]))
 
-t =
-    data
-    |> Enum.map(fn d -> Nx.from_binary(d, :f32) end)
-    |> Nx.stack()
-
-App.Input.get_by(%{embedding: t})
+Enum.map(data, fn
+d -> Nx.from_binary(d, :f32)
+end)
+|> Nx.stack()
 ```
+
+The result is:
+
+```elixir
+##Nx.Tensor<
+  f32[1][384]
+  EXLA.Backend<host:0, 0.968243412.4269146128.215745>
+  [
+     [-0.031445033848285675, 0.12630631029605865, 0.018703149631619453,...]
+  ]
+```
+
+You should recover the first embedding.
 
 ##### Notes on vector spaces
 

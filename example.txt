@@ -2,10 +2,39 @@ Mix.install([
 {:bumblebee, "~> 0.4.2"},
 {:exla, "~> 0.6.4"},
 {:nx, "~> 0.6.4 "},
-{:hnswlib, git: "https://github.com/elixir-nx/hnswlib", override: true}
+{:hnswlib, "~> 0.1.4"}
 ])
 
 Nx.global_default_backend(EXLA.Backend)
+
+{:ok, index} = HNSWLib.Index.new(_space = :cosine, _dim = 384, _max_elements = 200)
+transformer = "sentence-transformers/paraphrase-MiniLM-L6-v2"
+{:ok, %{model: _model, params: _params} = model_info} =
+      Bumblebee.load_model({:hf, transformer})
+
+{:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, transformer})
+serving = Bumblebee.Text.TextEmbedding.text_embedding(
+      model_info, 
+      tokenizer, 
+      defn_options: [compiler: EXLA, lazy_transfers: :never]
+      #output_pool: :mean_pooling,
+      #output_attribute: :hidden_state,
+      #embedding_processor: :l2_norm,
+    )
+
+%{embedding: data} = Nx.Serving.run(serving, "small") |>dbg()
+HNSWLib.Index.add_items(index, data)
+HNSWLib.Index.get_count(index) |> dbg()
+
+%{embedding: data} = Nx.Serving.run(serving, "tall") |> dbg()
+HNSWLib.Index.add_items(index, data)
+HNSWLIb.Index.get_count(index) |> dbg()
+
+%{embedding: data} = Nx.Serving.run(serving, "high")
+{:ok, labels, distances} = HNSWLib.Index.knn_query(index, data, k: 1) |> dbg()
+idx = Nx.to_flat_list(labels[0])
+{:ok, dt} = HNSWLib.Index.get_items(index, idx)
+Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end))
 
 defmodule Embedding do
   use GenServer
