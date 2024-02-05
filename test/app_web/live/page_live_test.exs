@@ -82,7 +82,7 @@ defmodule AppWeb.PageLiveTest do
     audio = file_input(lv, "#audio-upload-form", :speech, [file])
 
     # The transcription should be empty
-    assert render(lv) |> Floki.find("#output") |> Floki.text == ""
+    assert render(lv) |> Floki.find("#output") |> Floki.text() == ""
 
     # Should show an uploaded local file
     assert render_upload(audio, file.name)
@@ -91,7 +91,8 @@ defmodule AppWeb.PageLiveTest do
     AppWeb.SupervisorSupport.wait_for_completion()
 
     # A prediction should have occurred and the label should be shown with the audio transcription
-    assert render(lv) |> Floki.find("#output") |> Floki.text =~ "Sometimes, the inner voice is encouraging"
+    assert render(lv) |> Floki.find("#output") |> Floki.text() =~
+             "Sometimes, the inner voice is encouraging"
   end
 
   test "error should be shown if size is bigger than limit", %{conn: conn} do

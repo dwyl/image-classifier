@@ -12,13 +12,16 @@ defmodule Comparison.Models do
   def verify_and_download_model(model, force_download? \\ false) do
     case force_download? do
       true ->
-        File.rm_rf!(model.cache_path) # Delete any cached pre-existing model
-        download_model(model)         # Download model
+        # Delete any cached pre-existing model
+        File.rm_rf!(model.cache_path)
+        # Download model
+        download_model(model)
 
       false ->
         # Check if the model cache directory exists or if it's not empty.
         # If so, we download the model.
         model_location = Path.join(model.cache_path, "huggingface")
+
         if not File.exists?(model_location) or File.ls!(model_location) == [] do
           download_model(model)
         end

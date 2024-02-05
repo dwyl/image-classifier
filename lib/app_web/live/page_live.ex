@@ -3,6 +3,7 @@ defmodule AppWeb.PageLive do
   require Logger
   alias App.Image
   alias Vix.Vips.Image, as: Vimage
+  require Logger
 
   defmodule ImageInfo do
     @doc """
@@ -21,6 +22,19 @@ defmodule AppWeb.PageLive do
   @accepted_mime ~w(image/jpeg image/jpg image/png image/webp)
   @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
+  def check_integrity do
+    index_nb =
+      App.KnnIndex.load_index()
+      |> HNSWLib.Index.get_current_count()
+      |> elem(1)
+
+    db_nb = App.Repo.all(App.Image) |> length()
+
+    if index_nb == db_nb,
+      do: true,
+      else: false
+  end
+
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -33,6 +47,7 @@ defmodule AppWeb.PageLive do
        image_info: nil,
        image_preview_base64: nil,
        db_image: nil,
+       integrity: check_integrity(),
 
        # Related to the list of image examples
        example_list_tasks: [],
@@ -153,7 +168,7 @@ defmodule AppWeb.PageLive do
              {:image_info, ExImageInfo.info(file_binary)},
            {:check_mime, :ok} <-
              {:check_mime, check_mime(mime, mimetype)},
-           sha1 <- App.Image.calc_sha1(file_binary),
+           {:sha_calc, {:ok, sha1}} <- {:sha_calc, App.Image.calc_sha1(file_binary)},
            {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)},
            # Get image and resize
            {:ok, thumbnail_vimage} <-
@@ -184,6 +199,7 @@ defmodule AppWeb.PageLive do
             {:ok, %{tensor: tensor, path: path, image_info: image_info}}
 
           {:error, changeset} ->
+            dbg(changeset)
             {:error, changeset.errors}
         end
         |> handle_upload()
@@ -193,6 +209,7 @@ defmodule AppWeb.PageLive do
         {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
         {:check_mime, :error} -> {:postpone, %{error: "Bad mime type"}}
         {:sha_check, %App.Image{}} -> {:postpone, %{error: "Image already uploaded"}}
+        {:sha_calc, {:sha_error, msg}} -> {:postpone, %{error: msg}}
         {:error, reason} -> {:postpone, %{error: inspect(reason)}}
       end
     end)
@@ -222,8 +239,8 @@ defmodule AppWeb.PageLive do
 
         {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
 
-      _ ->
-        IO.puts("ERROR --------------")
+      msg ->
+        Logger.warning("ERROR --------------: #{inspect(msg)}")
         {:noreply, socket}
     end
   end
@@ -290,6 +307,7 @@ defmodule AppWeb.PageLive do
   end
 
   def handle_upload({:error, errors}) do
+    dbg(errors)
     {:postpone, %{error: errors}}
   end
 
@@ -310,11 +328,14 @@ defmodule AppWeb.PageLive do
     # compute an normed embedding (cosine case only) on the text result
     # and returns an App.Image{} as the result of a "knn_search"
     # with %{embedding: input_embedding} <- Nx.Serving.run(embedding_serving, text),
-    with %{embedding: input_embedding} <- Nx.Serving.batched_run(Embedding, text),
-         normed_input_embedding <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
+    with %{embedding: input_embedding} <-
+           Nx.Serving.batched_run(Embedding, text),
+         normed_input_embedding <-
+           Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
          {:not_empty_index, :ok} <-
            {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
-         %App.Image{} = result <- handle_knn(index, normed_input_embedding) do
+         %App.Image{} = result <-
+           handle_knn(index, normed_input_embedding) do
       {:noreply,
        assign(socket,
          transcription: String.trim(text),

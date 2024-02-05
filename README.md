@@ -75,7 +75,7 @@ with your voice! 🎙️
       - [The HNSWLib Index set-up](#the-hnswlib-index-set-up)
       - [The embeding model](#the-embeding-model)
     - [Using the Index and embedding](#using-the-index-and-embedding)
-      - [Worked example on how to use HNSWLib, the Elixir binding for the hnswlib library](#worked-example-on-how-to-use-hnswlib-the-elixir-binding-for-the-hnswlib-library)
+      - [Worked example on how to use HNSWLib](#worked-example-on-how-to-use-hnswlib)
         - [Notes on vector spaces](#notes-on-vector-spaces)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
@@ -3894,7 +3894,7 @@ We want to encode every caption and the input text into a specific vector space.
 In other words, we encode a string into a list of numbers.
 We use a transformer-based pre-trained model SBERT to compute an embedding for each caption. We picked-up the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" model.
 The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function.
-The transformer used is a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use [cosine_similarity](https://en.wikipedia.org/wiki/Cosine_similarity).
+This transformer uses a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use [cosine_similarity](https://en.wikipedia.org/wiki/Cosine_similarity).
 If you are curious, you can read further down on this.
 This model is loaded and served by an `Nx.Serving` started in the Application modeule like all other models.
 
@@ -4014,12 +4014,17 @@ You then add the `Nx.Serving` for the embeddings:
 
 children = [
   ...,
-  {Nx.Serving, serving: App.Models.embedding(), name: Embedding},
+  {Nx.Serving,
+    serving: App.Models.embedding(),
+    name: Embedding
+  },
   ...
 ]
 ```
 
 ### Using the Index and embedding
+
+The [paragraph](#worked-example-on-how-to-use-hnswlib) displays a worked example.
 
 We firstly append the index to the Liveview socket assigns so we work with an in-memory copy of it.
 This means this app works only with a **single node**.
@@ -4055,12 +4060,13 @@ Update the Liveview `handle_info` callback where we handle the captioning result
 def handle_info({ref, result}, %{assigns: assigns} = socket) do
   # Flush async call
     Process.demonitor(ref, [:flush])
-    # collect the "serving" and index
+    # collect the index
     %{index: index} = assigns
     [...]
 
     cond do
-      # If the upload task has finished executing, we update the socket assigns.
+      # If the upload task has finished executing,
+      # we update the socket assigns.
       Map.get(assigns, :task_ref) == ref ->
         image =
           %{
@@ -4072,25 +4078,45 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
 
         saved_index = Path.expand("priv/static/uploads/indexes.bin")
 
-        with %{embedding: data} <- Nx.Serving.run(Embedding, label),
+        with %{embedding: data} <-
+              Nx.Serving.run(Embedding, label),
              # compute a normed embedding (cosine case only) on the text result
-             normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
-             :ok <- HNSWLib.Index.add_items(index, normed_data),
-             {:ok, idx} <- HNSWLib.Index.get_current_count(index),
-             {:ok, _int} <- HNSWLib.Index.save_index(index, saved_index) do
+             normed_data <-
+              Nx.divide(data, Nx.LinAlg.norm(data)),
+             :ok <-
+              HNSWLib.Index.add_items(index, normed_data),
+             # get the last indice
+             {:ok, idx} <-
+              HNSWLib.Index.get_current_count(index),
+             # persist the updated Index into the Filesystem
+             {:ok, _int} <-
+              HNSWLib.Index.save_index(index, saved_index) do
 
+          # save the App.Image to the DB
           Map.merge(image, %{idx: idx, caption: label})
           |> App.Image.insert()
 
           {:noreply,
            socket
-           |> assign(running?: false, index: index, task_ref: nil, label: label)}
+           |> assign(
+            running?: false,
+            index: index,
+            task_ref: nil,
+            label: label
+           )
+          }
         else
           {:error, msg} ->
             {:noreply,
              socket
              |> put_flash(:error, msg)
-             |> assign(running?: false, index: index, task_ref: nil, label: nil)}
+             |> assign(
+              running?: false,
+              index: index,
+              task_ref: nil,
+              label: nil
+            )
+          }
         end
       [...]
     end
@@ -4114,11 +4140,17 @@ def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} 
   %{index: index} = assigns
   # compute an normed embedding (cosine case only) on the text result
   # and returns an App.Image{} as the result of a "knn_search"
-  with %{embedding: input_embedding} <- Nx.Serving.batched_run(Embedding, text),
-        normed_input_embedding <- Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
+  with %{embedding: input_embedding} <-
+          Nx.Serving.batched_run(Embedding, text),
+        normed_input_embedding <-
+          Nx.divide(
+            input_embedding,
+            Nx.LinAlg.norm(input_embedding)
+          ),
          {:not_empty_index, :ok} <-
            {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
-         %App.Image{} = result <- handle_knn(index, normed_input_embedding) do
+         %App.Image{} = result <-
+          handle_knn(index, normed_input_embedding) do
 
     {:noreply,
        assign(socket,
@@ -4241,8 +4273,13 @@ end
 
 def changeset(image, params \\ %{}) do
   image
-  |> Ecto.Changeset.cast(params, [:url, :description, :width, :height, :idx])
-  |> Ecto.Changeset.validate_required([:url, :description, :width, :height])
+  |> Ecto.Changeset.cast(
+    params,
+    [:url, :description, :width, :height, :idx]
+  )
+  |> Ecto.Changeset.validate_required(
+    [:url, :description, :width, :height]
+  )
 
   ...
 end
@@ -4250,7 +4287,7 @@ end
 
 [TODO]: give some explanations on this normalization, the handle_knn etc...
 
-#### Worked example on how to use HNSWLib, the Elixir binding for the [hnswlib](https://github.com/nmslib/hnswlib) library
+#### Worked example on how to use HNSWLib
 
 You can endow the vector space with the following metrics by setting the `space` argument from the list:
 
@@ -4272,23 +4309,30 @@ Mix.install([
 
 Nx.global_default_backend(EXLA.Backend)
 
-{:ok, index} = HNSWLib.Index.new(_space = :cosine, _dim = 384, _max_elements = 200)
+{:ok, index} =
+  HNSWLib.Index.new(
+    _space = :cosine,
+    _dim = 384,
+    _max_elements = 200
+  )
 
 transformer = "sentence-transformers/paraphrase-MiniLM-L6-v2"
 
-{:ok, %{model: _model, params: _params} = model_info} =
+{:ok, %{model: _, params: _} = model_info} =
       Bumblebee.load_model({:hf, transformer})
 
-{:ok, tokenizer} = Bumblebee.load_tokenizer({:hf, transformer})
+{:ok, tokenizer} =
+  Bumblebee.load_tokenizer({:hf, transformer})
 
-serving = Bumblebee.Text.TextEmbedding.text_embedding(
-      model_info,
-      tokenizer,
-      defn_options: [compiler: EXLA],
-      output_pool: :mean_pooling,
-      output_attribute: :hidden_state,
-      embedding_processor: :l2_norm
-    )
+serving =
+  Bumblebee.Text.TextEmbedding.text_embedding(
+    model_info,
+    tokenizer,
+    defn_options: [compiler: EXLA],
+    output_pool: :mean_pooling,
+    output_attribute: :hidden_state,
+    embedding_processor: :l2_norm
+  )
 
 HNSWLib.Index.get_current_count(index)
 #{:ok, 0}
@@ -4315,9 +4359,12 @@ You then append the embedding to your Index:
 
 ```elixir
 :ok = HNSWLib.Index.add_items(index, data)
+
 HNSWLib.Index.save_index(index, "my_index.bin")
 #{:ok, 1}
 ```
+
+You should see a file "my_index.bin" is your current directory.
 
 When you append an entry one by one, you can get the final indice of the Index with:
 
@@ -4340,7 +4387,9 @@ input = "tall"
 
 # you build your Index struct
 :ok = HNSWLib.Index.add_items(index, data)
+
 HNSWLib.Index.save_index(index, "my_index.bin")
+
 HNSWLib.Index.get_current_count(index)
 #{:ok, 2}
 ```
@@ -4356,7 +4405,11 @@ input = "small"
   Nx.Serving.run(serving, input)
 
 {:ok, labels, _d} =
-    HNSWLib.Index.knn_query(index, query_data, k: 1)
+    HNSWLib.Index.knn_query(
+      index,
+      query_data,
+      k: 1
+    )
 ```
 
 You should get:
@@ -4385,10 +4438,14 @@ This corresponds to the entry "short".
 We can recover the embedding to compare:
 
 ```elixir
-{:ok, data} = HNSWLib.Index.get_items(index, Nx.to_flat_list(labels[0]))
+{:ok, data} =
+  HNSWLib.Index.get_items(
+    index,
+    Nx.to_flat_list(labels[0])
+  )
 
 Enum.map(data, fn
-d -> Nx.from_binary(d, :f32)
+  d -> Nx.from_binary(d, :f32)
 end)
 |> Nx.stack()
 ```

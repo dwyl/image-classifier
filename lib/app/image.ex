@@ -82,6 +82,10 @@ defmodule App.Image do
   def calc_sha1(file_binary) do
     :crypto.hash(:sha, file_binary)
     |> Base.encode16()
+    |> case do
+      v when is_binary(v) -> {:ok, v}
+      {:case, encode_case} -> {:sha_error, encode_case}
+    end
   end
 
   @doc """

@@ -1,5 +1,4 @@
 defmodule AppWeb.SupervisorSupport do
-
   @moduledoc """
     This is a support module helper that is meant to wait for all the children of a supervisor to complete.
     If you go to `lib/app/application.ex`, you'll see that we created a `TaskSupervisor`, where async tasks are spawned.
@@ -16,6 +15,7 @@ defmodule AppWeb.SupervisorSupport do
   end
 
   defp wait_for_pids([]), do: nil
+
   defp wait_for_pids(pids) do
     receive do
       {:DOWN, _ref, :process, pid, _reason} -> wait_for_pids(List.delete(pids, pid))

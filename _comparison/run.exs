@@ -80,7 +80,7 @@ defmodule Benchmark do
     coco_dataset_images_path = File.cwd!() |> Path.join("coco_dataset") |> Path.join("*.jpg")
     files = Path.wildcard(coco_dataset_images_path)
 
-    #coco_dataset_captions =
+    # coco_dataset_captions =
     #  File.stream!(File.cwd!() |> Path.join("coco_dataset") |> Path.join("captions.csv"))
     #  |> CSV.decode!()
     #  |> Enum.map(& &1)

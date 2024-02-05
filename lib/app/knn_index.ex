@@ -1,6 +1,14 @@
 defmodule App.KnnIndex do
   use GenServer
 
+  @moduledoc """
+  A GenServer to load the Index file for HNSWLib.
+  It loads from the FileSystem if existing or from the table HnswlibIndex.
+  It creates an new one if no Index file is found in the FileSystem
+  and if the table HnswlibIndex is empty.
+
+
+  """
   @indexes "indexes.bin"
   @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
 
@@ -62,8 +70,8 @@ defmodule App.KnnIndex do
       {:ok, index} ->
         {:reply, index, state}
 
-      _ ->
-        {:stop, {:error, :badarg}, state}
+      {:error, msg} ->
+        {:stop, {:error, msg}, state}
     end
   end
 
