@@ -6,7 +6,7 @@ defmodule App.HnswlibIndex do
 
   require Logger
 
-  @saved_index Path.expand("priv/static/uploads/indexes.bin")
+  # @saved_index Path.expand("priv/static/uploads/indexes.bin")
 
   schema "hnswlib_index" do
     field(:file, :binary)
@@ -85,19 +85,5 @@ defmodule App.HnswlibIndex do
           {:error, msg} -> {:error, msg}
         end
     end
-  end
-
-  def not_empty_index(index) do
-    case HNSWLib.Index.get_current_count(index) do
-      {:ok, 0} ->
-        :error
-
-      {:ok, _} ->
-        :ok
-    end
-  end
-
-  def index_file do
-    @saved_index
   end
 end

@@ -1,5 +1,11 @@
 defmodule App.Image do
   use Ecto.Schema
+
+  @moduledoc """
+  Ecto schema for the table Images and
+  utility functions.
+  """
+
   # alias App.{Image, Repo}
 
   @primary_key {:id, :id, autogenerate: true}
@@ -82,10 +88,6 @@ defmodule App.Image do
   def calc_sha1(file_binary) do
     :crypto.hash(:sha, file_binary)
     |> Base.encode16()
-    |> case do
-      v when is_binary(v) -> {:ok, v}
-      {:case, encode_case} -> {:sha_error, encode_case}
-    end
   end
 
   @doc """

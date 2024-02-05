@@ -8,6 +8,14 @@ defmodule App.Application do
   @impl true
   def start(_type, _args) do
     App.Models.verify_and_download_models()
+    |> case do
+      {:error, msg} ->
+        Logger.warning(msg)
+        System.stop(1)
+
+      :ok ->
+        :ok
+    end
 
     children = [
       # Start the Telemetry supervisor
@@ -19,7 +27,7 @@ defmodule App.Application do
       # Start the HNSWLib Index from localstorage or from DB
       {App.KnnIndex, :cosine},
       # Nx serving for the embedding
-      {Nx.Serving, serving: App.Models.embedding(), name: Embedding},
+      {Nx.Serving, serving: App.Models.embedding(), name: Embedding, batch_size: 1},
       # Nx serving for Speech-to-Text
       {Nx.Serving,
        serving:

@@ -22,19 +22,6 @@ defmodule AppWeb.PageLive do
   @accepted_mime ~w(image/jpeg image/jpg image/png image/webp)
   @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
-  def check_integrity do
-    index_nb =
-      App.KnnIndex.load_index()
-      |> HNSWLib.Index.get_current_count()
-      |> elem(1)
-
-    db_nb = App.Repo.all(App.Image) |> length()
-
-    if index_nb == db_nb,
-      do: true,
-      else: false
-  end
-
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -47,7 +34,7 @@ defmodule AppWeb.PageLive do
        image_info: nil,
        image_preview_base64: nil,
        db_image: nil,
-       integrity: check_integrity(),
+       integrity: App.KnnIndex.check_integrity(),
 
        # Related to the list of image examples
        example_list_tasks: [],
@@ -59,8 +46,8 @@ defmodule AppWeb.PageLive do
        micro_off: false,
        speech_spin: false,
        search_result: nil,
-       tmp_wave: @tmp_wav,
-       index: App.KnnIndex.load_index()
+       tmp_wave: @tmp_wav
+       #  index: App.KnnIndex.load_index()
      )
      |> allow_upload(:image_list,
        accept: ~w(image/*),
@@ -168,7 +155,7 @@ defmodule AppWeb.PageLive do
              {:image_info, ExImageInfo.info(file_binary)},
            {:check_mime, :ok} <-
              {:check_mime, check_mime(mime, mimetype)},
-           {:sha_calc, {:ok, sha1}} <- {:sha_calc, App.Image.calc_sha1(file_binary)},
+           sha1 <- App.Image.calc_sha1(file_binary),
            {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)},
            # Get image and resize
            {:ok, thumbnail_vimage} <-
@@ -209,7 +196,6 @@ defmodule AppWeb.PageLive do
         {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
         {:check_mime, :error} -> {:postpone, %{error: "Bad mime type"}}
         {:sha_check, %App.Image{}} -> {:postpone, %{error: "Image already uploaded"}}
-        {:sha_calc, {:sha_error, msg}} -> {:postpone, %{error: msg}}
         {:error, reason} -> {:postpone, %{error: inspect(reason)}}
       end
     end)
@@ -323,19 +309,17 @@ defmodule AppWeb.PageLive do
     Process.demonitor(ref, [:flush])
     File.rm!(assigns.tmp_wave)
 
-    # %{embedding_serving: embedding_serving, index: index} = assigns
-    %{index: index} = assigns
     # compute an normed embedding (cosine case only) on the text result
     # and returns an App.Image{} as the result of a "knn_search"
-    # with %{embedding: input_embedding} <- Nx.Serving.run(embedding_serving, text),
     with %{embedding: input_embedding} <-
            Nx.Serving.batched_run(Embedding, text),
          normed_input_embedding <-
            Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
          {:not_empty_index, :ok} <-
-           {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
+           {:not_empty_index, App.KnnIndex.not_empty_index()},
+         #  {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
          %App.Image{} = result <-
-           handle_knn(index, normed_input_embedding) do
+           App.KnnIndex.knn_search(normed_input_embedding) do
       {:noreply,
        assign(socket,
          transcription: String.trim(text),
@@ -379,7 +363,7 @@ defmodule AppWeb.PageLive do
     # Flush async call
     Process.demonitor(ref, [:flush])
     # %{embedding_serving: embedding_serving, index: index} = assigns
-    %{index: index} = assigns
+    # %{index: index} = assigns
     # You need to change how you destructure the output of the model depending
     # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
     label =
@@ -405,17 +389,17 @@ defmodule AppWeb.PageLive do
             sha1: assigns.image_info.sha1
           }
 
-        saved_index = App.HnswlibIndex.index_file()
+        # saved_index = App.HnswlibIndex.index_file()
 
-        # with %{embedding: data} <- Nx.Serving.run(embedding_serving, label),
-        with %{embedding: data} <- Nx.Serving.batched_run(Embedding, label),
+        with %{embedding: data} <-
+               Nx.Serving.batched_run(Embedding, label),
              # compute a normed embedding (cosine case only) on the text result
-             normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
+             normed_data <-
+               Nx.divide(data, Nx.LinAlg.norm(data)),
              {:check_used, {:ok, pending_image}} <-
                {:check_used, App.Image.check_before_append_to_index(image.sha1)},
-             :ok <- HNSWLib.Index.add_items(index, normed_data),
-             {:ok, idx} <- HNSWLib.Index.get_current_count(index),
-             :ok <- HNSWLib.Index.save_index(index, saved_index) do
+             {:ok, idx} <-
+               App.KnnIndex.add_item(normed_data) do
           Ecto.Multi.new()
           # save updated Image to DB
           |> Ecto.Multi.run(:update_image, fn _, _ ->
@@ -436,18 +420,30 @@ defmodule AppWeb.PageLive do
               {:noreply,
                socket
                |> push_event("toast", %{message: "Invalid entry"})
-               |> assign(running?: false, index: index, task_ref: nil, label: nil)}
+               |> assign(
+                 running?: false,
+                 task_ref: nil,
+                 label: nil
+               )}
 
             {:error, :save_index, _, _} ->
               {:noreply,
                socket
                |> push_event("toast", %{message: "Please retry"})
-               |> assign(running?: false, index: index, task_ref: nil, label: nil)}
+               |> assign(
+                 running?: false,
+                 task_ref: nil,
+                 label: nil
+               )}
 
             {:ok, _} ->
               {:noreply,
                socket
-               |> assign(running?: false, index: index, task_ref: nil, label: label)}
+               |> assign(
+                 running?: false,
+                 task_ref: nil,
+                 label: label
+               )}
           end
         else
           {:check_used, {:error, msg}} ->
@@ -458,8 +454,11 @@ defmodule AppWeb.PageLive do
             {:noreply,
              socket
              |> push_event("toast", %{message: msg})
-             #  |> put_flash(:error, msg)
-             |> assign(running?: false, index: index, task_ref: nil, label: nil)}
+             |> assign(
+               running?: false,
+               task_ref: nil,
+               label: nil
+             )}
         end
 
       # If the example task has finished executing, we upload the socket assigns.
@@ -488,41 +487,6 @@ defmodule AppWeb.PageLive do
         obj
       end
     end)
-  end
-
-  def handle_knn(nil, _), do: {:error, "no index found"}
-
-  def handle_knn(index, input) do
-    # refactored to denest function as per Credo
-    # case HNSWLib.Index.get_current_count(index) do
-    # {:ok, 0} ->
-    # {:error, "no entries in index"}
-
-    # {:ok, _c} ->
-    # check the embeddings
-    # {:ok, l} = HNSWLib.Index.get_current_count(index) |> dbg()
-
-    # for i <- 0..(l - 1) do
-    #   {:ok, dt} = HNSWLib.Index.get_items(index, [i])
-    #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
-    # end
-
-    case HNSWLib.Index.knn_query(index, input, k: 1) do
-      {:ok, labels, distances} ->
-        dbg(distances)
-
-        labels[0]
-        |> Nx.to_flat_list()
-        |> hd()
-        |> then(fn idx ->
-          App.Repo.get_by(App.Image, %{idx: idx + 1})
-        end)
-
-      {:error, msg} ->
-        {:error, msg}
-    end
-
-    # end
   end
 
   @doc """

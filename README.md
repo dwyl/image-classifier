@@ -105,7 +105,12 @@ We then encode these texts as vectors and run a _knn_ search.
 ## Who? 👤
 
 This tutorial is aimed at `Phoenix` beginners
-that want to grasp how to ~~do image captioning~~ start to use machine learning capabilities of the Elixir langugage within a `Phoenix` application.
+that want to start to use machine learning capabilities of the Elixir langugage within a `Phoenix` application.
+We propose to use pre-trained models from Hugging Face via `Bumblebee` and grasp how to:
+
+- run a model, in particular image captioning
+- how to use embeddings
+- how to run a semantic search using an Approximate Nearest Neighbour algorithm.
 
 If you are completely new to `Phoenix` and `LiveView`,
 we recommend you follow the **`LiveView` _Counter_ Tutorial**:
@@ -124,8 +129,7 @@ This tutorial requires you have `Elixir` and `Phoenix` installed.
 If you you don't, please see [how to install Elixir](https://github.com/dwyl/learn-elixir#installation) and [Phoenix](https://hexdocs.pm/phoenix/installation.html#phoenix).
 
 This guide assumes you know the basics of `Phoenix` and have _some_ knowledge of how it works.
-If you don't, we _highly suggest_ you follow our other tutorials first.
-e.g: [github.com/dwyl/**phoenix-chat-example**](https://github.com/dwyl/phoenix-chat-example)
+If you don't, we _highly suggest_ you follow our other tutorials first, e.g: [github.com/dwyl/**phoenix-chat-example**](https://github.com/dwyl/phoenix-chat-example)
 
 In addition to this, **_some_ knowledge of `AWS`** - what it is, what an `S3` bucket is/does - **is assumed**.
 
@@ -157,14 +161,10 @@ Run the following command in a given folder:
 mix phx.new . --app app --no-dashboard --no-ecto  --no-gettext --no-mailer
 ```
 
-We're running [`mix phx.new`](https://hexdocs.pm/phoenix/Mix.Tasks.Phx.New.html)
-to generate a new project without a dashboard
-and mailer (email) service,
+We're running [`mix phx.new`](https://hexdocs.pm/phoenix/Mix.Tasks.Phx.New.html) to generate a new project without a dashboard and mailer (email) service,
 since we don't need those features in our project.
 
-After this,
-if you run `mix phx.server` to run your server,
-you should be able to see the following page.
+After this, if you run `mix phx.server` to run your server, you should be able to see the following page.
 
 <p align="center">
   <img src="https://github.com/dwyl/fields/assets/194400/891e890e-c94a-402e-baee-ee47fd3725a7">
@@ -174,11 +174,9 @@ We're ready to start building.
 
 ### 1. Installing initial dependencies
 
-Now that we're ready to go,
-let's start by adding some dependencies.
+Now that we're ready to go, let's start by adding some dependencies.
 
-Head over to `mix.exs`
-and add the following dependencies
+Head over to `mix.exs`and add the following dependencies
 to the `deps` section.
 
 ```elixir
@@ -188,38 +186,27 @@ to the `deps` section.
 {:vix, "~> 0.23.1"}
 ```
 
-- [**`bumblebee`**](https://github.com/elixir-nx/bumblebee),
-  a framework that will allows us to integrate
+- [**`bumblebee`**](https://github.com/elixir-nx/bumblebee) is a framework that will allows us to integrate
   [`Transformer Models`](https://huggingface.co/docs/transformers/index) in `Phoenix`.
-  `Transformers` (from [Hugging Face](https://huggingface.co/))
-  are APIs that allow us to easily download and ~~train~~ use
-  [pretrained models](https://blogs.nvidia.com/blog/2022/12/08/what-is-a-pretrained-ai-model).
-  `Bumblebee` aims to support all Transformer Models,
-  however some are lacking.
+  The `Transformers` (from [Hugging Face](https://huggingface.co/))
+  are APIs that allow us to easily download and use
+  [pre-trained models](https://blogs.nvidia.com/blog/2022/12/08/what-is-a-pretrained-ai-model).
+  The `Bumblebee` package aims to support all Transformer Models, even if some are still lacking.
   You may check which ones are supported by visiting
-  `Bumblebee`'s repository
-  or visiting https://jonatanklosko-bumblebee-tools.hf.space/apps/repository-inspector
+  `Bumblebee`'s repository or by visiting https://jonatanklosko-bumblebee-tools.hf.space/apps/repository-inspector
   and checking if the model is currently supported.
 
-- [**`EXLA`**](https://hexdocs.pm/exla/EXLA.html),
-  Elixir implementation of [Google's XLA](https://www.tensorflow.org/xla/),
+- [**`Nx`**](https://hexdocs.pm/nx/Nx.html) is a library that allows us to work with
+  [`Numerical Elixir`](https://github.com/elixir-nx/), the Elixir's way of doing [numerical computing](https://www.hilarispublisher.com/open-access/introduction-to-numerical-computing-2168-9679-1000423.pdf). It supports tensors and numericla computations.
+- [**`EXLA`**](https://hexdocs.pm/exla/EXLA.html) is the Elixir implementation of [Google's XLA](https://www.tensorflow.org/xla/),
   a compiler that provides faster linear algebra calculations
   with `TensorFlow` models.
-  This backend compiler is needed for [`Nx`](https://github.com/elixir-nx/nx),
-  a framework that allows support for tensors and numerical definitions
-  in Elixir.
-  We are installing `EXLA` because allows us to compile models
-  _just-in-time_ and run them on CPU and/or GPU.
+  This backend compiler is needed for `Nx`.
+  We are installing `EXLA` because allows us to compile models _just-in-time_ and run them on CPU and/or GPU.
 
-- [**`Nx`**](https://hexdocs.pm/nx/Nx.html),
-  a library that allows us to work with
-  [`Numerical Elixir`](https://github.com/elixir-nx/),
-  Elixir's way of doing [numerical computing](https://www.hilarispublisher.com/open-access/introduction-to-numerical-computing-2168-9679-1000423.pdf).
+- [**`Vix`**](https://hexdocs.pm/vix/readme.html) is an Elixir extension for [libvips](https://www.libvips.org/), an image processing library.
 
-- [**`Vix`**](https://hexdocs.pm/vix/readme.html), an Elixir extension for [libvips](https://www.libvips.org/) image processing library.
-
-In `config/config.exs`,
-let's add our `:nx` configuration
+In `config/config.exs`, let's add our `:nx` configuration
 to use `EXLA`.
 
 ```elixir
@@ -228,12 +215,13 @@ config :nx, default_backend: EXLA.Backend
 
 ### 2. Adding `LiveView` capabilities to our project
 
-As it stands,
-our project is not using `LiveView`.
+This will launch a super-powered process that establishes a websocket connection
+between the server and the browser.
+
+As it stands,,our project is not using `LiveView`.
 Let's fix this.
 
-In `lib/app_web/router.ex`,
-change the `scope "/"` to the following.
+In `lib/app_web/router.ex`, change the `scope "/"` to the following.
 
 ```elixir
   scope "/", AppWeb do
@@ -273,7 +261,6 @@ create a file called `page_live.html.heex`
 and use the following code.
 
 ```html
-<.flash_group flash={@flash} />
 <div
   class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32"
 >
@@ -3476,6 +3463,8 @@ We now need to add some server-side code.
 
 The uploaded audio file will be saved on disk as a temporary file
 in the `/priv/static/uploads` folder.
+We will make this file unique every time a user records an audio.
+Wew simply an `Ecto.UUID` string to the file name and pass it into the Liveview socket.
 
 The Liveview `mount/3` function returns a socket. Let's update it
 and pass extra arguments -
@@ -3504,7 +3493,8 @@ def mount(_,_,socket) do
     accept: :any,
     auto_upload: true,
     progress: &handle_progress/3,
-    max_entries: 1
+    max_entries: 1,
+    tmp_wave: @tmp_wave
   )
   |> allow_upload(:image_list, ...)
 end
@@ -3517,12 +3507,14 @@ on this audio file.
 We named the serving `"Whisper"`.
 
 ```elixir
-def handle_progress(:speech, entry, socket) when entry.done? do
-  socket
-  |> consume_uploaded_entry(entry, fn %{path: path} ->
-    :ok = File.cp!(path, @tmp_wav)
-    {:ok, @tmp_wav}
-  end)
+def handle_progress(:speech, entry, %{assigns: assigns} = socket) when entry.done? do
+  tmp_wave =
+      socket
+      |> consume_uploaded_entry(entry, fn %{path: path} ->
+        tmp_wave = assigns.tmp_wave <> Ecto.UUID.generate() <> ".wav"
+        :ok = File.cp!(path, tmp_wave)
+        {:ok, tmp_wave}
+      end)
 
   audio_task =
     Task.Supervisor.async(
@@ -3532,13 +3524,21 @@ def handle_progress(:speech, entry, socket) when entry.done? do
       end
     )
 
-  {:noreply, assign(socket, audio_ref: audio_task.ref, micro_off: true, speech_spin: true)}
+  {:noreply, socket
+  |> assign(
+    audio_ref: audio_task.ref,
+    micro_off: true,
+    speech_spin: true,
+    tmp_wave: tmp_wave,
+  )}
 end
 ```
 
 And that's it for the Liveview portion!
 
 #### 1.4 Serving the `Whisper` model
+
+We add an extra check on the models to shutdown the app in case of a problem with the models.
 
 We now add the model `Whisper` in the
 `lib/app/application.ex`
@@ -3548,6 +3548,15 @@ so it's available throughout the application in runtime.
 # lib/app/application.ex
 
 def start(_type, _args) do
+    App.Models.verify_and_download_models()
+    |> case do
+      {:error, msg} ->
+        Logger.warning(msg)
+        System.stop(1)
+
+      :ok ->
+        :ok
+    end
 
     [...]
     # Nx serving for Speech-to-Text
@@ -3649,34 +3658,64 @@ defmodule App.Models do
 
     case {force_models_download, use_test_models} do
       {true, true} ->
-        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
-        download_model(@captioning_test_model)      # Download captioning test model model
-        download_model(@audio_test_model)           # Download whisper model
+        # Delete any cached pre-existing models
+        File.rm_rf!(@models_folder_path)
+
+        # Download captioning test model model
+        with {:ok, _} <-
+               download_model(@captioning_test_model),
+             # Download whisper model
+             {:ok, _} <-
+               download_model(@audio_test_model) do
+          :ok
+        else
+          {:error, msg} -> {:error, msg}
+        end
 
       {true, false} ->
-        File.rm_rf!(@models_folder_path) # Delete any cached pre-existing models
-        download_model(@captioning_prod_model)      # Download captioning prod model
-        download_model(@audio_prod_model)              # Download whisper model
+        # Delete any cached pre-existing models
+        File.rm_rf!(@models_folder_path)
+
+        # Download captioning prod model
+        with {:ok, _} <-
+               download_model(@captioning_prod_model),
+             # Download whisper model
+             {:ok, _} <-
+               download_model(@audio_prod_model) do
+          :ok
+        else
+          {:error, msg} -> {:error, msg}
+        end
 
       {false, false} ->
         # Check if the prod model cache directory exists or if it's not empty.
         # If so, we download the prod models.
 
-        # Captioning test model
-        check_folder_and_download(@captioning_prod_model)
-
         # Audio capture model
-        check_folder_and_download(@audio_prod_model)
+        with :ok <-
+               check_folder_and_download(@audio_prod_model),
+             # Captioning test model
+             :ok <-
+               check_folder_and_download(@captioning_prod_model) do
+          :ok
+        else
+          {:error, msg} -> {:error, msg}
+        end
 
       {false, true} ->
         # Check if the test model cache directory exists or if it's not empty.
         # If so, we download the test models.
 
         # Captioning test model
-        check_folder_and_download(@captioning_test_model)
+        with :ok <-
+               check_folder_and_download(@captioning_test_model),
 
-        # Audio capture model
-        check_folder_and_download(@audio_test_model)
+             # Audio capture model
+             :ok <- check_folder_and_download(@audio_test_model) do
+          :ok
+        else
+          {:error, msg} -> {:error, msg}
+        end
     end
   end
 
@@ -3687,54 +3726,78 @@ defmodule App.Models do
   This assumes the models that are being used exist locally, in the @models_folder_path.
   """
   def caption_serving do
-    model = load_offline_model(@captioning_prod_model)
+    load_offline_model(@captioning_prod_model)
+    |> then(fn response ->
+      case response do
+        {:ok, model} ->
+          %Nx.Serving{} =
+            Bumblebee.Vision.image_to_text(
+              model.model_info,
+              model.featurizer,
+              model.tokenizer,
+              model.generation_config,
+              compile: [batch_size: 1],
+              defn_options: [compiler: EXLA],
+              # needed to run on `Fly.io`
+              preallocate_params: true
+            )
 
-    Bumblebee.Vision.image_to_text(
-      model.model_info,
-      model.featurizer,
-      model.tokenizer,
-      model.generation_config,
-      compile: [batch_size: 10],
-      defn_options: [compiler: EXLA],
-      # needed to run on `Fly.io`
-      preallocate_params: true
-    )
+        {:error, msg} ->
+          {:error, msg}
+      end
+    end)
   end
 
   @doc """
   Serving function that serves the `Bumblebee` audio transcription model used throughout the app.
   """
   def audio_serving do
-    model = load_offline_model(@audio_prod_model)
+    load_offline_model(@audio_prod_model)
+    |> then(fn response ->
+      case response do
+        {:ok, model} ->
+          %Nx.Serving{} =
+            Bumblebee.Audio.speech_to_text_whisper(
+              model.model_info,
+              model.featurizer,
+              model.tokenizer,
+              model.generation_config,
+              chunk_num_seconds: 30,
+              task: :transcribe,
+              defn_options: [compiler: EXLA],
+              preallocate_params: true
+            )
 
-    Bumblebee.Audio.speech_to_text_whisper(
-      model.model_info,
-      model.featurizer,
-      model.tokenizer,
-      model.generation_config,
-      chunk_num_seconds: 30,
-      task: :transcribe,
-      defn_options: [compiler: EXLA],
-      preallocate_params: true
-    )
+        {:error, msg} ->
+          {:error, msg}
+      end
+    end)
   end
 
     @doc """
   Serving function for tests only. It uses a test audio transcription model.
   """
   def audio_serving_test do
-    model = load_offline_model(@audio_test_model)
+    load_offline_model(@audio_test_model)
+    |> then(fn response ->
+      case response do
+        {:ok, model} ->
+          %Nx.Serving{} =
+            Bumblebee.Audio.speech_to_text_whisper(
+              model.model_info,
+              model.featurizer,
+              model.tokenizer,
+              model.generation_config,
+              chunk_num_seconds: 30,
+              task: :transcribe,
+              defn_options: [compiler: EXLA],
+              preallocate_params: true
+            )
 
-    Bumblebee.Audio.speech_to_text_whisper(
-      model.model_info,
-      model.featurizer,
-      model.tokenizer,
-      model.generation_config,
-      chunk_num_seconds: 30,
-      task: :transcribe,
-      defn_options: [compiler: EXLA],
-      preallocate_params: true
-    )
+        {:error, msg} ->
+          {:error, msg}
+      end
+    end)
   end
 
   @doc """
@@ -3744,15 +3807,25 @@ defmodule App.Models do
   This assumes the models that are being used exist locally, in the @models_folder_path.
   """
   def caption_serving_test do
-    model = load_offline_model(@captioning_test_model)
+    load_offline_model(@captioning_test_model)
+    |> then(fn response ->
+      case response do
+        {:ok, model} ->
+          %Nx.Serving{} =
+            Bumblebee.Vision.image_classification(
+              model.model_info,
+              model.featurizer,
+              top_k: 1,
+              compile: [batch_size: 10],
+              defn_options: [compiler: EXLA],
+              # needed to run on `Fly.io`
+              preallocate_params: true
+            )
 
-    Bumblebee.Vision.image_classification(model.model_info, model.featurizer,
-      top_k: 1,
-      compile: [batch_size: 10],
-      defn_options: [compiler: EXLA],
-      # needed to run on `Fly.io`
-      preallocate_params: true
-    )
+        {:error, msg} ->
+          {:error, msg}
+      end
+    end)
   end
 
   # Loads the models from the cache folder.
@@ -3763,40 +3836,46 @@ defmodule App.Models do
 
     # Loading model
     loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: true}
-    {:ok, model_info} = Bumblebee.load_model(loading_settings)
 
-    info = %{model_info: model_info}
+    Bumblebee.load_model(loading_settings)
+    |> case do
+      {:ok, model_info} ->
+        info = %{model_info: model_info}
 
-    # Load featurizer, tokenizer and generation config if needed
+        # Load featurizer, tokenizer and generation config if needed
 
-    info =
-      if Map.get(model, :load_featurizer) do
-        {:ok, featurizer} = Bumblebee.load_featurizer(loading_settings)
-        Map.put(info, :featurizer, featurizer)
-      else
-        info
-      end
+        info =
+          if Map.get(model, :load_featurizer) do
+            {:ok, featurizer} = Bumblebee.load_featurizer(loading_settings)
+            Map.put(info, :featurizer, featurizer)
+          else
+            info
+          end
 
-    info =
-      if Map.get(model, :load_tokenizer) do
-        {:ok, tokenizer} = Bumblebee.load_tokenizer(loading_settings)
-        Map.put(info, :tokenizer, tokenizer)
-      else
-        info
-      end
+        info =
+          if Map.get(model, :load_tokenizer) do
+            {:ok, tokenizer} = Bumblebee.load_tokenizer(loading_settings)
+            Map.put(info, :tokenizer, tokenizer)
+          else
+            info
+          end
 
-    info =
-      if Map.get(model, :load_generation_config) do
-        {:ok, generation_config} =
-          Bumblebee.load_generation_config(loading_settings)
+        info =
+          if Map.get(model, :load_generation_config) do
+            {:ok, generation_config} =
+              Bumblebee.load_generation_config(loading_settings)
 
-        Map.put(info, :generation_config, generation_config)
-      else
-        info
-      end
+            Map.put(info, :generation_config, generation_config)
+          else
+            info
+          end
 
-    # Return a map with the model and respective parameters.
-    info
+        # # Return a map with the model and respective parameters.
+        {:ok, info}
+
+      {:error, msg} ->
+        {:error, msg}
+    end
   end
 
   # Downloads the models according to a given %ModelInfo struct.
@@ -3806,28 +3885,49 @@ defmodule App.Models do
 
     # Download model
     downloading_settings = {:hf, model.name, cache_dir: model.cache_path}
-    Bumblebee.load_model(downloading_settings)
 
     # Download featurizer, tokenizer and generation config if needed
-    if Map.get(model, :load_featurizer) do
-      Bumblebee.load_featurizer(downloading_settings)
-    end
+    Bumblebee.load_model(downloading_settings)
+    |> case do
+      {:ok, _} ->
+        if Map.get(model, :load_featurizer) do
+          {:ok, _} = Bumblebee.load_featurizer(downloading_settings)
+        end
 
-    if Map.get(model, :load_tokenizer) do
-      Bumblebee.load_tokenizer(downloading_settings)
-    end
+        if Map.get(model, :load_tokenizer) do
+          {:ok, _} = Bumblebee.load_tokenizer(downloading_settings)
+        end
 
-    if Map.get(model, :load_generation_config) do
-      Bumblebee.load_generation_config(downloading_settings)
+        if Map.get(model, :load_generation_config) do
+          {:ok, _} = Bumblebee.load_generation_config(downloading_settings)
+        end
+
+      {:error, msg} ->
+        {:error, msg}
     end
   end
 
 
   # Checks if the folder exists and downloads the model if it doesn't.
   defp check_folder_and_download(model) do
-    model_location = Path.join(model.cache_path, "huggingface")
-    if not File.exists?(model_location) or File.ls!(model_location) == [] do
+    :ok = File.mkdir_p!(@models_folder_path)
+
+    model_location =
+      Path.join(model.cache_path, "huggingface")
+
+    with false <-
+           File.exists?(model_location),
+         {:error, :enoent} <-
+           File.ls(model_location) do
       download_model(model)
+      |> case do
+        {:ok, _} -> :ok
+        {:error, msg} -> {:error, msg}
+      end
+    else
+      _ ->
+        Logger.info("No dowlnoad")
+        :ok
     end
   end
 end
@@ -3872,14 +3972,15 @@ and update the booleans used for our UI
 def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
       when assigns.audio_ref == ref do
   Process.demonitor(ref, [:flush])
-  File.rm!(@tmp_wav)
+  File.rm!(assigns.tmp_wav)
 
   {:noreply,
     assign(socket,
       transcription: String.trim(text),
       micro_off: false,
       speech_spin: false,
-      audio_ref: nil
+      audio_ref: nil,
+      tmp_wave: @tmp_wav
     )}
 end
 ```
@@ -3892,62 +3993,229 @@ and **transcribe it**. 🎉
 
 We want to encode every caption and the input text into a specific vector space.
 In other words, we encode a string into a list of numbers.
-We use a transformer-based pre-trained model SBERT to compute an embedding for each caption. We picked-up the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" model.
-The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function.
-This transformer uses a 384 dimensional vector space. Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance to use [cosine_similarity](https://en.wikipedia.org/wiki/Cosine_similarity).
+
+We use a transformer-based pre-trained model SBERT to compute an embedding for each caption.
+We picked-up the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" model.
+The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function that returns an `%Nx.Serving{}` struct.
+This transformer uses a 384 dimensional vector space.
+Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance.
+You can read more about [cosine_similarity here](https://en.wikipedia.org/wiki/Cosine_similarity).
 If you are curious, you can read further down on this.
+
 This model is loaded and served by an `Nx.Serving` started in the Application modeule like all other models.
 
-We instantiate the HNSWLib index with a `GenServer`, and is also started in the Application module.
+We instantiate the HNSWLib index with a `GenServer`.
+It is started in the Application module.
+We will use an Index file.
+This file will be updated any time we append an embedding.
+This means the app is uses this unique file so is meant to run on a **single node**.
 
 #### The HNSWLib Index set-up
 
 This library works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**.
-We instantiate the Index struct via a file in a GenServer.
-We endow the vector space with a cosine pseudo-metric.
+We instantiate the Index file via a file in a GenServer.
+Because we are deploying with Fly.io, we need to persist the Index file in the database because the machine - thus its attached volume - is pruned when inactive.
+
+We endow the vector space with a `:cosine` pseudo-metric.
 When the app starts, we either read or create this file. The file is saved in the "/priv/static/uploads" folder.
 
-Add the following file:
+Add the following GenServer file: it will load the Index file, and also provides a client API to interact with the Index which is hold in the state of the GenServer.
+
+This solution works for a single node.
+
+It is crucial to save the correspondance between the Image table and the Index file to retrieve the correct images.
 
 ```elixir
 # /lib/app/knn_index.ex
 defmodule App.KnnIndex do
   use GenServer
 
+  @moduledoc """
+  A GenServer to load and handle the Index file for HNSWLib.
+  It loads from the FileSystem if existing or from the table HnswlibIndex.
+  It creates an new one if no Index file is found in the FileSystem
+  and if the table HnswlibIndex is empty.
+
+
+  """
   @indexes "indexes.bin"
+  @saved_index Path.expand("priv/static/uploads/" <> @indexes)
   @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
 
+  # client API ------------------
   def start_link(space) do
+    :ok = File.mkdir_p!(@upload_dir)
     GenServer.start_link(__MODULE__, space, name: __MODULE__)
   end
 
-  def init(space) do
-    :ok = File.mkdir_p!(upload_dir)
-
-    path = Path.join([upload_dir, @indexes])
-
-    {:ok, index} =
-      case File.exists?(path) do
-        false ->
-          Logger.info("New Index")
-          HNSWLib.Index.new(_space = space, _dim = 384, _max_elements = 200)
-
-        true ->
-          Logger.info("Existing Index")
-          HNSWLib.Index.load_index(space, 384, path)
-      end
-
-    {:ok, index}
+  def get_index_path do
+    # Path.join([@upload_dir, @indexes])
+    @saved_index
   end
 
   def load_index do
     GenServer.call(__MODULE__, :load)
   end
 
+  @doc """
+  Debugging function to check the Idnex current count
+  """
+  def get_count do
+    GenServer.call(__MODULE__, :get_count)
+  end
+
+  @doc """
+  Debugging function to print the Index
+  """
+  def get_index do
+    GenServer.call(__MODULE__, :get_index)
+  end
+
+  def add_item(embedding) do
+    GenServer.call(__MODULE__, {:add, embedding})
+  end
+
+  def knn_search(input) do
+    GenServer.call(__MODULE__, {:knn_search, input})
+  end
+
+  def not_empty_index do
+    GenServer.call(__MODULE__, :not_empty)
+  end
+
+  def index_file do
+    @saved_index
+  end
+
+  def check_integrity do
+    index_nb =
+      App.KnnIndex.load_index()
+      |> HNSWLib.Index.get_current_count()
+      |> elem(1)
+
+    db_nb = App.Repo.all(App.Image) |> length()
+
+    if index_nb == db_nb,
+      do: true,
+      else: false
+  end
+
+  # ---------------------------------------------------
+  @impl true
+  def init(space) do
+    File.mkdir_p!(@upload_dir)
+
+    path = get_index_path()
+    dim = 384
+    max_elements = 200
+
+    require Logger
+
+    case File.exists?(path) do
+      false ->
+        App.HnswlibIndex.maybe_load_index_from_db(space, dim, max_elements)
+        |> case do
+          {:ok, index} -> {:ok, index}
+          {:error, msg} -> {:ok, {:error, msg}}
+        end
+
+      true ->
+        Logger.info("Existing Index")
+        {:ok, _index} = HNSWLib.Index.load_index(space, dim, path)
+    end
+  end
+
+  @impl true
+  def handle_call(:load, _, {:error, :badarg} = state) do
+    App.HnswlibIndex.maybe_load_index_from_db(:cosine, 384, 200)
+    |> case do
+      {:ok, index} ->
+        {:reply, index, state}
+
+      {:error, msg} ->
+        {:stop, {:error, msg}, state}
+    end
+  end
+
   def handle_call(:load, _from, state) do
     {:reply, state, state}
   end
+
+  def handle_call(:get_count, _, state) do
+    {:ok, count} = HNSWLib.Index.get_current_count(state)
+    {:reply, count, state}
+  end
+
+  def handle_call(:get_index, _, state) do
+    {:reply, state, state}
+  end
+
+  def handle_call({:add, embedding}, _, state) do
+    with :ok <-
+           HNSWLib.Index.add_items(state, embedding),
+         {:ok, idx} <-
+           HNSWLib.Index.get_current_count(state),
+         :ok <-
+           HNSWLib.Index.save_index(state, @saved_index) do
+      idx |> dbg()
+      {:reply, {:ok, idx}, state}
+    else
+      msg ->
+        {:reply, {:error, msg}, state}
+    end
+  end
+
+  def handle_call({:knn_search, nil}, _, state) do
+    {:reply, {:error, "no index found"}, state}
+  end
+
+  def handle_call({:knn_search, input}, _, state) do
+    # refactored to denest function as per Credo
+    # case HNSWLib.Index.get_current_count(index) do
+    # {:ok, 0} ->
+    # {:error, "no entries in index"}
+
+    # {:ok, _c} ->
+    # check the embeddings
+    # {:ok, l} = HNSWLib.Index.get_current_count(index) |> dbg()
+
+    # for i <- 0..(l - 1) do
+    #   {:ok, dt} = HNSWLib.Index.get_items(index, [i])
+    #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
+    # end
+
+    case HNSWLib.Index.knn_query(state, input, k: 1) do
+      {:ok, labels, distances} ->
+        dbg(distances)
+
+        response =
+          labels[0]
+          |> Nx.to_flat_list()
+          |> hd()
+          |> then(fn idx ->
+            App.Repo.get_by(App.Image, %{idx: idx + 1})
+          end)
+
+        {:reply, response, state}
+
+      {:error, msg} ->
+        {:reply, {:error, msg}, state}
+    end
+
+    # end
+  end
+
+  def handle_call(:not_empty, _, state) do
+    case HNSWLib.Index.get_current_count(state) do
+      {:ok, 0} ->
+        {:reply, :error, state}
+
+      {:ok, _} ->
+        {:reply, :ok, state}
+    end
+  end
 end
+
 ```
 
 #### The embeding model
@@ -4016,7 +4284,8 @@ children = [
   ...,
   {Nx.Serving,
     serving: App.Models.embedding(),
-    name: Embedding
+    name: Embedding,
+    batch_size: 5
   },
   ...
 ]
@@ -4043,7 +4312,6 @@ def mount(_, _, socket) do
     speech_spin: false,
     search_result: nil,
     tmp_wave: @tmp_wav,
-    index: App.KnnIndex.load_index()
     )
     |> alow_upload(:speech,...)
     [...]
@@ -4060,9 +4328,6 @@ Update the Liveview `handle_info` callback where we handle the captioning result
 def handle_info({ref, result}, %{assigns: assigns} = socket) do
   # Flush async call
     Process.demonitor(ref, [:flush])
-    # collect the index
-    %{index: index} = assigns
-    [...]
 
     cond do
       # If the upload task has finished executing,
@@ -4076,21 +4341,15 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
             description: label
           }
 
-        saved_index = Path.expand("priv/static/uploads/indexes.bin")
-
         with %{embedding: data} <-
-              Nx.Serving.run(Embedding, label),
+               Nx.Serving.batched_run(Embedding, label),
              # compute a normed embedding (cosine case only) on the text result
              normed_data <-
-              Nx.divide(data, Nx.LinAlg.norm(data)),
-             :ok <-
-              HNSWLib.Index.add_items(index, normed_data),
-             # get the last indice
+               Nx.divide(data, Nx.LinAlg.norm(data)),
+             {:check_used, {:ok, pending_image}} <-
+               {:check_used, App.Image.check_before_append_to_index(image.sha1)},
              {:ok, idx} <-
-              HNSWLib.Index.get_current_count(index),
-             # persist the updated Index into the Filesystem
-             {:ok, _int} <-
-              HNSWLib.Index.save_index(index, saved_index) do
+               App.KnnIndex.add_item(normed_data) do
 
           # save the App.Image to the DB
           Map.merge(image, %{idx: idx, caption: label})
@@ -4100,7 +4359,6 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
            socket
            |> assign(
             running?: false,
-            index: index,
             task_ref: nil,
             label: label
            )
@@ -4112,7 +4370,6 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
              |> put_flash(:error, msg)
              |> assign(
               running?: false,
-              index: index,
               task_ref: nil,
               label: nil
             )
@@ -4136,21 +4393,17 @@ def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} 
   Process.demonitor(ref, [:flush])
   File.rm!(@tmp_wav)
 
-
-  %{index: index} = assigns
   # compute an normed embedding (cosine case only) on the text result
   # and returns an App.Image{} as the result of a "knn_search"
-  with %{embedding: input_embedding} <-
-          Nx.Serving.batched_run(Embedding, text),
-        normed_input_embedding <-
-          Nx.divide(
-            input_embedding,
-            Nx.LinAlg.norm(input_embedding)
-          ),
+   with %{embedding: input_embedding} <-
+           Nx.Serving.batched_run(Embedding, text),
+         normed_input_embedding <-
+           Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
          {:not_empty_index, :ok} <-
-           {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
+           {:not_empty_index, App.KnnIndex.not_empty_index()},
+         #  {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
          %App.Image{} = result <-
-          handle_knn(index, normed_input_embedding) do
+           App.KnnIndex.knn_search(normed_input_embedding) do
 
     {:noreply,
        assign(socket,
@@ -4188,44 +4441,13 @@ def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} 
 end
 ```
 
-We next define the `handle_knn` function.
+We next come back to the `knn_search` function we defined in the "KnnIndex" GenServer.
 The "approximate nearest neighbour" search function uses the function `HNSWLib.Index.knn_query/3`.
 It returns a tuple `{:ok, indices, distances}` where "indices" and "distances" are lists.
 The length is the number of neighbours you want to find parametrized by the `k` parameter.
 With `k=1`, we ask for a single neighbour.
 
 > You may further use a cut-off distance to exclude responses that might not be meaningful.
-
-```elixir
-def handle_knn(_, nil), do: {:error, "no index found"}
-
-def handle_knn(index, input) do
-  case HNSWLib.Index.get_current_count(index) do
-    {:ok, 0} ->
-      {:error, "no entries in index"}
-
-    {:ok, _c} ->
-      # check the embeddings
-      # {:ok, l} = HNSWLib.Index.get_current_count(index) |> dbg()
-
-      # for i <- 0..(l - 1) do
-      #   {:ok, dt} = HNSWLib.Index.get_items(index, [i])
-      #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
-      # end
-
-      case HNSWLib.Index.knn_query(index, input, k: 1) do
-        {:ok, label, distance} ->
-
-          label[0]
-          |> Nx.to_flat_list()
-          |> hd()
-          |> then(fn idx ->
-            App.Repo.get_by(App.Image, %{idx: idx + 1})
-          end)
-      end
-  end
-end
-```
 
 We will now display the found image with the URL field of the `%App.Image{}` struct.
 
