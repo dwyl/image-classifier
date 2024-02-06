@@ -16,7 +16,7 @@ defmodule AppWeb.IndexCheck do
 
       false ->
         Logger.warning("Index Integrity Error")
-        {:halt, push_redirect(socket, to: ~p"/404")}
+        {:halt, redirect(socket, to: ~p"/404")}
     end
   end
 end

@@ -1,12 +1,9 @@
 defmodule AppWeb.Live404 do
-  use AppWeb, :live_view
+  use Phoenix.LiveView
 
   @moduledoc """
   Index integrity error page
   """
-  def mount(_, _, socket) do
-    {:ok, socket}
-  end
 
   def render(assigns) do
     ~H"""

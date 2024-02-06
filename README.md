@@ -72,7 +72,7 @@ with your voice! 🎙️
       - [1.4 Serving the `Whisper` model](#14-serving-the-whisper-model)
       - [1.5 Handling the model's response and updating elements in the view](#15-handling-the-models-response-and-updating-elements-in-the-view)
     - [Embeddings and semantic search](#embeddings-and-semantic-search)
-      - [The HNSWLib Index set-up](#the-hnswlib-index-set-up)
+      - [The HNSWLib Index](#the-hnswlib-index)
       - [The embeding model](#the-embeding-model)
     - [Using the Index and embedding](#using-the-index-and-embedding)
       - [Worked example on how to use HNSWLib](#worked-example-on-how-to-use-hnswlib)
@@ -451,13 +451,13 @@ let's make some changes to
 
 We've added a few features:
 
-- used
+- we used
   [`<.live_file_input/>`](https://hexdocs.pm/phoenix_live_view/Phoenix.Component.html#live_file_input/1)
   for `LiveView` file upload.
   We've wrapped this component
   with an element that is annotated with the `phx-drop-target` attribute
   pointing to the DOM `id` of the file input.
-- because `<.live_file_input/>` is being used,
+- because we used `<.live_file_input/>`,
   we need to annotate its wrapping element
   with `phx-submit` and `phx-change`,
   as per
@@ -501,18 +501,15 @@ defmodule AppWeb.PageLive do
     {:noreply, socket}
   end
 
-  defp handle_progress(:image_list, entry, socket) do
-    #if entry.done? do
-      uploaded_file =
-        consume_uploaded_entry(socket, entry, fn %{path: _path} = _meta ->
-          {:ok, entry}
-        end)
-    end
-
+  defp handle_progress(:image_list, entry, socket) when entry.done? do
+    uploaded_file =
+      consume_uploaded_entry(socket, entry, fn %{path: _path} = _meta ->
+        {:ok, entry}
+      end)
     {:noreply, socket}
   end
 
-  defp handle_progress(:iamge_list, _, socket), do: {:noreply, socket}
+  defp handle_progress(:image_list, _, socket), do: {:noreply, socket}
 end
 ```
 
@@ -1791,7 +1788,8 @@ In the same file, add:
   def predict_example_image(body) do
     with {:vix, {:ok, img_thumb}} <-
            {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
-         {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
+         {:pre_process, {:ok, t_img}} <-
+           {:pre_process, pre_process_image(img_thumb)} do
 
       # Create an async task to classify the image from unsplash
       Task.Supervisor.async(App.TaskSupervisor, fn ->
@@ -3991,7 +3989,7 @@ and **transcribe it**. 🎉
 
 ### Embeddings and semantic search
 
-We want to encode every caption and the input text into a specific vector space.
+We want to encode every caption and the input text into an embedding which is a vector of a specific vector space.
 In other words, we encode a string into a list of numbers.
 
 We use a transformer-based pre-trained model SBERT to compute an embedding for each caption.
@@ -4010,7 +4008,7 @@ We will use an Index file.
 This file will be updated any time we append an embedding.
 This means the app is uses this unique file so is meant to run on a **single node**.
 
-#### The HNSWLib Index set-up
+#### The HNSWLib Index
 
 This library works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**.
 We instantiate the Index file via a file in a GenServer.
@@ -4519,7 +4517,6 @@ The first is the standard euclidean metric, the second the inner product, and th
 
 We use the small model "sentence-transformers/paraphrase-MiniLM-L6-v2" to compute embeddings from text.
 We then use it with `Nx.Serving` to run the model.
-You get embeddings, save them into the Index.
 
 ```elixir
 Mix.install([
@@ -4560,7 +4557,7 @@ HNSWLib.Index.get_current_count(index)
 #{:ok, 0}
 ```
 
-You compute an embedding for the words "small" and "tall":
+You compute an embedding for the word "small":
 
 ```elixir
 input = "short"

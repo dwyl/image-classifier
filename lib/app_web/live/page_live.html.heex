@@ -153,8 +153,9 @@
       <h2 class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl text-center">
         Semantic search using an audio
       </h2>
+      <br />
       <p>
-        Please record a phrase. You can listen to your audio. It will automatically be transcripted into a text and appear below. The search for matching images will run automatically and the found image appear below
+        Please record a phrase. You can listen to your audio. It will be transcripted automatically into a text and appear below. The semantic search for matching images will then run automatically and the found image appear below.
       </p>
       <br />
       <form id="audio-upload-form" phx-change="noop" class="flex flex-col items-center">
@@ -173,6 +174,7 @@
           <span id="text">Record</span>
         </button>
       </form>
+      <br />
       <p class="flex flex-col items-center">
         <audio id="audio" controls></audio>
       </p>
@@ -186,6 +188,7 @@
           <span class="text-gray-300 font-light">Waiting for image input.</span>
         <% end %>
       </div>
+      <br />
 
       <div :if={@search_result}>
         <div class="border-gray-900/10">

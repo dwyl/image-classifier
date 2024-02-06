@@ -77,27 +77,42 @@ defmodule AppWeb.PageLive do
 
   Should be invoked after some seconds when LiveView is mounted.
   """
-  def handle_event("show_examples", _data, socket) do
+
+  def handle_event("show_examples", _data, %{assigns: assigns} = socket)
+      when is_nil(assigns.task_ref) do
     # Only run if the user hasn't uploaded anything
-    if is_nil(socket.assigns.task_ref) do
-      # Retrieves a random image from Unsplash with a given `image_width` dimension
-      random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
+    # Retrieves a random image from Unsplash with a given `image_width` dimension
+    random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
 
-      # Spawns prediction tasks for example image from random Unsplash image
-      tasks =
-        for _ <- 1..2 do
-          %{url: url, body: body} = track_redirected(random_image)
-          predict_example_image(body, url)
-        end
+    # Spawns prediction tasks for example image from random Unsplash image
+    tasks =
+      for _ <- 1..2 do
+        %{url: url, body: body} = track_redirected(random_image)
+        predict_example_image(body, url)
+      end
 
-      # List to change `example_list` socket assign to show skeleton loading
-      display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
+    # List to change `example_list` socket assign to show skeleton loading
+    display_example_images =
+      Enum.all?(tasks, fn
+        task when is_map(task) -> Map.get(task, :ref) != nil
+        _ -> false
+      end)
+      |> case do
+        true ->
+          Enum.map(tasks, fn
+            obj -> %{predicting?: true, ref: obj.ref}
+          end)
 
-      # Updates the socket assigns
-      {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
-    else
-      {:noreply, socket}
-    end
+        false ->
+          nil
+      end
+
+    # Updates the socket assigns
+    {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
+  end
+
+  def handle_event("show_examples", _, socket) do
+    {:noreply, socket}
   end
 
   @doc """
@@ -165,8 +180,8 @@ defmodule AppWeb.PageLive do
            {:ok, thumbnail_vimage} <-
              Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
            # Pre-process it
-           {:ok, tensor} <-
-             pre_process_image(thumbnail_vimage) do
+           {:pre_process, {:ok, tensor}} <-
+             {:pre_process, pre_process_image(thumbnail_vimage)} do
         image_info = %{
           mimetype: mimetype,
           width: width,
@@ -190,7 +205,7 @@ defmodule AppWeb.PageLive do
             {:ok, %{tensor: tensor, path: path, image_info: image_info}}
 
           {:error, changeset} ->
-            dbg(changeset.erros)
+            dbg(changeset.errors)
             {:error, changeset.errors}
         end
         |> handle_upload()
@@ -200,6 +215,7 @@ defmodule AppWeb.PageLive do
         {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
         {:check_mime, :error} -> {:postpone, %{error: "Bad mime type"}}
         {:sha_check, %App.Image{}} -> {:postpone, %{error: "Image already uploaded"}}
+        {:pre_process, {:error, _msg}} -> {:postpone, %{error: "pre_processing error"}}
         {:error, reason} -> {:postpone, %{error: inspect(reason)}}
       end
     end)
@@ -297,7 +313,7 @@ defmodule AppWeb.PageLive do
   end
 
   def handle_upload({:error, errors}) do
-    dbg(errors)
+    :ok = Logger.warning(inspect(errors))
     {:postpone, %{error: errors}}
   end
 
@@ -317,7 +333,7 @@ defmodule AppWeb.PageLive do
     # and returns an App.Image{} as the result of a "knn_search"
     with %{embedding: input_embedding} <-
            Nx.Serving.batched_run(Embedding, text),
-         normed_input_embedding <-
+         %Nx.Tensor{} = normed_input_embedding <-
            Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
          {:not_empty_index, :ok} <-
            {:not_empty_index, App.KnnIndex.not_empty_index()},
@@ -381,16 +397,18 @@ defmodule AppWeb.PageLive do
           # coveralls-ignore-stop
       end
 
+    %{image_info: image_info} = assigns
+
     cond do
       # If the upload task has finished executing, we update the socket assigns.
       Map.get(assigns, :task_ref) == ref ->
         image =
           %{
-            url: assigns.image_info.url,
-            width: assigns.image_info.width,
-            height: assigns.image_info.height,
+            url: image_info.url,
+            width: image_info.width,
+            height: image_info.height,
             description: label,
-            sha1: assigns.image_info.sha1
+            sha1: image_info.sha1
           }
 
         # saved_index = App.HnswlibIndex.index_file()
@@ -505,45 +523,103 @@ defmodule AppWeb.PageLive do
   def predict_example_image(body, url) do
     with {:vix, {:ok, img_thumb}} <-
            {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
-         {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
+         {:pre_process, {:ok, t_img}} <-
+           {:pre_process, pre_process_image(img_thumb)} do
       # Create an async task to classify the image from unsplash
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)
       |> Map.merge(%{url: url})
     else
-      {stage, error} -> {stage, error}
+      {:vix, {:error, msg}} ->
+        :ok = Logger.warning(inspect(msg))
+
+      {:pre_process, {:error, msg}} ->
+        :ok = Logger.warning(inspect(msg))
     end
   end
 
   def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 5MB."
 
-  defp pre_process_image(%Vimage{} = image) do
-    # If the image has an alpha channel, flatten it:
-    {:ok, flattened_image} =
-      case Vix.Vips.Image.has_alpha?(image) do
-        true -> Vix.Vips.Operation.flatten(image)
-        false -> {:ok, image}
-      end
+  # If the image has an alpha channel, flatten it:
+  defp flatten(image) do
+    case Vix.Vips.Image.has_alpha?(image) do
+      true ->
+        Vix.Vips.Operation.flatten(image)
+        |> case do
+          {:ok, img} ->
+            {:ok, img}
 
-    # Convert the image to sRGB colourspace ----------------
-    {:ok, srgb_image} = Vix.Vips.Operation.colourspace(flattened_image, :VIPS_INTERPRETATION_sRGB)
+          {:error, msg} ->
+            {:error, msg}
+        end
 
-    # Converting image to tensor ----------------
-    {:ok, tensor} = Vix.Vips.Image.write_to_tensor(srgb_image)
+      false ->
+        {:ok, image}
+    end
+  end
 
-    # We reshape the tensor given a specific format.
-    # In this case, we are using {height, width, channels/bands}.
-    %Vix.Tensor{data: binary, type: type, shape: {x, y, bands}} = tensor
-    format = [:height, :width, :bands]
-    shape = {x, y, bands}
+  # Convert the image to sRGB colourspace ----------------
+  defp srgb(%Vimage{} = image) do
+    Vix.Vips.Operation.colourspace(image, :VIPS_INTERPRETATION_sRGB)
+    |> case do
+      {:ok, %Vimage{} = srgb_image} ->
+        {:ok, srgb_image}
 
-    final_tensor =
-      binary
-      |> Nx.from_binary(type)
-      |> Nx.reshape(shape, names: format)
+      {:error, msg} ->
+        {:error, msg}
+    end
+  end
 
-    {:ok, final_tensor}
+  # Converting image to tensor ----------------
+  defp to_tensor(%Vimage{} = image) do
+    Vix.Vips.Image.write_to_tensor(image)
+    |> case do
+      {:ok, %Vix.Tensor{} = tensor} ->
+        {:ok, tensor}
+
+      # {:error, "test1"}
+
+      # {:ok, %Vix.Tensor{shape: {}, data: nil, names: [], type: ""}}
+
+      {:error, msg} ->
+        {:error, msg}
+    end
+  end
+
+  def pre_process_image(%Vimage{} = v_img) do
+    with {:ok, %Vimage{} = flattened_image} <-
+           flatten(v_img),
+         {:ok, %Vimage{} = srgb_image} <-
+           srgb(flattened_image),
+         {:ok, %Vix.Tensor{} = tensor} <-
+           to_tensor(srgb_image),
+         data when data != nil <- Map.get(tensor, :data) do
+      # We reshape the tensor given a specific format.
+      # In this case, we are using {height, width, channels/bands}.
+
+      %Vix.Tensor{data: binary, type: type, shape: {x, y, bands}} = tensor
+      format = [:height, :width, :bands]
+      shape = {x, y, bands}
+
+      final_tensor =
+        binary
+        |> Nx.from_binary(type)
+        |> Nx.reshape(shape, names: format)
+
+      {:ok, %Nx.Tensor{} = final_tensor}
+    else
+      {:error, msg} ->
+        {:error, msg}
+
+      nil ->
+        {:error, "Image empty"}
+    end
+  end
+
+  def pre_process_image({:error, msg}) do
+    IO.puts("Error-------------")
+    {:error, msg}
   end
 
   defp track_redirected(url) do

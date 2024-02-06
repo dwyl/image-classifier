@@ -379,7 +379,7 @@ defmodule App.Models do
       end
     else
       _ ->
-        Logger.info("No dowlnoad")
+        Logger.info("No download")
         :ok
     end
   end
