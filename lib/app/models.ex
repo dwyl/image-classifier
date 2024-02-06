@@ -83,9 +83,9 @@ defmodule App.Models do
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
 
-        # Download captioning test model model
         with {:ok, _} <-
                download_model(@captioning_test_model),
+             # Download captioning test model model
              {:ok, _} <-
                download_model(@embedding_model),
              # Download whisper model
@@ -100,15 +100,15 @@ defmodule App.Models do
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
 
-        # Download captioning prod model
         with {:ok, _} <-
                download_model(@captioning_prod_model),
+             # Download captioning prod model
              # Download whisper model
              {:ok, _} <-
                download_model(@audio_prod_model),
-
              # download embedding model
-             {:ok, _} <- download_model(@embedding_model) do
+             {:ok, _} <-
+               download_model(@embedding_model) do
           :ok
         else
           {:error, msg} -> {:error, msg}

@@ -17,7 +17,11 @@ defmodule AppWeb.Router do
   scope "/", AppWeb do
     pipe_through :browser
 
+    live("/404", Live404)
+
+    # live_session(:default, on_mount: {AppWeb.IndexCheck, :default}) do
     live "/", PageLive
+    # end
   end
 
   # Other scopes may use custom stacks.

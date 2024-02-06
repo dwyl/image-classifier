@@ -5,6 +5,8 @@ defmodule AppWeb.PageLive do
   alias Vix.Vips.Image, as: Vimage
   require Logger
 
+  on_mount {AppWeb.IndexCheck, :default}
+
   defmodule ImageInfo do
     @doc """
     General information for the image that is being analysed.
@@ -34,7 +36,6 @@ defmodule AppWeb.PageLive do
        image_info: nil,
        image_preview_base64: nil,
        db_image: nil,
-       integrity: App.KnnIndex.check_integrity(),
 
        # Related to the list of image examples
        example_list_tasks: [],
@@ -150,13 +151,16 @@ defmodule AppWeb.PageLive do
     consume_uploaded_entry(socket, entry, fn %{path: path} ->
       with {:magic, {:ok, %{mime_type: mime}}} <-
              {:magic, magic_check(path)},
-           {:read, {:ok, file_binary}} <- {:read, File.read(path)},
+           {:read, {:ok, file_binary}} <-
+             {:read, File.read(path)},
            {:image_info, {mimetype, width, height, _variant}} <-
              {:image_info, ExImageInfo.info(file_binary)},
            {:check_mime, :ok} <-
              {:check_mime, check_mime(mime, mimetype)},
-           sha1 <- App.Image.calc_sha1(file_binary),
-           {:sha_check, :ok} <- {:sha_check, App.Image.check_sha1(sha1)},
+           sha1 <-
+             App.Image.calc_sha1(file_binary),
+           {:sha_check, :ok} <-
+             {:sha_check, App.Image.check_sha1(sha1)},
            # Get image and resize
            {:ok, thumbnail_vimage} <-
              Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
@@ -186,7 +190,7 @@ defmodule AppWeb.PageLive do
             {:ok, %{tensor: tensor, path: path, image_info: image_info}}
 
           {:error, changeset} ->
-            dbg(changeset)
+            dbg(changeset.erros)
             {:error, changeset.errors}
         end
         |> handle_upload()

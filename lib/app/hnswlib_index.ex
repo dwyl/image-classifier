@@ -6,6 +6,11 @@ defmodule App.HnswlibIndex do
 
   require Logger
 
+  @moduledoc """
+  Ecto schema to save the HNSWLib Index file into a singleton table
+  with utility functions
+  """
+
   # @saved_index Path.expand("priv/static/uploads/indexes.bin")
 
   schema "hnswlib_index" do
@@ -21,20 +26,37 @@ defmodule App.HnswlibIndex do
   end
 
   def save() do
-    try do
-      path = App.KnnIndex.get_index_path()
-      file = File.read!(path)
-
-      Repo.get!(HnswlibIndex, 1)
-      |> HnswlibIndex.changeset(%{file: file})
-      |> Repo.update()
-    rescue
-      e in Ecto.StaleEntryError ->
-        require Logger
-        Logger.warning(inspect(e))
+    with path <-
+           App.KnnIndex.get_index_path(),
+         {:ok, file} <-
+           File.read(path),
+         index <-
+           Repo.get(HnswlibIndex, 1),
+         {:ok, schema} <-
+           HnswlibIndex.changeset(index, %{file: file})
+           |> Repo.update() do
+      {:ok, schema}
+    else
+      {:error, msg} ->
+        Logger.warning(inspect(msg))
         Process.sleep(10)
         save()
     end
+
+    # try do
+    #   path = App.KnnIndex.get_index_path()
+    #   file = File.read(path)
+
+    #   Repo.get(HnswlibIndex, 1)
+    #   |> HnswlibIndex.changeset(%{file: file})
+    #   |> Repo.update()
+    # rescue
+    #   e in Ecto.StaleEntryError ->
+    #     require Logger
+    #     Logger.warning(inspect(e))
+    #     Process.sleep(10)
+    #     save()
+    # end
   end
 
   def maybe_load_index_from_db(space, dim, max_elements) do

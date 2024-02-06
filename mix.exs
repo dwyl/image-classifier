@@ -79,7 +79,8 @@ defmodule App.MixProject do
       # Testing
       {:excoveralls, "~> 0.15", only: [:test, :dev]},
       {:mock, "~> 0.3.0", only: :test},
-      {:credo, "~> 1.6", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 
