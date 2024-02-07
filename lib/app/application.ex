@@ -5,17 +5,22 @@ defmodule App.Application do
   require Logger
   use Application
 
-  @impl true
-  def start(_type, _args) do
+  def check_models_on_startup do
     App.Models.verify_and_download_models()
     |> case do
       {:error, msg} ->
         Logger.warning(msg)
-        System.stop(1)
+        System.stop(0)
 
       :ok ->
+        Logger.info("Models :ok")
         :ok
     end
+  end
+
+  @impl true
+  def start(_type, _args) do
+    :ok = check_models_on_startup()
 
     children = [
       # Start the Telemetry supervisor

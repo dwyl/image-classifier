@@ -3,13 +3,17 @@ defmodule App.KnnIndex do
 
   @moduledoc """
   A GenServer to load and handle the Index file for HNSWLib.
-  It loads from the FileSystem if existing or from the table HnswlibIndex.
+  It loads the index from the FileSystem if existing or from the table HnswlibIndex.
   It creates an new one if no Index file is found in the FileSystem
   and if the table HnswlibIndex is empty.
-
-
+  It holds the index and the App.Image singleton table in the state.
   """
+
+  require Logger
+
   @indexes "indexes.bin"
+  @dim 384
+  @max_elements 200
   @saved_index Path.expand("priv/static/uploads/" <> @indexes)
   @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
 
@@ -19,28 +23,25 @@ defmodule App.KnnIndex do
     GenServer.start_link(__MODULE__, space, name: __MODULE__)
   end
 
-  def get_index_path do
-    # Path.join([@upload_dir, @indexes])
+  def index_path do
     @saved_index
   end
 
   def load_index do
-    GenServer.call(__MODULE__, :load)
+    GenServer.call(__MODULE__, :load_index)
   end
 
-  @doc """
-  Debugging function to check the Idnex current count
-  """
+  def save_index_to_db do
+    GenServer.call(__MODULE__, :save_index_to_db)
+  end
+
   def get_count do
     GenServer.call(__MODULE__, :get_count)
   end
 
-  @doc """
-  Debugging function to print the Index
-  """
-  def get_index do
-    GenServer.call(__MODULE__, :get_index)
-  end
+  # def get_index do
+  #   GenServer.call(__MODULE__, :get_index)
+  # end
 
   def add_item(embedding) do
     GenServer.call(__MODULE__, {:add, embedding})
@@ -54,81 +55,106 @@ defmodule App.KnnIndex do
     GenServer.call(__MODULE__, :not_empty)
   end
 
-  def index_file do
-    @saved_index
-  end
-
-  def check_integrity do
+  @doc """
+  Called `on_mount`to halt the Liveview in case the Index file length
+  is not equal to the count of images in the db.
+  """
+  def check_index_integrity do
     index_nb =
       App.KnnIndex.load_index()
+      |> elem(0)
       |> HNSWLib.Index.get_current_count()
-      |> elem(1)
+      |> case do
+        {:ok, index_db} ->
+          index_db
+
+        {:error, msg} ->
+          Logger.warning(inspect(msg))
+          :error
+      end
 
     db_nb = App.Repo.all(App.Image) |> length()
 
-    if index_nb == db_nb,
-      do: true,
-      else: false
+    index_nb == db_nb
   end
 
   # ---------------------------------------------------
   @impl true
   def init(space) do
-    File.mkdir_p!(@upload_dir)
+    :ok = File.mkdir_p!(@upload_dir)
 
-    path = get_index_path()
-    dim = 384
-    max_elements = 200
-
-    require Logger
-
-    case File.exists?(path) do
+    case File.exists?(@saved_index) do
       false ->
-        App.HnswlibIndex.maybe_load_index_from_db(space, dim, max_elements)
+        App.HnswlibIndex.maybe_load_index_from_db(space, @dim, @max_elements)
         |> case do
-          {:ok, index} -> {:ok, index}
-          {:error, msg} -> {:ok, {:error, msg}}
+          {:ok, index, index_schema} -> {:ok, {index, index_schema, space}}
+          {:error, msg} -> {:stop, {:error, msg}}
         end
 
       true ->
         Logger.info("Existing Index")
-        {:ok, _index} = HNSWLib.Index.load_index(space, dim, path)
+
+        App.Repo.get_by(App.HnswlibIndex, id: 1)
+        |> case do
+          nil ->
+            {:stop, {:error, "Incoherence on table"}}
+
+          schema ->
+            {:ok, index} = HNSWLib.Index.load_index(space, @dim, @saved_index)
+            {:ok, {index, schema, space}}
+        end
     end
   end
 
   @impl true
-  def handle_call(:load, _, {:error, :badarg} = state) do
-    App.HnswlibIndex.maybe_load_index_from_db(:cosine, 384, 200)
+  def handle_call(:load_index, _, {:error, :badarg, space} = state) do
+    App.HnswlibIndex.maybe_load_index_from_db(:cosine, @dim, @max_elements)
     |> case do
-      {:ok, index} ->
-        {:reply, index, state}
+      {:ok, index, index_schema} ->
+        {:reply, index, {index, index_schema, space}}
 
       {:error, msg} ->
         {:stop, {:error, msg}, state}
     end
   end
 
-  def handle_call(:load, _from, state) do
+  def handle_call(:load_index, _from, state) do
     {:reply, state, state}
   end
 
-  def handle_call(:get_count, _, state) do
-    {:ok, count} = HNSWLib.Index.get_current_count(state)
-    {:reply, count, state}
+  def handle_call(:save_index_to_db, _, {index, index_schema, space} = state) do
+    with {:ok, file} <-
+           File.read(@saved_index),
+         {:ok, updated_schema} <-
+           index_schema
+           |> App.HnswlibIndex.changeset(%{file: file})
+           |> App.Repo.update() do
+      {:reply, {:ok, updated_schema}, {index, updated_schema, space}}
+    else
+      {:error, msg} ->
+        {:reply, {:error, msg}, state}
+    end
   end
 
-  def handle_call(:get_index, _, state) do
-    {:reply, state, state}
+  def handle_call(:get_count, _, {index, _, _} = state) do
+    HNSWLib.Index.get_current_count(index)
+    |> case do
+      {:ok, count} ->
+        {:reply, count, state}
+
+      {:error, msg} ->
+        {:reply, {:error, msg}, state}
+    end
   end
 
-  def handle_call({:add, embedding}, _, state) do
+  def handle_call({:add, embedding}, _, {index, _, _} = state) do
     with :ok <-
-           HNSWLib.Index.add_items(state, embedding),
+           HNSWLib.Index.add_items(index, embedding),
          {:ok, idx} <-
-           HNSWLib.Index.get_current_count(state),
+           HNSWLib.Index.get_current_count(index),
          :ok <-
-           HNSWLib.Index.save_index(state, @saved_index) do
-      idx |> dbg()
+           HNSWLib.Index.save_index(index, @saved_index) do
+      Logger.info("idx: #{idx}")
       {:reply, {:ok, idx}, state}
     else
       msg ->
@@ -140,24 +166,10 @@ defmodule App.KnnIndex do
     {:reply, {:error, "no index found"}, state}
   end
 
-  def handle_call({:knn_search, input}, _, state) do
-    # refactored to denest function as per Credo
-    # case HNSWLib.Index.get_current_count(index) do
-    # {:ok, 0} ->
-    # {:error, "no entries in index"}
-
-    # {:ok, _c} ->
-    # check the embeddings
-    # {:ok, l} = HNSWLib.Index.get_current_count(index) |> dbg()
-
-    # for i <- 0..(l - 1) do
-    #   {:ok, dt} = HNSWLib.Index.get_items(index, [i])
-    #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
-    # end
-
-    case HNSWLib.Index.knn_query(state, input, k: 1) do
+  def handle_call({:knn_search, input}, _, {index, _, _} = state) do
+    case HNSWLib.Index.knn_query(index, input, k: 1) do
       {:ok, labels, distances} ->
-        dbg(distances)
+        Logger.info(inspect(distances))
 
         response =
           labels[0]
@@ -176,8 +188,8 @@ defmodule App.KnnIndex do
     # end
   end
 
-  def handle_call(:not_empty, _, state) do
-    case HNSWLib.Index.get_current_count(state) do
+  def handle_call(:not_empty, _, {index, _, _} = state) do
+    case HNSWLib.Index.get_current_count(index) do
       {:ok, 0} ->
         {:reply, :error, state}
 

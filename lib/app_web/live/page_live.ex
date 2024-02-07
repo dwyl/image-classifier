@@ -3,7 +3,7 @@ defmodule AppWeb.PageLive do
   require Logger
   alias App.Image
   alias Vix.Vips.Image, as: Vimage
-  require Logger
+  alias Vix.Vips.Operation, as: Vops
 
   on_mount {AppWeb.IndexCheck, :default}
 
@@ -178,7 +178,7 @@ defmodule AppWeb.PageLive do
              {:sha_check, App.Image.check_sha1(sha1)},
            # Get image and resize
            {:ok, thumbnail_vimage} <-
-             Vix.Vips.Operation.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
+             Vops.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
            # Pre-process it
            {:pre_process, {:ok, tensor}} <-
              {:pre_process, pre_process_image(thumbnail_vimage)} do
@@ -202,7 +202,7 @@ defmodule AppWeb.PageLive do
                 file_binary: file_binary
               })
 
-            {:ok, %{tensor: tensor, path: path, image_info: image_info}}
+            {:ok, %{tensor: tensor, image_info: image_info, path: path}}
 
           {:error, changeset} ->
             dbg(changeset.errors)
@@ -291,7 +291,7 @@ defmodule AppWeb.PageLive do
   Called in `handle_progress` to Handle the upload to the bucket and returns the format `{:ok, map}` or {:postpone, message}`
   as demanded by the signature of callback function used `consume_uploaded_entry`
   """
-  def handle_upload({:ok, map}) do
+  def handle_upload({:ok, map}) when is_map(map) do
     %{path: path, tensor: tensor, image_info: image_info} = map
     # if success, Upload image to S3
     Image.upload_image_to_s3(path, image_info.mimetype)
@@ -419,12 +419,12 @@ defmodule AppWeb.PageLive do
              normed_data <-
                Nx.divide(data, Nx.LinAlg.norm(data)),
              {:check_used, {:ok, pending_image}} <-
-               {:check_used, App.Image.check_before_append_to_index(image.sha1)},
-             {:ok, idx} <-
-               App.KnnIndex.add_item(normed_data) do
+               {:check_used, App.Image.check_before_append_to_index(image.sha1)} do
           Ecto.Multi.new()
           # save updated Image to DB
           |> Ecto.Multi.run(:update_image, fn _, _ ->
+            idx = App.KnnIndex.get_count() + 1
+
             Ecto.Changeset.change(pending_image, %{
               idx: idx,
               description: image.description,
@@ -434,7 +434,9 @@ defmodule AppWeb.PageLive do
           end)
           # save Index file to DB
           |> Ecto.Multi.run(:save_index, fn _, _ ->
-            App.HnswlibIndex.save()
+            {:ok, idx} = App.KnnIndex.add_item(normed_data)
+            Logger.info("#{idx}")
+            App.KnnIndex.save_index_to_db()
           end)
           |> App.Repo.transaction()
           |> case do
@@ -522,7 +524,7 @@ defmodule AppWeb.PageLive do
   """
   def predict_example_image(body, url) do
     with {:vix, {:ok, img_thumb}} <-
-           {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
+           {:vix, Vops.thumbnail_buffer(body, @image_width)},
          {:pre_process, {:ok, t_img}} <-
            {:pre_process, pre_process_image(img_thumb)} do
       # Create an async task to classify the image from unsplash
@@ -542,10 +544,10 @@ defmodule AppWeb.PageLive do
   def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 5MB."
 
   # If the image has an alpha channel, flatten it:
-  defp flatten(image) do
-    case Vix.Vips.Image.has_alpha?(image) do
+  defp flatten(%Vimage{} = image) do
+    case Vimage.has_alpha?(image) do
       true ->
-        Vix.Vips.Operation.flatten(image)
+        Vops.flatten(image)
         |> case do
           {:ok, img} ->
             {:ok, img}
@@ -561,7 +563,7 @@ defmodule AppWeb.PageLive do
 
   # Convert the image to sRGB colourspace ----------------
   defp srgb(%Vimage{} = image) do
-    Vix.Vips.Operation.colourspace(image, :VIPS_INTERPRETATION_sRGB)
+    Vops.colourspace(image, :VIPS_INTERPRETATION_sRGB)
     |> case do
       {:ok, %Vimage{} = srgb_image} ->
         {:ok, srgb_image}
@@ -577,10 +579,6 @@ defmodule AppWeb.PageLive do
     |> case do
       {:ok, %Vix.Tensor{} = tensor} ->
         {:ok, tensor}
-
-      # {:error, "test1"}
-
-      # {:ok, %Vix.Tensor{shape: {}, data: nil, names: [], type: ""}}
 
       {:error, msg} ->
         {:error, msg}
@@ -618,7 +616,6 @@ defmodule AppWeb.PageLive do
   end
 
   def pre_process_image({:error, msg}) do
-    IO.puts("Error-------------")
     {:error, msg}
   end
 

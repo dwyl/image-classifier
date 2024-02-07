@@ -75,6 +75,8 @@ with your voice! 🎙️
       - [The HNSWLib Index](#the-hnswlib-index)
       - [The embeding model](#the-embeding-model)
     - [Using the Index and embedding](#using-the-index-and-embedding)
+      - [`on_mount` hook](#on_mount-hook)
+      - [Computation of embeddings](#computation-of-embeddings)
       - [Worked example on how to use HNSWLib](#worked-example-on-how-to-use-hnswlib)
         - [Notes on vector spaces](#notes-on-vector-spaces)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
@@ -2259,7 +2261,8 @@ which we will now change.
       |> Map.merge(%{url: url})
 
     else
-      {stage, error} -> {stage, error}
+      {:vix, {:error, msg}} -> {:error, msg}
+      {:pre_process, {:error, msg}} -> {:error, msg}
     end
   end
 ```
@@ -2981,10 +2984,11 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
   # and if consuming the entry was successful.
 
   with %{tensor: tensor, image_info: image_info} <-
-          consume_uploaded_entry(socket, entry, fn %{} = meta ->
+          consume_uploaded_entry(socket, entry, fn %{path: path} ->
              with {:magic, {:ok, %{mime_type: mime}}} <-
                     {:magic, magic_check(path)},
-                  file_binary <- File.read!(path),
+                  {:read, {:ok, file_binary}} <-
+                    {:read, File.read(path)},
                   {:image_info, {mimetype, width, height, _variant}} <-
                     {:image_info, ExImageInfo.info(file_binary)},
                   {:check_mime, :ok} <-
@@ -3172,8 +3176,7 @@ including in widespread tools like
 
 ### Overview of the process
 
-Let's go over the process in detail
-so we know what to expect.
+Let's go over the process in detail so we know what to expect.
 
 As it stands, when images are uploaded and captioned,
 the URL is saved, as well as the caption,
@@ -3194,12 +3197,10 @@ Firstly, we will:
 - run a **Speech-To-Text** process to produce a text transcription
   from the audio.
 
-We will use - thus load - the _pre-trained_ model
-[openai/whisper-small](https://huggingface.co/openai/whisper-small)
+We will use - thus load - the _pre-trained_ model [openai/whisper-small](https://huggingface.co/openai/whisper-small)
 from <https://huggingface.co>
-and use it with the help of the
-[Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5)
-function to run this model against our input.
+and use it with the help of the [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5) function.
+We get an `Nx.Serving` that we will use to run this model with an input.
 
 We then want to find images whose captions
 approximates this text in terms of meaning.
@@ -3214,50 +3215,53 @@ Our next steps will be to prepare the [symmetric semantic search](https://www.sb
 
 We will use the [transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>) with the [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) pre-trained system available in [Huggingface](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
 
-- we transform a text into a vector.
-  We use the sentence-transformer model
-  [`sentence-transformers/paraphrase-MiniLM-L6-v2` ](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2)
-  because of its small size. We will run it with the help of the
-  [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function.
-  This encoding is done for each image caption.
+We transform a text into a vector: we use the sentence-transformer model [`sentence-transformers/paraphrase-MiniLM-L6-v2` ](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) because of its small size.
+We will run it with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function.
+This encoding is done for each image caption.
 
-- after this, we then run a [**knn_neighbour**](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) search.
-  The idea is to work in the embeddings vector space
-  and find the image vectors that are close to the target vector.
+After this, we then run a [**knn_neighbour**](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) search.
+The idea is to work in the embeddings vector space and find the image vectors that are close to the target vector.
 
-  There are several ways to do this.
+There are several ways to do this.
 
-  We can use the `pgvector`, a vector extension of Postgres. It is used to store vectors (the embeddings) and to run similarity searches. We can then run:
+We can use the `pgvector`, a vector extension of Postgres. It is used to store vectors (the embeddings) and to run similarity searches. We can then run:
 
-  - a full exact search with the [cosine similarity](https://github.com/pgvector/pgvector#distances) operator `<=>`, or
-  - or use an Approximate Nearest Neighbour seach with the indexing algorithms. The extension proposes [IVFFLAT](https://github.com/pgvector/pgvector#ivfflat) or `[HNSWLIB](https://github.com/pgvector/pgvector#hnsw) algorithms. You can find some explanations on both algorithms [here](https://tembo.io/blog/vector-indexes-in-pgvector) and [there](https://neon.tech/blog/understanding-vector-search-and-hnsw-index-with-pgvector).
+- a full exact search with the [cosine similarity](https://github.com/pgvector/pgvector#distances) operator `<=>`,
+- or use an Approximate Nearest Neighbour seach with the indexing algorithms. The extension proposes [IVFFLAT](https://github.com/pgvector/pgvector#ivfflat) or `[HNSWLIB](https://github.com/pgvector/pgvector#hnsw) algorithms. You can find some explanations on both algorithms [here](https://tembo.io/blog/vector-indexes-in-pgvector) and [there](https://neon.tech/blog/understanding-vector-search-and-hnsw-index-with-pgvector).
 
-  This requires the `pgvector` extension to be installed in Fly.io. We lacked of resources to do so.
+This requires the `pgvector` extension to be installed in Fly.io. We lacked of resources to do so.
 
-  > Note that [Supabase](https://supabase.com/docs/guides/database/extensions/pgvector) can use the pgvector extension, and you can use [Supabase with Fly.io](https://fly.io/docs/reference/supabase/).
+> Note that [Supabase](https://supabase.com/docs/guides/database/extensions/pgvector) can use the pgvector extension, and you can use [Supabase with Fly.io](https://fly.io/docs/reference/supabase/).
 
-  > Note that you need to save the embeddings (as vectors) into the database, so the database will be intensively used. This may lead to scaling problems and potential race conditions.
+> Note that you need to save the embeddings (as vectors) into the database, so the database will be intensively used. This may lead to scaling problems and potential race conditions.
 
-  We can alternatively use the `hnswlib` library and its Elixir binding [HNSWLib](https://github.com/elixir-nx/hnswlib).
-  This "externalises" the ANN search from the database as it uses an in-memory file that needs to be persisted on disk, thus at the expense of using the filesystem with again potential race conditions.
-  It works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**: this struct will allow us to efficiently retrieve
-  vector data.
+We can alternatively use the `hnswlib` library and its Elixir binding [HNSWLib](https://github.com/elixir-nx/hnswlib).
+This "externalises" the ANN search from the database as it uses an in-memory file.
+This file needs to be persisted on disk, thus at the expense of using the Filesystem with again potential race conditions.
+It works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**: this struct will allow us to efficiently retrieve vector data.
 
-  We will use this last option.
+We will use this last option.
 
-  We will incrementally append the embedding computed from the captions to the Index. We will get an indice that is the order of this embedding in the Index.
-  We then run a "knn\*search" algorithm; the input will be the embedding of the audio transcript.
-  This algorithm will return the most relevant position(s) - `indices` -
-  among the `Index` indices that minimize the choosen distance between this input and the existing vectors.
-  This is where we'll need to save
-  whether the index or the embedding to look-up for the corresponding image(s), depending upon if you append items one by one or by batch.
-  In our case, you will append items one by one so we will use the indice to uniquely recover the nearest image whose caption is close semantically to our audio.
+We will append incrementally the computed embedding from the captions into the Index.
+We will get an indice that is the order of this embedding in the Index.
+We then run a "knn_search" algorithm; the input will be the embedding of the audio transcript.
+This algorithm will return the most relevant position(s) - `indices` -
+among the `Index` indices that minimize the choosen distance between this input and the existing vectors.
 
-  Do note that the measured distance is dependant on the
-  [similarity metric](https://www.pinecone.io/learn/vector-similarity/)
-  used by the embedding model.
-  Because the "sentence-transformer" model we've chosen was trained with **_cosine_similarity_**,
-  so that's what we'll use. Bumblebee may have options to correctly use this metric, but we used a normalisation process which fits our needs.
+This is where we'll need to save:
+
+- whether the index,
+- or the embedding
+
+to look-up for the corresponding image(s), depending upon if you append items one by one or by batch.
+
+In our case, you will append items one by one so we will use the indice to uniquely recover the nearest image whose caption is close semantically to our audio.
+
+Do note that the measured distance is dependant on the [similarity metric](https://www.pinecone.io/learn/vector-similarity/)
+used by the embedding model.
+Because the "sentence-transformer" model we've chosen was trained with **_cosine_similarity_**,
+this is what we'll use.
+Bumblebee may have options to correctly use this metric, but we used a normalisation process which fits our needs.
 
 #### Pre-requisites
 
@@ -3286,7 +3290,7 @@ Indeed, `Bumblebee` uses `ffmpeg` under the hood to process audio files into ten
 
 > **Source:** <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>
 
-We firstly need capture the audio and upload it to the server.
+We firstly need to capture the audio and upload it to the server.
 
 The process is quite similar to the image upload, except that we
 use a special Javascript hook to record the audio
@@ -3461,8 +3465,8 @@ We now need to add some server-side code.
 
 The uploaded audio file will be saved on disk as a temporary file
 in the `/priv/static/uploads` folder.
-We will make this file unique every time a user records an audio.
-Wew simply an `Ecto.UUID` string to the file name and pass it into the Liveview socket.
+We will make this file _unique_ every time a user records an audio.
+We simply use an `Ecto.UUID` string to the file name and pass it into the Liveview socket.
 
 The Liveview `mount/3` function returns a socket. Let's update it
 and pass extra arguments -
@@ -3478,21 +3482,19 @@ we change the code like so:
 @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
 def mount(_,_,socket) do
-  File.mkdir_p!(@upload_dir)
-
   socket
   |> assign(
     ...,
     transcription: nil,
     micro_off: false,
     speech_spin: false,
+    tmp_wave: @tmp_wav
   )
   |> allow_upload(:speech,
     accept: :any,
     auto_upload: true,
     progress: &handle_progress/3,
-    max_entries: 1,
-    tmp_wave: @tmp_wave
+    max_entries: 1
   )
   |> allow_upload(:image_list, ...)
 end
@@ -3536,7 +3538,7 @@ And that's it for the Liveview portion!
 
 #### 1.4 Serving the `Whisper` model
 
-We add an extra check on the models to shutdown the app in case of a problem with the models.
+Now that we are adding several models, we will run an extra check on the models to shutdown the app in case of a problem with the models as it makes no sense to continue.
 
 We now add the model `Whisper` in the
 `lib/app/application.ex`
@@ -3545,18 +3547,26 @@ so it's available throughout the application in runtime.
 ```elixir
 # lib/app/application.ex
 
-def start(_type, _args) do
-    App.Models.verify_and_download_models()
-    |> case do
-      {:error, msg} ->
-        Logger.warning(msg)
-        System.stop(1)
+def check_models_on_startup do
+  App.Models.verify_and_download_models()
+  |> case do
+    {:error, msg} ->
+      Logger.warning(msg)
+      System.stop(0)
 
-      :ok ->
+    :ok ->
         :ok
+  end
+end
+
+def start(_type, _args) do
     end
 
-    [...]
+    # model check-up
+    :ok = check_models_on_startup()
+
+    children = [
+      ...,
     # Nx serving for Speech-to-Text
     {Nx.Serving,
       serving:
@@ -3566,8 +3576,9 @@ def start(_type, _args) do
           App.Models.audio_serving()
         end,
       name: Whisper},
-    [...]
+    ,...
   ]
+  ...
 ```
 
 As you can see, we're doing a similar serving
@@ -3674,11 +3685,11 @@ defmodule App.Models do
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
 
-        # Download captioning prod model
         with {:ok, _} <-
+                # Download captioning prod model
                download_model(@captioning_prod_model),
-             # Download whisper model
              {:ok, _} <-
+             # Download whisper model
                download_model(@audio_prod_model) do
           :ok
         else
@@ -3689,11 +3700,11 @@ defmodule App.Models do
         # Check if the prod model cache directory exists or if it's not empty.
         # If so, we download the prod models.
 
-        # Audio capture model
         with :ok <-
+              # Audio capture model
                check_folder_and_download(@audio_prod_model),
-             # Captioning test model
              :ok <-
+             # Captioning test model
                check_folder_and_download(@captioning_prod_model) do
           :ok
         else
@@ -3704,12 +3715,13 @@ defmodule App.Models do
         # Check if the test model cache directory exists or if it's not empty.
         # If so, we download the test models.
 
-        # Captioning test model
         with :ok <-
+              # Captioning test model
                check_folder_and_download(@captioning_test_model),
 
-             # Audio capture model
-             :ok <- check_folder_and_download(@audio_test_model) do
+             :ok <-
+              # Audio capture model
+              check_folder_and_download(@audio_test_model) do
           :ok
         else
           {:error, msg} -> {:error, msg}
@@ -3913,10 +3925,7 @@ defmodule App.Models do
     model_location =
       Path.join(model.cache_path, "huggingface")
 
-    with false <-
-           File.exists?(model_location),
-         {:error, :enoent} <-
-           File.ls(model_location) do
+   if File.ls(model_location) == {:error, :enoent} or File.ls(model_location) == {:ok, []} do
       download_model(model)
       |> case do
         {:ok, _} -> :ok
@@ -4011,17 +4020,25 @@ This means the app is uses this unique file so is meant to run on a **single nod
 #### The HNSWLib Index
 
 This library works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**.
-We instantiate the Index file via a file in a GenServer.
+We instantiate the Index file via a file in a `GenServer` which holds the index in the state.
+When the app starts, we either read or create this file. The file is saved in the "/priv/static/uploads" folder.
+The GenServer runs also all the client calls to the index.
+
 Because we are deploying with Fly.io, we need to persist the Index file in the database because the machine - thus its attached volume - is pruned when inactive.
 
-We endow the vector space with a `:cosine` pseudo-metric.
-When the app starts, we either read or create this file. The file is saved in the "/priv/static/uploads" folder.
+It is crucial to save the correspondance between the Image table and the Index file to retrieve the correct images.
+
+We therefor disable a user to load several times the same file as otherwise, we would have the several indexes for the same picture.
+This is done with a SHA computation.
+
+Since computations using models is a long run process, and since several users may interact with the app,
+we need several steps to ensure that the information is synchronized between the database and the index file.
+
+We also endow the vector space with a `:cosine` pseudo-metric.
 
 Add the following GenServer file: it will load the Index file, and also provides a client API to interact with the Index which is hold in the state of the GenServer.
 
 This solution works for a single node.
-
-It is crucial to save the correspondance between the Image table and the Index file to retrieve the correct images.
 
 ```elixir
 # /lib/app/knn_index.ex
@@ -4231,16 +4248,24 @@ We provide a serving for the embedding model in the "App.Models" module. It shou
   }
 
 def embedding() do
-  model = load_offline_model(@embedding_model)
+    load_offline_model(@embedding_model)
+    |> then(fn response ->
+      case response do
+        {:ok, model} ->
+          # return n %Nx.Serving{} struct
+          %Nx.Serving{} =
+            Bumblebee.Text.TextEmbedding.text_embedding(
+              model.model_info,
+              model.tokenizer,
+              defn_options: [compiler: EXLA],
+              preallocate_params: true
+            )
 
-  Bumblebee.Text.TextEmbedding.text_embedding(
-    model.model_info,
-    model.tokenizer,
-    compile: [batch_size: 16, sequence_length: 130],
-    defn_options: [compiler: EXLA],
-    preallocate_params: true
-  )
-end
+        {:error, msg} ->
+          {:error, msg}
+      end
+    end)
+  end
 
 
 def verify_and_download_models() do
@@ -4293,8 +4318,51 @@ children = [
 
 The [paragraph](#worked-example-on-how-to-use-hnswlib) displays a worked example.
 
-We firstly append the index to the Liveview socket assigns so we work with an in-memory copy of it.
-This means this app works only with a **single node**.
+#### `on_mount` hook
+
+We firstly add an `on_mount` hook to the Liveview to check that the index and the database are synced.
+This happens when the index count and the length of the table "images" are equal.
+There is no point to continue if this is not the case.
+We declared the hook in the Liveview rather than with a `live_session` in the router.
+
+```elixir
+defmodule AppWeb.IndexCheck do
+  import Phoenix.LiveView
+  use AppWeb, :verified_routes
+
+  require Logger
+
+  @moduledoc """
+  Checks if the length of the Image table is equal to the index count of the Hnswlib Index file.
+  Redirects to 404 page if not.
+  """
+  def on_mount(:default, _params, _session, socket) do
+    App.KnnIndex.check_integrity()
+    |> case do
+      true ->
+        {:cont, socket}
+
+      false ->
+        Logger.warning("Index Integrity Error")
+        {:halt, redirect(socket, to: ~p"/404")}
+    end
+  end
+end
+```
+
+Then we declare it in the Liveview:
+
+```elixir
+defmodule AppWeb.PageLive do
+  use AppWeb, :live_view
+  ...
+
+  on_mount {AppWeb.IndexCheck, :default}
+
+  def mount(....)
+```
+
+#### Computation of embeddings
 
 ```elixir
 @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
@@ -4345,10 +4413,9 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
              normed_data <-
                Nx.divide(data, Nx.LinAlg.norm(data)),
              {:check_used, {:ok, pending_image}} <-
-               {:check_used, App.Image.check_before_append_to_index(image.sha1)},
-             {:ok, idx} <-
-               App.KnnIndex.add_item(normed_data) do
-
+               {:check_used, App.Image.check_before_append_to_index(image.sha1)} do
+          {:ok, idx}  =
+            App.KnnIndex.add_item(normed_data) do
           # save the App.Image to the DB
           Map.merge(image, %{idx: idx, caption: label})
           |> App.Image.insert()

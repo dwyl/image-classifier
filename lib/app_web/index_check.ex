@@ -9,7 +9,7 @@ defmodule AppWeb.IndexCheck do
   Redirects to 404 page if not.
   """
   def on_mount(:default, _params, _session, socket) do
-    App.KnnIndex.check_integrity()
+    App.KnnIndex.check_index_integrity()
     |> case do
       true ->
         {:cont, socket}

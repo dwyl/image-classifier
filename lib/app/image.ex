@@ -6,8 +6,6 @@ defmodule App.Image do
   utility functions.
   """
 
-  # alias App.{Image, Repo}
-
   @primary_key {:id, :id, autogenerate: true}
   schema "images" do
     field(:description, :string)

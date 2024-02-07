@@ -20,10 +20,10 @@ defmodule App.Models do
 
   # Embedding-------
   @embedding_model %ModelInfo{
-    name: "sentence-transformers/paraphrase-MiniLM-L6-v2",
     cache_path: Path.join(@models_folder_path, "paraphrase-MiniLM-L6-v2"),
     load_featurizer: false,
     load_tokenizer: true,
+    name: "sentence-transformers/paraphrase-MiniLM-L6-v2",
     load_generation_config: true
   }
   # Captioning --
@@ -102,11 +102,8 @@ defmodule App.Models do
 
         with {:ok, _} <-
                download_model(@captioning_prod_model),
-             # Download captioning prod model
-             # Download whisper model
              {:ok, _} <-
                download_model(@audio_prod_model),
-             # download embedding model
              {:ok, _} <-
                download_model(@embedding_model) do
           :ok
@@ -118,15 +115,12 @@ defmodule App.Models do
         # Check if the prod model cache directory exists or if it's not empty.
         # If so, we download the prod models.
 
-        # Audio capture model
         with :ok <-
+               check_folder_and_download(@captioning_prod_model),
+             :ok <-
                check_folder_and_download(@audio_prod_model),
-             # Embedding model
              :ok <-
-               check_folder_and_download(@embedding_model),
-             # Captioning test model
-             :ok <-
-               check_folder_and_download(@captioning_prod_model) do
+               check_folder_and_download(@embedding_model) do
           :ok
         else
           {:error, msg} -> {:error, msg}
@@ -136,11 +130,8 @@ defmodule App.Models do
         # Check if the test model cache directory exists or if it's not empty.
         # If so, we download the test models.
 
-        # Captioning test model
         with :ok <-
                check_folder_and_download(@captioning_test_model),
-
-             # Audio capture model
              :ok <- check_folder_and_download(@audio_test_model) do
           :ok
         else
@@ -368,19 +359,15 @@ defmodule App.Models do
     model_location =
       Path.join(model.cache_path, "huggingface")
 
-    with false <-
-           File.exists?(model_location),
-         {:error, :enoent} <-
-           File.ls(model_location) do
+    if File.ls(model_location) == {:error, :enoent} or File.ls(model_location) == {:ok, []} do
       download_model(model)
       |> case do
-        {:ok, _} -> :ok
+        {:ok, %Bumblebee.Text.GenerationConfig{}} -> :ok
         {:error, msg} -> {:error, msg}
       end
     else
-      _ ->
-        Logger.info("No download")
-        :ok
+      Logger.info("No download")
+      :ok
     end
   end
 end

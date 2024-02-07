@@ -11,8 +11,6 @@ defmodule App.HnswlibIndex do
   with utility functions
   """
 
-  # @saved_index Path.expand("priv/static/uploads/indexes.bin")
-
   schema "hnswlib_index" do
     field(:file, :binary)
     field(:lock_version, :integer, default: 1)
@@ -25,87 +23,53 @@ defmodule App.HnswlibIndex do
     |> Ecto.Changeset.validate_required([:id])
   end
 
-  def save() do
-    with path <-
-           App.KnnIndex.get_index_path(),
-         {:ok, file} <-
-           File.read(path),
-         index <-
-           Repo.get(HnswlibIndex, 1),
-         {:ok, schema} <-
-           HnswlibIndex.changeset(index, %{file: file})
-           |> Repo.update() do
-      {:ok, schema}
-    else
-      {:error, msg} ->
-        Logger.warning(inspect(msg))
-        Process.sleep(10)
-        save()
-    end
-
-    # try do
-    #   path = App.KnnIndex.get_index_path()
-    #   file = File.read(path)
-
-    #   Repo.get(HnswlibIndex, 1)
-    #   |> HnswlibIndex.changeset(%{file: file})
-    #   |> Repo.update()
-    # rescue
-    #   e in Ecto.StaleEntryError ->
-    #     require Logger
-    #     Logger.warning(inspect(e))
-    #     Process.sleep(10)
-    #     save()
-    # end
-  end
-
   def maybe_load_index_from_db(space, dim, max_elements) do
+    IO.puts("maybe load index from db -----------")
     # check if the table has an entry
     Repo.get_by(HnswlibIndex, id: 1)
     |> case do
-      # table empty
       nil ->
-        # create a singleton row
+        # table empty
         Logger.info("New Index")
+        create(space, dim, max_elements)
 
-        HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
-        |> Repo.insert()
-        |> case do
-          {:ok, _index} ->
-            HNSWLib.Index.new(space, dim, max_elements)
-
-          {:error, msg} ->
-            {:error, msg}
-        end
-
-      # table is not empty but has no file
       response when response.file == nil ->
+        # table is not empty but has no file
         Logger.info("Recreate Index")
-
+        # recreate the table
         App.Repo.delete_all(App.HnswlibIndex)
 
-        HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
-        |> Repo.insert()
-        |> case do
-          {:ok, _index} ->
-            HNSWLib.Index.new(space, dim, max_elements)
+        create(space, dim, max_elements)
 
-          {:error, msg} ->
-            {:error, msg}
-        end
-
-      # table is not empty and has a file
-      index_file ->
+      index_db ->
+        # table is not empty and has a file
         Logger.info("Loading Index from DB")
 
-        with path <- App.KnnIndex.get_index_path(),
+        with path <-
+               App.KnnIndex.index_path(),
              # save on disk
-             :ok <- File.write(path, index_file.file) do
-          # load the index file
-          HNSWLib.Index.load_index(space, dim, path)
+             :ok <-
+               File.write(path, index_db.file),
+             # load the index file
+             {:ok, index} <-
+               HNSWLib.Index.load_index(space, dim, path) do
+          {:ok, index, index_db}
         else
           {:error, msg} -> {:error, msg}
         end
+    end
+  end
+
+  defp create(space, dim, max_elements) do
+    HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
+    |> Repo.insert()
+    |> case do
+      {:ok, schema} ->
+        HNSWLib.Index.new(space, dim, max_elements)
+        |> Tuple.append(schema)
+
+      {:error, msg} ->
+        {:error, msg}
     end
   end
 end
