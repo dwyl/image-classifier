@@ -16,7 +16,7 @@ defmodule AppWeb.IndexCheck do
         {:cont, socket}
 
       false ->
-        Logger.warning("Index Integrity Error")
+        Logger.warning("\u274C" <> " Index Integrity Error")
         {:halt, redirect(socket, to: ~p"/404")}
     end
   end
