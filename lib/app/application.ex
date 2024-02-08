@@ -13,7 +13,7 @@ defmodule App.Application do
         System.stop(0)
 
       :ok ->
-        Logger.info("Models :ok")
+        Logger.info("Models: " <> "\u2705")
         :ok
     end
   end

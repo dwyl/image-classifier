@@ -73,9 +73,7 @@ defmodule App.Image do
       %App.Image{} = img ->
         {:ok, img}
 
-      res ->
-        require Logger
-        Logger.warning(inspect(res))
+      nil ->
         {:error, "Already uploaded"}
     end
   end
@@ -91,7 +89,7 @@ defmodule App.Image do
   @doc """
   Returns `:ok` or `nil` if the given sha1 is saved into the database Image table.
   """
-  def check_sha1(sha1) do
+  def check_sha1(sha1) when is_binary(sha1) do
     App.Repo.get_by(App.Image, %{sha1: sha1})
     |> case do
       nil ->

@@ -434,8 +434,7 @@ defmodule AppWeb.PageLive do
           end)
           # save Index file to DB
           |> Ecto.Multi.run(:save_index, fn _, _ ->
-            {:ok, idx} = App.KnnIndex.add_item(normed_data)
-            Logger.info("#{idx}")
+            {:ok, _idx} = App.KnnIndex.add_item(normed_data)
             App.KnnIndex.save_index_to_db()
           end)
           |> App.Repo.transaction()

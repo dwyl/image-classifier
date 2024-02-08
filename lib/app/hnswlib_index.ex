@@ -2,7 +2,7 @@ defmodule App.HnswlibIndex do
   use Ecto.Schema
 
   alias App.HnswlibIndex
-  alias App.Repo
+  # alias App.Repo
 
   require Logger
 
@@ -10,6 +10,9 @@ defmodule App.HnswlibIndex do
   Ecto schema to save the HNSWLib Index file into a singleton table
   with utility functions
   """
+
+  @type index :: %HNSWLib.Index{space: atom(), dim: integer(), reference: term()}
+  @type index_schema :: %App.HnswlibIndex{file: binary(), lock_version: integer()}
 
   schema "hnswlib_index" do
     field(:file, :binary)
@@ -23,10 +26,12 @@ defmodule App.HnswlibIndex do
     |> Ecto.Changeset.validate_required([:id])
   end
 
+  @spec maybe_load_index_from_db(atom(), integer(), integer()) ::
+          {:ok, index(), index_schema()} | {:error, String.t()}
+
   def maybe_load_index_from_db(space, dim, max_elements) do
-    IO.puts("maybe load index from db -----------")
     # check if the table has an entry
-    Repo.get_by(HnswlibIndex, id: 1)
+    App.Repo.get_by(HnswlibIndex, id: 1)
     |> case do
       nil ->
         # table empty
@@ -62,7 +67,7 @@ defmodule App.HnswlibIndex do
 
   defp create(space, dim, max_elements) do
     HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
-    |> Repo.insert()
+    |> App.Repo.insert()
     |> case do
       {:ok, schema} ->
         HNSWLib.Index.new(space, dim, max_elements)

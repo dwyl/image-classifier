@@ -20,10 +20,10 @@ defmodule App.Models do
 
   # Embedding-------
   @embedding_model %ModelInfo{
+    name: "sentence-transformers/paraphrase-MiniLM-L6-v2",
     cache_path: Path.join(@models_folder_path, "paraphrase-MiniLM-L6-v2"),
     load_featurizer: false,
     load_tokenizer: true,
-    name: "sentence-transformers/paraphrase-MiniLM-L6-v2",
     load_generation_config: true
   }
   # Captioning --
@@ -75,10 +75,11 @@ defmodule App.Models do
   The models that are downloaded are hardcoded in this function.
   """
   def verify_and_download_models() do
-    force_models_download = Application.get_env(:app, :force_models_download, false)
-    use_test_models = Application.get_env(:app, :use_test_models, false)
-
-    case {force_models_download, use_test_models} do
+    {
+      Application.get_env(:app, :force_models_download, false),
+      Application.get_env(:app, :use_test_models, false)
+    }
+    |> case do
       {true, true} ->
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
@@ -132,7 +133,8 @@ defmodule App.Models do
 
         with :ok <-
                check_folder_and_download(@captioning_test_model),
-             :ok <- check_folder_and_download(@audio_test_model) do
+             :ok <-
+               check_folder_and_download(@audio_test_model) do
           :ok
         else
           {:error, msg} -> {:error, msg}
@@ -145,7 +147,6 @@ defmodule App.Models do
     |> then(fn response ->
       case response do
         {:ok, model} ->
-          # return n %Nx.Serving{} struct
           %Nx.Serving{} =
             Bumblebee.Text.TextEmbedding.text_embedding(
               model.model_info,
@@ -366,7 +367,7 @@ defmodule App.Models do
         {:error, msg} -> {:error, msg}
       end
     else
-      Logger.info("No download")
+      Logger.info("No download: #{model.name}")
       :ok
     end
   end

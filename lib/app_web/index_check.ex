@@ -12,6 +12,7 @@ defmodule AppWeb.IndexCheck do
     App.KnnIndex.check_index_integrity()
     |> case do
       true ->
+        Logger.info("Index coherent: " <> "\u2705")
         {:cont, socket}
 
       false ->

@@ -44,7 +44,7 @@ defmodule App.KnnIndex do
   # end
 
   def add_item(embedding) do
-    GenServer.call(__MODULE__, {:add, embedding})
+    GenServer.call(__MODULE__, {:add_item, embedding})
   end
 
   def knn_search(input) do
@@ -147,7 +147,7 @@ defmodule App.KnnIndex do
     end
   end
 
-  def handle_call({:add, embedding}, _, {index, _, _} = state) do
+  def handle_call({:add_item, embedding}, _, {index, _, _} = state) do
     with :ok <-
            HNSWLib.Index.add_items(index, embedding),
          {:ok, idx} <-
@@ -179,6 +179,7 @@ defmodule App.KnnIndex do
             App.Repo.get_by(App.Image, %{idx: idx + 1})
           end)
 
+        # possible TODO: add threshold on  "distances"
         {:reply, response, state}
 
       {:error, msg} ->
