@@ -59,23 +59,28 @@ defmodule App.KnnIndex do
   Called `on_mount`to halt the Liveview in case the Index file length
   is not equal to the count of images in the db.
   """
+
+  # def check_index_integrity do
+  #   index_nb =
+  #     App.KnnIndex.load_index()
+  #     |> elem(0)
+  #     |> HNSWLib.Index.get_current_count()
+  #     |> case do
+  #       {:ok, index_db} ->
+  #         index_db
+
+  #       {:error, msg} ->
+  #         Logger.warning(inspect(msg))
+  #         :error
+  #     end
+
+  #   db_nb = App.Repo.all(App.Image) |> length()
+
+  #   index_nb == db_nb
+  # end
+
   def check_index_integrity do
-    index_nb =
-      App.KnnIndex.load_index()
-      |> elem(0)
-      |> HNSWLib.Index.get_current_count()
-      |> case do
-        {:ok, index_db} ->
-          index_db
-
-        {:error, msg} ->
-          Logger.warning(inspect(msg))
-          :error
-      end
-
-    db_nb = App.Repo.all(App.Image) |> length()
-
-    index_nb == db_nb
+    GenServer.call(__MODULE__, :integrity)
   end
 
   # ---------------------------------------------------
@@ -107,6 +112,23 @@ defmodule App.KnnIndex do
   end
 
   @impl true
+  def handle_call(:integrity, _, {index, _, _} = state) do
+    index_count =
+      HNSWLib.Index.get_current_count(index)
+      |> case do
+        {:ok, index_db} ->
+          index_db
+
+        {:error, msg} ->
+          Logger.warning(inspect(msg))
+          :error
+      end
+
+    db_length = App.Repo.all(App.Image) |> length()
+
+    {:reply, index_count == db_length, state}
+  end
+
   def handle_call(:load_index, _, {:error, :badarg, space} = state) do
     App.HnswlibIndex.maybe_load_index_from_db(:cosine, @dim, @max_elements)
     |> case do
