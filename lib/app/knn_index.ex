@@ -60,25 +60,6 @@ defmodule App.KnnIndex do
   is not equal to the count of images in the db.
   """
 
-  # def check_index_integrity do
-  #   index_nb =
-  #     App.KnnIndex.load_index()
-  #     |> elem(0)
-  #     |> HNSWLib.Index.get_current_count()
-  #     |> case do
-  #       {:ok, index_db} ->
-  #         index_db
-
-  #       {:error, msg} ->
-  #         Logger.warning(inspect(msg))
-  #         :error
-  #     end
-
-  #   db_nb = App.Repo.all(App.Image) |> length()
-
-  #   index_nb == db_nb
-  # end
-
   def check_index_integrity do
     GenServer.call(__MODULE__, :integrity)
   end
