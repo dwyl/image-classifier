@@ -32,53 +32,6 @@ defmodule App.Image do
   end
 
   @doc """
-  Uploads the given image to S3
-  and adds the image information to the database.
-  """
-
-  # def insert(image_info) do
-  #   image = Map.take(image_info, [:mimetype, :width, :height, :url, :description, :sha1])
-  #   changeset = changeset(%Image{}, image)
-
-  #   case changeset.valid? do
-  #     true -> Repo.insert(changeset)
-  #     false -> {:error, changeset.errors}
-  #   end
-  # end
-
-  # def update(sha1, %AppWeb.PageLive.ImageInfo{} = params) do
-  #   image =
-  #     App.Repo.get_by(App.Image, sha1: sha1)
-
-  #   params = Map.take(params, [:mimetype, :width, :height, :url, :description, :sha1])
-
-  #   changeset =
-  #     changeset(image, params)
-
-  #   require Logger
-
-  #   case changeset.valid? do
-  #     true ->
-  #       Logger.info(image)
-  #       {:ok, _img} = App.Repo.update(image, changeset)
-
-  #     false ->
-  #       {:error, inspect(changeset.errors)}
-  #   end
-  # end
-
-  def check_before_append_to_index(sha1) do
-    App.Repo.get_by(App.Image, sha1: sha1)
-    |> case do
-      %App.Image{} = img ->
-        {:ok, img}
-
-      nil ->
-        {:error, "Already uploaded"}
-    end
-  end
-
-  @doc """
   Calculates the SHA1 of a given binary
   """
   def calc_sha1(file_binary) do
@@ -87,16 +40,16 @@ defmodule App.Image do
   end
 
   @doc """
-  Returns `:ok` or `nil` if the given sha1 is saved into the database Image table.
+  Returns `{:ok, image}` or `nil` if the given sha1 is saved into the database Image table.
   """
   def check_sha1(sha1) when is_binary(sha1) do
     App.Repo.get_by(App.Image, %{sha1: sha1})
     |> case do
       nil ->
-        :ok
+        nil
 
       %App.Image{} = image ->
-        image
+        {:ok, image}
     end
   end
 

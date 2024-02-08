@@ -174,7 +174,7 @@ defmodule AppWeb.PageLive do
              {:check_mime, check_mime(mime, mimetype)},
            sha1 <-
              App.Image.calc_sha1(file_binary),
-           {:sha_check, :ok} <-
+           {:sha_check, nil} <-
              {:sha_check, App.Image.check_sha1(sha1)},
            # Get image and resize
            {:ok, thumbnail_vimage} <-
@@ -214,7 +214,7 @@ defmodule AppWeb.PageLive do
         {:read, msg} -> {:postpone, %{error: inspect(msg)}}
         {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
         {:check_mime, :error} -> {:postpone, %{error: "Bad mime type"}}
-        {:sha_check, %App.Image{}} -> {:postpone, %{error: "Image already uploaded"}}
+        {:sha_check, {:ok, %App.Image{}}} -> {:postpone, %{error: "Image already uploaded"}}
         {:pre_process, {:error, _msg}} -> {:postpone, %{error: "pre_processing error"}}
         {:error, reason} -> {:postpone, %{error: inspect(reason)}}
       end
@@ -419,7 +419,7 @@ defmodule AppWeb.PageLive do
              normed_data <-
                Nx.divide(data, Nx.LinAlg.norm(data)),
              {:check_used, {:ok, pending_image}} <-
-               {:check_used, App.Image.check_before_append_to_index(image.sha1)} do
+               {:check_used, App.Image.check_sha1(image.sha1)} do
           Ecto.Multi.new()
           # save updated Image to DB
           |> Ecto.Multi.run(:update_image, fn _, _ ->
