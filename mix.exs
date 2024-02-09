@@ -70,8 +70,8 @@ defmodule App.MixProject do
       {:exla, "~> 0.6.4"},
       # {:xla, "~> 0.6.0"},
       {:nx, "~> 0.6.4 "},
-      # {:hnswlib, "~> 0.1.4"},
-      {:hnswlib, git: "https://github.com/elixir-nx/hnswlib", override: true},
+       {:hnswlib, "~> 0.1.4"},
+      #{:hnswlib, git: "https://github.com/elixir-nx/hnswlib", override: true},
 
       # Image
       {:vix, "~> 0.26.0"},
@@ -96,7 +96,7 @@ defmodule App.MixProject do
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind default", "esbuild default"],
       "assets.deploy": ["tailwind default --minify", "esbuild default --minify", "phx.digest"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "run priv/repo/seeds.exs", "test"],
       t: ["test"],
       c: ["coveralls.html"],
       s: ["phx.server"]
