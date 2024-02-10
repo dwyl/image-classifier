@@ -469,9 +469,15 @@ defmodule AppWeb.PageLive do
                )}
           end
         else
-          {:check_used, {:error, msg}} ->
-            Logger.debug(msg)
-            {:noreply, socket |> push_event("toast", %{message: msg})}
+          {:check_used, nil} ->
+            {:noreply,
+             socket
+             |> push_event("toast", %{message: "Race condition"})
+             |> assign(
+               running?: false,
+               task_ref: nil,
+               label: nil
+             )}
 
           {:error, msg} ->
             {:noreply,
