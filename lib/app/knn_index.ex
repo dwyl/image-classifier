@@ -60,9 +60,9 @@ defmodule App.KnnIndex do
   is not equal to the count of images in the db.
   """
 
-  def check_index_integrity do
-    GenServer.call(__MODULE__, :integrity)
-  end
+  # def check_index_integrity do
+  #   GenServer.call(__MODULE__, :integrity)
+  # end
 
   # ---------------------------------------------------
   @impl true
@@ -86,29 +86,57 @@ defmodule App.KnnIndex do
             {:stop, {:error, "Incoherence on table"}}
 
           schema ->
-            {:ok, index} = HNSWLib.Index.load_index(space, @dim, @saved_index)
-            {:ok, {index, schema, space}}
+            check_integrity(schema, space)
         end
     end
   end
 
-  @impl true
-  def handle_call(:integrity, _, {index, _, _} = state) do
-    index_count =
-      HNSWLib.Index.get_current_count(index)
-      |> case do
-        {:ok, index_db} ->
-          index_db
+  defp check_integrity(schema, space) do
+    HNSWLib.Index.load_index(space, @dim, @saved_index)
+    |> case do
+      {:ok, index} ->
+        index_count =
+          HNSWLib.Index.get_current_count(index)
+          |> case do
+            {:ok, index_db} ->
+              index_db
 
-        {:error, msg} ->
-          Logger.warning(inspect(msg))
-          :error
-      end
+            {:error, msg} ->
+              Logger.warning(inspect(msg))
+              :error
+          end
 
-    db_length = App.Repo.all(App.Image) |> length()
+        len = App.Repo.all(App.Image) |> length()
 
-    {:reply, index_count == db_length, state}
+        if index_count == len do
+          Logger.info("Integrity: " <> "\u2705")
+          {:ok, {index, schema, space}}
+        else
+          {:stop, {:error, "Integrity error"}}
+        end
+
+      {:error, msg} ->
+        {:stop, {:error, msg}}
+    end
   end
+
+  @impl true
+  # def handle_call(:integrity, _, {index, _, _} = state) do
+  #   index_count =
+  #     HNSWLib.Index.get_current_count(index)
+  #     |> case do
+  #       {:ok, index_db} ->
+  #         index_db
+
+  #       {:error, msg} ->
+  #         Logger.warning(inspect(msg))
+  #         :error
+  #     end
+
+  #   db_length = App.Repo.all(App.Image) |> length()
+
+  #   {:reply, index_count == db_length, state}
+  # end
 
   def handle_call(:load_index, _, {:error, :badarg, space} = state) do
     App.HnswlibIndex.maybe_load_index_from_db(:cosine, @dim, @max_elements)

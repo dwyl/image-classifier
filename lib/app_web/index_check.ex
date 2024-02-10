@@ -1,23 +1,23 @@
-defmodule AppWeb.IndexCheck do
-  import Phoenix.LiveView
-  use AppWeb, :verified_routes
+# defmodule AppWeb.IndexCheck do
+#   import Phoenix.LiveView
+#   use AppWeb, :verified_routes
 
-  require Logger
+#   require Logger
 
-  @moduledoc """
-  Checks if the length of the Image table is equal to the index count of the Hnswlib Index file.
-  Redirects to 404 page if not.
-  """
-  def on_mount(:default, _params, _session, socket) do
-    App.KnnIndex.check_index_integrity()
-    |> case do
-      true ->
-        Logger.info("Index coherent: " <> "\u2705")
-        {:cont, socket}
+#   @moduledoc """
+#   Checks if the length of the Image table is equal to the index count of the Hnswlib Index file.
+#   Redirects to 404 page if not.
+#   """
+#   def on_mount(:default, _params, _session, socket) do
+#     App.KnnIndex.check_index_integrity()
+#     |> case do
+#       true ->
+#         Logger.info("Index coherent: " <> "\u2705")
+#         {:cont, socket}
 
-      false ->
-        Logger.warning("\u274C" <> " Index Integrity Error")
-        {:halt, redirect(socket, to: ~p"/404")}
-    end
-  end
-end
+#       false ->
+#         Logger.warning("\u274C" <> " Index Integrity Error")
+#         {:halt, redirect(socket, to: ~p"/404")}
+#     end
+#   end
+# end

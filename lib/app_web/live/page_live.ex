@@ -5,7 +5,7 @@ defmodule AppWeb.PageLive do
   alias Vix.Vips.Image, as: Vimage
   alias Vix.Vips.Operation, as: Vops
 
-  on_mount {AppWeb.IndexCheck, :default}
+  # on_mount {AppWeb.IndexCheck, :default}
 
   defmodule ImageInfo do
     @doc """
