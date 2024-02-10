@@ -29,8 +29,6 @@ defmodule App.Application do
       App.Repo,
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
-      # Start the HNSWLib Index from localstorage or from DB
-      {App.KnnIndex, :cosine},
       # Nx serving for the embedding
       {Nx.Serving, serving: App.Models.embedding(), name: Embedding, batch_size: 1},
       # Nx serving for Speech-to-Text
@@ -60,6 +58,17 @@ defmodule App.Application do
       # Start a worker by calling: App.Worker.start_link(arg)
       # {App.Worker, arg}
     ]
+
+
+    # We are starting the HNSWLib Index GenServer only during testing.
+    # Because this GenServer needs the database to be seeded first,
+    # we only add it when we're not testing.
+    # When testing, you need to spawn this process manually (it is done in the test_helper.exs file).
+    children = if Application.get_env(:app, :start_genserver, true) == true do
+      Enum.concat(children, [{App.KnnIndex, :cosine}])
+    else
+      children
+    end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

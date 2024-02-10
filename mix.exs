@@ -96,7 +96,7 @@ defmodule App.MixProject do
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind default", "esbuild default"],
       "assets.deploy": ["tailwind default --minify", "esbuild default --minify", "phx.digest"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "run priv/repo/seeds.exs", "test"],
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       t: ["test"],
       c: ["coveralls.html"],
       s: ["phx.server"]
