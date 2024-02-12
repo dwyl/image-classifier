@@ -138,7 +138,6 @@
           <span>Description: </span>
           <!-- conditional Spinner or display caption text or waiting text-->
           <AppWeb.Spinner.spin spin={@running?} />
-          <%!-- conditional display caption text or waiting text --%>
           <%= if @label do %>
             <span class="text-gray-700 font-light"><%= @label %></span>
           <% else %>

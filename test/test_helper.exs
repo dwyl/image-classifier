@@ -14,5 +14,5 @@ ExUnit.after_suite(fn _ ->
   # Make sure it's the same one used in `App.KnnIndex` so `mix test` always executes successfully.
   Application.app_dir(:app, ["priv", "static", "uploads"])
   |> Path.join("indexes_test.bin")
-  |> File.rm!()
+  |> File.rm()
 end)

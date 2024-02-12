@@ -1,5 +1,6 @@
 defmodule App.Image do
   use Ecto.Schema
+  require Logger
 
   @moduledoc """
   Ecto schema for the table Images and
@@ -117,7 +118,6 @@ defmodule App.Image do
           else: {:error, "Not accepted mime type."}
 
       {:ok, %GenMagic.Result{} = res} ->
-        require Logger
         Logger.warning(%{gen_magic_response: res})
         {:error, "Not acceptable."}
     end
