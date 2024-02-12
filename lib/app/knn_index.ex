@@ -13,12 +13,12 @@ defmodule App.KnnIndex do
 
   @dim 384
   @max_elements 200
-  @saved_index (if(Application.compile_env(:app, :knnindex_indices_test, false)) do
-                  Path.expand("priv/static/uploads/" <> "indexes_test.bin")
-                else
-                  Path.expand("priv/static/uploads/" <> "indexes.bin")
-                end)
   @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
+  @saved_index (if(Application.compile_env(:app, :knnindex_indices_test, false)) do
+    Path.join(@upload_dir, "indexes_test.bin")
+  else
+    Path.join(@upload_dir, "indexes.bin")
+  end)
 
   # client API ------------------
   def start_link(space) do

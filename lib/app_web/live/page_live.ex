@@ -164,24 +164,22 @@ defmodule AppWeb.PageLive do
     # We consume the entry only if the entry is done uploading from the image
     # and if consuming the entry was successful.
     consume_uploaded_entry(socket, entry, fn %{path: path} ->
-      with {:magic, {:ok, %{mime_type: mime}}} <-
-             {:magic, magic_check(path)},
-           {:read, {:ok, file_binary}} <-
-             {:read, File.read(path)},
+      with {:magic, {:ok, %{mime_type: mime}}} <- {:magic, magic_check(path)},
+           # Check if file can be properly read
+           {:read, {:ok, file_binary}} <- {:read, File.read(path)},
+           # Check the image info
            {:image_info, {mimetype, width, height, _variant}} <-
              {:image_info, ExImageInfo.info(file_binary)},
-           {:check_mime, :ok} <-
-             {:check_mime, check_mime(mime, mimetype)},
-           sha1 <-
-             App.Image.calc_sha1(file_binary),
-           {:sha_check, nil} <-
-             {:sha_check, App.Image.check_sha1(sha1)},
+           # Check mime type
+           {:check_mime, :ok} <- {:check_mime, check_mime(mime, mimetype)},
+           # Get SHA1 code from the image and check it
+           sha1 <- App.Image.calc_sha1(file_binary),
+           {:sha_check, nil} <- {:sha_check, App.Image.check_sha1(sha1)},
            # Get image and resize
-           {:ok, thumbnail_vimage} <-
-             Vops.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
-           # Pre-process it
-           {:pre_process, {:ok, tensor}} <-
-             {:pre_process, pre_process_image(thumbnail_vimage)} do
+           {:ok, thumbnail_vimage} <- Vops.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
+           # Pre-process the image as tensor
+           {:pre_process, {:ok, tensor}} <- {:pre_process, pre_process_image(thumbnail_vimage)} do
+
         image_info = %{
           mimetype: mimetype,
           width: width,
@@ -241,12 +239,12 @@ defmodule AppWeb.PageLive do
 
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
       %{error: errors} ->
-        Logger.info("Error uploading image. #{inspect(errors)}")
+        Logger.warning("Error uploading image. #{inspect(errors)}")
 
         {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
 
       msg ->
-        Logger.warning("ERROR --------------: #{inspect(msg)}")
+        Logger.warning(inspect(msg))
         {:noreply, socket}
     end
   end
