@@ -11,10 +11,13 @@ defmodule App.KnnIndex do
 
   require Logger
 
-  @indexes "indexes.bin"
   @dim 384
   @max_elements 200
-  @saved_index Path.expand("priv/static/uploads/" <> @indexes)
+  @saved_index (if(Application.compile_env(:app, :knnindex_indices_test, false)) do
+                  Path.expand("priv/static/uploads/" <> "indexes_test.bin")
+                else
+                  Path.expand("priv/static/uploads/" <> "indexes.bin")
+                end)
   @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
 
   # client API ------------------
@@ -112,6 +115,8 @@ defmodule App.KnnIndex do
           Logger.info("Integrity: " <> "\u2705")
           {:ok, {index, schema, space}}
         else
+          dbg(index_count)
+          dbg(len)
           {:stop, {:error, "Integrity error"}}
         end
 
