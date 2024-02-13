@@ -66,7 +66,8 @@ defmodule App.HnswlibIndex do
     end
   end
 
-  defp create(space, dim, max_elements) do
+  @spec create(atom(), integer(), integer()) :: {:ok, map(), map()} | {:error, binary()}
+  def create(space, dim, max_elements) do
     HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
     |> App.Repo.insert()
     |> case do

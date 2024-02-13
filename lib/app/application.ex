@@ -5,6 +5,12 @@ defmodule App.Application do
   require Logger
   use Application
 
+  @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
+
+  @saved_index if Application.compile_env(:app, :knnindex_indices_test, false),
+                 do: Path.join(@upload_dir, "indexes_test.bin"),
+                 else: Path.join(@upload_dir, "indexes.bin")
+
   def check_models_on_startup do
     App.Models.verify_and_download_models()
     |> case do
@@ -59,16 +65,16 @@ defmodule App.Application do
       # {App.Worker, arg}
     ]
 
-
     # We are starting the HNSWLib Index GenServer only during testing.
     # Because this GenServer needs the database to be seeded first,
     # we only add it when we're not testing.
     # When testing, you need to spawn this process manually (it is done in the test_helper.exs file).
-    children = if Application.get_env(:app, :start_genserver, true) == true do
-      Enum.concat(children, [{App.KnnIndex, :cosine}])
-    else
-      children
-    end
+    children =
+      if Application.get_env(:app, :start_genserver, true) == true do
+        Enum.concat(children, [{App.KnnIndex, [space: :cosine, index: @saved_index]}])
+      else
+        children
+      end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
