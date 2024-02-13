@@ -80,18 +80,18 @@ defmodule App.KnnIndex do
             {:stop, {:error, "Incoherence on table"}}
 
           schema ->
-            check_integrity(index_path, schema, space) |> dbg()
+            check_integrity(index_path, schema, space)
         end
     end
   end
 
   defp check_integrity(path, schema, space) do
     with db_count <-
-           App.Repo.all(App.Image) |> length() |> dbg(),
+           App.Repo.all(App.Image) |> length(),
          {:ok, index} <-
            HNSWLib.Index.load_index(space, @dim, path),
          {:ok, index_count} <-
-           HNSWLib.Index.get_current_count(index) |> dbg(),
+           HNSWLib.Index.get_current_count(index),
          true <-
            index_count == db_count do
       Logger.info("Integrity: " <> "\u2705")

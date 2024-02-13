@@ -43,5 +43,5 @@ npm-debug.log
 .elixir_ls
 
 # KNN index direcotry
-priv/static/uploads/
+priv/static/uploads/indexes.bin
 

@@ -215,15 +215,12 @@ defmodule AppWeb.PageLiveTest do
   end
 
   test "genserver init" do
-    path = set_path("indexes1.bin")
+    path = set_path("indexes_gen_test_1.bin")
     {:ok, file} = File.read(path)
 
     # ------------------------------------------------
     # happy path
-    Supervisor.stop(App.Supervisor)
-    App.Application.start(:normal, [])
-    App.Repo.delete_all(App.HnswlibIndex)
-    App.Repo.delete_all(App.Image)
+    reset()
 
     next_lock = 1
 
@@ -253,10 +250,7 @@ defmodule AppWeb.PageLiveTest do
     assert 1 == App.KnnIndex.get_count()
     # ------------------------------------------------
     # case Index file does not exist on Filesystem but exists in DB => create from DB copy.
-    Supervisor.stop(App.Supervisor)
-    App.Application.start(:normal, [])
-    App.Repo.delete_all(App.HnswlibIndex)
-    App.Repo.delete_all(App.Image)
+    reset()
 
     assert {:error, "Incoherence on table"} ==
              Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
@@ -265,12 +259,9 @@ defmodule AppWeb.PageLiveTest do
 
     # ------------------------------------------------
     # db es empty but index file is present
-    Supervisor.stop(App.Supervisor)
-    App.Application.start(:normal, [])
-    App.Repo.delete_all(App.HnswlibIndex)
-    App.Repo.delete_all(App.Image)
+    reset()
 
-    path = set_path("indexes2.bin")
+    path = set_path("indexes_gen_test_2.bin")
 
     App.HnswlibIndex.changeset(%App.HnswlibIndex{}, %{
       lock_version: next_lock,
@@ -286,10 +277,7 @@ defmodule AppWeb.PageLiveTest do
 
     # ------------------------------------------------
     # load file from db
-    Supervisor.stop(App.Supervisor)
-    App.Application.start(:normal, [])
-    App.Repo.delete_all(App.HnswlibIndex)
-    App.Repo.delete_all(App.Image)
+    reset()
 
     %App.HnswlibIndex{}
     |> App.HnswlibIndex.changeset(%{
@@ -305,13 +293,19 @@ defmodule AppWeb.PageLiveTest do
 
     assert App.KnnIndex.get_index() == App.KnnIndex.load_index() |> elem(0)
 
+    # -------------------------------------------------
+    # reset()
+    # path = set_path("ok.bin")
+
+    # assert :error ==
+    #          Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
+    #          |> dbg()
+    #          |> elem(0)
+
     # ------------------------------------------------
     # no index file and index table no empty but no file.
     # because the process has been stopped without uploading an image
-    Supervisor.stop(App.Supervisor)
-    App.Application.start(:normal, [])
-    App.Repo.delete_all(App.HnswlibIndex)
-    App.Repo.delete_all(App.Image)
+    reset()
 
     %App.HnswlibIndex{}
     |> App.HnswlibIndex.changeset(%{
@@ -329,5 +323,12 @@ defmodule AppWeb.PageLiveTest do
   defp set_path(name) do
     Application.app_dir(:app, ["priv", "static", "uploads"])
     |> Path.join(name)
+  end
+
+  defp reset do
+    Supervisor.stop(App.Supervisor)
+    App.Application.start(:normal, [])
+    App.Repo.delete_all(App.HnswlibIndex)
+    App.Repo.delete_all(App.Image)
   end
 end
