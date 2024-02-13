@@ -274,7 +274,7 @@ defmodule App.Models do
   # Loads the models from the cache folder.
   # It will load the model and the respective the featurizer, tokenizer and generation config if needed,
   # and return a map with all of these at the end.
-  @spec load_offline_model(any()) ::
+  @spec load_offline_model(map()) ::
           {:ok, map()} | {:error, String.t()}
 
   defp load_offline_model(model) do
@@ -326,6 +326,7 @@ defmodule App.Models do
 
   # Downloads the pre-trained models according to a given %ModelInfo struct.
   # It will load the model and the respective the featurizer, tokenizer and generation config if needed.
+  @spec download_model(map()) :: {:ok, map()} | {:error, binary()}
   defp download_model(model) do
     Logger.info("Downloading #{model.name}...")
 

@@ -196,4 +196,151 @@ defmodule AppWeb.PageLiveTest do
 
     assert ret == {:noreply, %{}}
   end
+
+  test "genserver init" do
+    # test path
+    # upload_dir = Application.app_dir(:app, ["priv", "static", "uploads"])
+
+    # saved_index =
+    #   Path.join(upload_dir, "indexes_test.bin")
+
+    path = set_path("indexes1.bin")
+    {:ok, file} = File.read(path)
+    # assert App.KnnIndex.index_path() == path
+
+    # ------------------------------------------------
+    # happy path
+    Supervisor.stop(App.Supervisor)
+    App.Application.start(:normal, [])
+    App.Repo.delete_all(App.HnswlibIndex)
+    App.Repo.delete_all(App.Image)
+
+    next_lock = 1
+
+    %App.HnswlibIndex{}
+    |> App.HnswlibIndex.changeset(%{
+      lock_version: next_lock,
+      file: file,
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    %{
+      description: nil,
+      width: 445,
+      url: nil,
+      idx: 1,
+      height: 259,
+      sha1: "C3E6725418C904560448D182050AECCD7F1D9E93",
+      mimetype: "image/png"
+    }
+    |> App.Image.insert()
+
+    assert :ok ==
+             Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
+             |> dbg()
+             |> elem(0)
+
+    assert 1 == App.KnnIndex.get_count() |> dbg()
+    # ------------------------------------------------
+    # case Index file does not exist on Filesystem but exists in DB => create from DB copy.
+    Supervisor.stop(App.Supervisor)
+    App.Application.start(:normal, [])
+    App.Repo.delete_all(App.HnswlibIndex)
+    App.Repo.delete_all(App.Image)
+
+    # %{
+    #   description: nil,
+    #   width: 445,
+    #   url: nil,
+    #   idx: 1,
+    #   height: 259,
+    #   sha1: "C3E6725418C904560448D182050AECCD7F1D9E93",
+    #   mimetype: "image/png"
+    # }
+    # |> App.Image.insert()
+
+    # %App.HnswlibIndex{}
+    # |> App.HnswlibIndex.changeset(%{
+    #   lock_version: next_lock,
+    #   file: file,
+    #   id: 1
+    # })
+
+    assert {:error, "Incoherence on table"} ==
+             Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
+             |> dbg()
+             |> elem(1)
+             |> elem(0)
+
+    # ------------------------------------------------
+    # db es empty but index file is present
+    Supervisor.stop(App.Supervisor)
+    App.Application.start(:normal, [])
+    App.Repo.delete_all(App.HnswlibIndex)
+    App.Repo.delete_all(App.Image)
+
+    path = set_path("indexes2.bin")
+
+    App.HnswlibIndex.changeset(%App.HnswlibIndex{}, %{
+      lock_version: next_lock,
+      file: nil,
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    assert {:error, "Integrity error"} ==
+             Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
+             |> dbg()
+             |> elem(1)
+             |> elem(0)
+
+    # ------------------------------------------------
+    # load file from db
+    Supervisor.stop(App.Supervisor)
+    App.Application.start(:normal, [])
+    App.Repo.delete_all(App.HnswlibIndex)
+    App.Repo.delete_all(App.Image)
+
+    %App.HnswlibIndex{}
+    |> App.HnswlibIndex.changeset(%{
+      lock_version: next_lock,
+      file: file,
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    assert :ok ==
+             Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: ""]})
+             |> dbg()
+             |> elem(0)
+
+    assert App.KnnIndex.get_index() == App.KnnIndex.load_index() |> elem(0)
+
+    # ------------------------------------------------
+    # no index file and index table no empty but no file.
+    # because the process has been stopped without uploading an image
+    Supervisor.stop(App.Supervisor)
+    App.Application.start(:normal, [])
+    App.Repo.delete_all(App.HnswlibIndex)
+    App.Repo.delete_all(App.Image)
+
+    %App.HnswlibIndex{}
+    |> App.HnswlibIndex.changeset(%{
+      lock_version: next_lock,
+      file: nil,
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    assert :ok ==
+             Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: ""]})
+             |> dbg()
+             |> elem(0)
+  end
+
+  defp set_path(name) do
+    Application.app_dir(:app, ["priv", "static", "uploads"])
+    |> Path.join(name)
+  end
 end
