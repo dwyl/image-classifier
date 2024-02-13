@@ -11,6 +11,10 @@ defmodule AppWeb.PageLiveTest do
     {:ok, _view, _html} = live(conn)
   end
 
+  ############################################################
+  # MOUNTING -------------------------------------------------
+  ############################################################
+
   test "connected and renders hook after period of inactivity", %{conn: conn} do
     {:ok, lv, html} = live(conn, ~p"/")
     assert html =~ "Caption your image!"
@@ -24,6 +28,10 @@ defmodule AppWeb.PageLiveTest do
     # Should show "Examples" title
     assert render(lv) =~ "Examples"
   end
+
+  ############################################################
+  # SUCCESSFUL SCENARIOS -------------------------------------
+  ############################################################
 
   test "uploading a file and getting prediction", %{conn: conn} do
     {:ok, lv, html} = live(conn, ~p"/")
@@ -94,6 +102,11 @@ defmodule AppWeb.PageLiveTest do
     assert render(lv) |> Floki.find("#output") |> Floki.text() =~
              "Sometimes, the inner voice is encouraging"
   end
+
+
+  ############################################################
+  # ERROR SCENARIOS ------------------------------------------
+  ############################################################
 
   test "error should be shown if size is bigger than limit", %{conn: conn} do
     {:ok, lv, html} = live(conn, ~p"/")
@@ -185,6 +198,10 @@ defmodule AppWeb.PageLiveTest do
       assert render(lv) =~ "Waiting for image input."
     end
   end
+
+  ############################################################
+  # UNIT TESTS ON HANDLERS -----------------------------------
+  ############################################################
 
   test "handle_intermediate_progress", %{conn: _conn} do
     ret = AppWeb.PageLive.handle_progress(:image_list, %{}, %{})

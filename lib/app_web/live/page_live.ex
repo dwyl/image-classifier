@@ -290,10 +290,13 @@ defmodule AppWeb.PageLive do
   as demanded by the signature of callback function used `consume_uploaded_entry`
   """
   def handle_upload({:ok, map}) when is_map(map) do
+
     %{path: path, tensor: tensor, image_info: image_info} = map
-    # if success, Upload image to S3
+
     Image.upload_image_to_s3(path, image_info.mimetype)
     |> case do
+
+      # If the upload is successful, we update the socket assigns with the image info
       {:ok, url} ->
         image_info =
           struct(
@@ -305,7 +308,7 @@ defmodule AppWeb.PageLive do
 
       # If S3 upload fails, we return error
       {:error, reason} ->
-        Logger.warning(inspect(reason))
+        Logger.warning("Error uploading image: #{inspect(reason)}")
         {:postpone, "Bucket error"}
     end
   end
