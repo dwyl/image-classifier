@@ -67,15 +67,24 @@ defmodule App.HnswlibIndex do
 
   @spec create(atom(), integer(), integer()) :: {:ok, map(), map()} | {:error, binary()}
   def create(space, dim, max_elements) do
-    HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
-    |> App.Repo.insert()
-    |> case do
-      {:ok, schema} ->
-        HNSWLib.Index.new(space, dim, max_elements)
-        |> Tuple.append(schema)
+    {:ok, schema} =
+      HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
+      |> App.Repo.insert()
 
-      {:error, msg} ->
-        {:error, msg}
-    end
+    {:ok, index} =
+      HNSWLib.Index.new(space, dim, max_elements)
+
+    {:ok, index, schema}
   end
+
+  # HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
+  # |> App.Repo.insert()
+  # |> case do
+  #   {:ok, schema} ->
+  #     HNSWLib.Index.new(space, dim, max_elements)
+  #     |> Tuple.append(schema)
+
+  #   {:error, msg} ->
+  #     {:error, msg}
+  # end
 end

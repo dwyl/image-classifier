@@ -309,6 +309,9 @@ defmodule AppWeb.PageLiveTest do
              |> elem(0)
   end
 
+  test "create space" do
+  end
+
   defp set_path(name) do
     Application.app_dir(:app, ["priv", "static", "uploads"])
     |> Path.join(name)
