@@ -213,14 +213,18 @@ defmodule AppWeb.PageLiveTest do
     assert ret == {:noreply, %{}}
   end
 
+  ############################################################
+  # KnnIndex GenServer testing -------------------------------
+  ############################################################
+
   test "genserver init" do
     path = set_path("indexes_gen_test_1.bin")
     {:ok, file} = File.read(path)
 
     # ------------------------------------------------
     # happy path:
-    # - db contains an Index file,
-    # - the Filesystem index file exists
+    # - db image table contains an Index file,
+    # - the index file exists in the FileSystem
     # - both have same length
 
     reset()
