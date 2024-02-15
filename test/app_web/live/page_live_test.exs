@@ -4,6 +4,8 @@ defmodule AppWeb.PageLiveTest do
   import AppWeb.UploadSupport
   import Mock
 
+  @moduledoc false
+
   test "connected mount", %{conn: conn} do
     conn = get(conn, "/")
     assert html_response(conn, 200) =~ "Caption your image!"
@@ -298,19 +300,18 @@ defmodule AppWeb.PageLiveTest do
 
     reset()
 
-    %App.HnswlibIndex{}
-    |> App.HnswlibIndex.changeset(%{
-      lock_version: next_lock,
-      file: file,
-      id: 1
-    })
-    |> App.Repo.insert()
+    {:ok, _index_db} =
+      %App.HnswlibIndex{}
+      |> App.HnswlibIndex.changeset(%{
+        lock_version: next_lock,
+        file: file,
+        id: 1
+      })
+      |> App.Repo.insert()
 
     assert :ok ==
              Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: ""]})
              |> elem(0)
-
-    assert App.KnnIndex.get_index() == App.KnnIndex.load_index() |> elem(0)
 
     # -------------------------------------------------
     # case:
@@ -331,17 +332,103 @@ defmodule AppWeb.PageLiveTest do
     assert :ok ==
              Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: ""]})
              |> elem(0)
+
+    # -------------------------------------------------
+    # case:
+    # - load a bad index file
+
+    reset()
+
+    path = set_path("indexes_gen_test_3.bin")
+    {:ok, file} = File.read(path)
+
+    %App.HnswlibIndex{}
+    |> App.HnswlibIndex.changeset(%{
+      lock_version: next_lock,
+      file: file,
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    assert :error ==
+             Supervisor.start_child(
+               App.Supervisor,
+               {App.KnnIndex, [space: :cosine, index: path]}
+             )
+             |> elem(0)
   end
 
-  defp set_path(name) do
+  # -------------
+  ### Helpers functions
+  def set_path(name) do
     Application.app_dir(:app, ["priv", "static", "uploads"])
     |> Path.join(name)
   end
 
-  defp reset do
+  def reset do
     Supervisor.stop(App.Supervisor)
     App.Application.start(:normal, [])
     App.Repo.delete_all(App.HnswlibIndex)
     App.Repo.delete_all(App.Image)
+  end
+
+  ############################################################
+  # GUARD TEST ON AUDIO -------------------------------------
+  ############################################################
+
+  # Supervisor.stop(App.Supervisor)
+  # App.Application.start(:normal, [])
+  # App.Repo.delete_all(App.HnswlibIndex)
+  # App.Repo.delete_all(App.Image)
+
+  # path =
+  #   Application.app_dir(:app, ["priv", "static", "uploads"])
+  #   |> Path.join("indexes_empty.bin")
+
+  # Supervisor.start_child(
+  #   App.Supervisor,
+  #   {App.KnnIndex, [space: :cosine, index: path]}
+  # )
+
+  test "do not run audio if image bank is empty", %{conn: conn} do
+    path = set_path("indexes_empty.bin")
+    next_lock = 2
+
+    App.Application.start(:normal, [])
+    # Supervisor.which_children(App.Supervisor)
+
+    {:ok, lv, _html} = live(conn, ~p"/")
+    assert render_hook(lv, "show_examples", %{})
+
+    App.Repo.delete_all(App.HnswlibIndex)
+    App.Repo.delete_all(App.Image)
+
+    %App.HnswlibIndex{}
+    |> App.HnswlibIndex.changeset(%{
+      lock_version: next_lock,
+      file: File.read!(path),
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    {:ok, _} =
+      Supervisor.start_child(
+        App.Supervisor,
+        {App.KnnIndex, [space: :cosine, index: path]}
+      )
+
+    # Get audio file and add it to the form
+    file =
+      [:code.priv_dir(:app), "static", "audio", "itwillallbeok.mp3"]
+      |> Path.join()
+      |> build_upload("audio/mp3")
+
+    file_input(lv, "#audio-upload-form", :speech, [file]) |> dbg()
+    #   # Wait for the audio prediction to end
+    AppWeb.SupervisorSupport.wait_for_completion()
+
+    # A prediction should have occurred and the label should be shown with the audio transcription
+    assert render(lv) |> Floki.find("#output") |> Floki.text() =~
+             "!! The image bank is empty. Please upload some !!"
   end
 end

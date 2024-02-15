@@ -98,7 +98,6 @@ defmodule AppWeb.PageLive do
     {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
   end
 
-
   @doc """
   Double-checks the MIME type of uploaded file to ensure that the file
   is an image and is not corrupted.
@@ -312,13 +311,12 @@ defmodule AppWeb.PageLive do
 
     # compute an normed embedding (cosine case only) on the text result
     # and returns an App.Image{} as the result of a "knn_search"
-    with %{embedding: input_embedding} <-
+    with {:not_empty_index, :ok} <-
+           {:not_empty_index, App.KnnIndex.not_empty_index() |> dbg()},
+         %{embedding: input_embedding} <-
            Nx.Serving.batched_run(Embedding, text),
          %Nx.Tensor{} = normed_input_embedding <-
            Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
-         {:not_empty_index, :ok} <-
-           {:not_empty_index, App.KnnIndex.not_empty_index()},
-         #  {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
          %App.Image{} = result <-
            App.KnnIndex.knn_search(normed_input_embedding) do
       {:noreply,
@@ -331,13 +329,14 @@ defmodule AppWeb.PageLive do
          tmp_wave: @tmp_wav
        )}
     else
-      # record without entries
+      # stop transcription if no entries in the Index
       {:not_empty_index, :error} ->
-        Logger.debug("No entries in Index")
-
         {:noreply,
-         assign(socket,
+         socket
+         |> push_event("toast", %{message: "No images yet"})
+         |> assign(
            micro_off: false,
+           transcription: "!! The image bank is empty. Please upload some !!",
            search_result: nil,
            speech_spin: false,
            audio_ref: nil,
@@ -391,8 +390,6 @@ defmodule AppWeb.PageLive do
             description: label,
             sha1: image_info.sha1
           }
-
-        # saved_index = App.HnswlibIndex.index_file()
 
         with %{embedding: data} <-
                Nx.Serving.batched_run(Embedding, label),

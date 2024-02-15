@@ -30,7 +30,6 @@ defmodule App.HnswlibIndex do
           {:ok, index(), index_schema()} | {:error, String.t()}
 
   def maybe_load_index_from_db(space, dim, max_elements) do
-
     # check if the table has an entry
     App.Repo.get_by(HnswlibIndex, id: 1)
     |> case do
@@ -74,6 +73,15 @@ defmodule App.HnswlibIndex do
 
     {:ok, index} =
       HNSWLib.Index.new(space, dim, max_elements)
+
+    # build an empty Index for tests
+    if Mix.env() == :test do
+      empty_index =
+        Application.app_dir(:app, ["priv", "static", "uploads"])
+        |> Path.join("indexes_empty.bin")
+
+      HNSWLib.Index.save_index(index, empty_index)
+    end
 
     {:ok, index, schema}
   end
