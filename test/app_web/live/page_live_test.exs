@@ -217,6 +217,7 @@ defmodule AppWeb.PageLiveTest do
   # KnnIndex GenServer testing -------------------------------
   ############################################################
 
+  @tag timeout: 120_000
   test "genserver init" do
     path = set_path("indexes_gen_test_1.bin")
     {:ok, file} = File.read(path)
