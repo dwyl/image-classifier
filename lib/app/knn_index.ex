@@ -28,14 +28,6 @@ defmodule App.KnnIndex do
     @saved_index
   end
 
-  def load_index do
-    GenServer.call(__MODULE__, :load_index)
-  end
-
-  def get_index do
-    GenServer.call(__MODULE__, :get_index)
-  end
-
   def save_index_to_db do
     GenServer.call(__MODULE__, :save_index_to_db)
   end
@@ -107,25 +99,6 @@ defmodule App.KnnIndex do
   end
 
   @impl true
-  def handle_call(:get_index, _, {index, _, _} = state) do
-    {:reply, index, state}
-  end
-
-  def handle_call(:load_index, _, {:error, :badarg, space} = state) do
-    App.HnswlibIndex.maybe_load_index_from_db(:cosine, @dim, @max_elements)
-    |> case do
-      {:ok, index, index_schema} ->
-        {:reply, index, {index, index_schema, space}}
-
-      {:error, msg} ->
-        {:stop, {:error, msg}, state}
-    end
-  end
-
-  def handle_call(:load_index, _from, state) do
-    {:reply, state, state}
-  end
-
   def handle_call(:save_index_to_db, _, {index, index_schema, space} = state) do
     with {:ok, file} <-
            File.read(@saved_index),
@@ -141,14 +114,15 @@ defmodule App.KnnIndex do
   end
 
   def handle_call(:get_count, _, {index, _, _} = state) do
-    HNSWLib.Index.get_current_count(index)
-    |> case do
-      {:ok, count} ->
-        {:reply, count, state}
+    {:ok, count} = HNSWLib.Index.get_current_count(index)
+    {:reply, count, state}
+    # |> case do
+    #   {:ok, count} ->
+    #     {:reply, count, state}
 
-      {:error, msg} ->
-        {:reply, {:error, msg}, state}
-    end
+    #   {:error, msg} ->
+    #     {:reply, {:error, msg}, state}
+    # end
   end
 
   def handle_call({:add_item, embedding}, _, {index, _, _} = state) do
@@ -196,6 +170,7 @@ defmodule App.KnnIndex do
   def handle_call(:not_empty, _, {index, _, _} = state) do
     case HNSWLib.Index.get_current_count(index) do
       {:ok, 0} ->
+        Logger.warning("Empty index")
         {:reply, :error, state}
 
       {:ok, _} ->

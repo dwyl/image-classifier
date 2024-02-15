@@ -30,5 +30,4 @@ config :phoenix, :plug_init_mode, :runtime
 config :app,
   start_genserver: false,
   knnindex_indices_test: true,
-
   use_test_models: true

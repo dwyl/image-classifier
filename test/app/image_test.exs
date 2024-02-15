@@ -14,15 +14,15 @@ defmodule AppWeb.ImageTest do
            body: "{\"errors\":{\"detail\":\"Uploaded file is not a valid image.\"}}"
          }}
       end do
+      file_path =
+        [:code.priv_dir(:app), "static", "images", "phoenix.xyz"]
+        |> Path.join()
 
-        file_path = [:code.priv_dir(:app), "static", "images", "phoenix.xyz"]
-          |> Path.join()
+      mimetype = "image/xyz"
 
-        mimetype = "image/xyz"
+      {:error, response} = Image.upload_image_to_s3(file_path, mimetype)
 
-        {:error, response} = Image.upload_image_to_s3(file_path, mimetype)
-
-        assert response == "Uploaded file is not a valid image."
+      assert response == "Uploaded file is not a valid image."
     end
   end
 
@@ -35,16 +35,15 @@ defmodule AppWeb.ImageTest do
            reason: "Time out."
          }}
       end do
+      file_path =
+        [:code.priv_dir(:app), "static", "images", "phoenix.xyz"]
+        |> Path.join()
 
-        file_path = [:code.priv_dir(:app), "static", "images", "phoenix.xyz"]
-          |> Path.join()
+      mimetype = "image/xyz"
 
-        mimetype = "image/xyz"
+      {:error, response} = Image.upload_image_to_s3(file_path, mimetype)
 
-        {:error, response} = Image.upload_image_to_s3(file_path, mimetype)
-
-        assert response == "Time out."
+      assert response == "Time out."
     end
   end
-
 end
