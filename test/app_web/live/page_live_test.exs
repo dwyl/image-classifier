@@ -356,6 +356,26 @@ defmodule AppWeb.PageLiveTest do
                {App.KnnIndex, [space: :cosine, index: path]}
              )
              |> elem(0)
+
+    # -------------------------------------------------
+    # case:
+    # - knn_search with empty Index
+    reset()
+
+    path = set_path("indexes_empty.bin")
+
+    %App.HnswlibIndex{}
+    |> App.HnswlibIndex.changeset(%{
+      lock_version: next_lock,
+      file: File.read!(path),
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    {:ok, state} = App.KnnIndex.init(space: :cosine, index: path)
+
+    assert {:reply, {:error, "no index found"}, state} ==
+             App.KnnIndex.handle_call({:knn_search, nil}, self(), state)
   end
 
   # -------------
@@ -426,5 +446,8 @@ defmodule AppWeb.PageLiveTest do
     # A prediction should have occurred and the label should be shown with the audio transcription
     assert render_async(lv) |> Floki.find("#output") |> Floki.text() =~
              "!! The image bank is empty. Please upload some !!"
+  end
+
+  test "GS" do
   end
 end

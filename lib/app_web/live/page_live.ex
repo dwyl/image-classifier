@@ -312,7 +312,7 @@ defmodule AppWeb.PageLive do
     # compute an normed embedding (cosine case only) on the text result
     # and returns an App.Image{} as the result of a "knn_search"
     with {:not_empty_index, :ok} <-
-           {:not_empty_index, App.KnnIndex.not_empty_index() |> dbg()},
+           {:not_empty_index, App.KnnIndex.not_empty_index()},
          %{embedding: input_embedding} <-
            Nx.Serving.batched_run(Embedding, text),
          %Nx.Tensor{} = normed_input_embedding <-
