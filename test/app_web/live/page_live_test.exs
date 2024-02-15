@@ -103,7 +103,6 @@ defmodule AppWeb.PageLiveTest do
              "Sometimes, the inner voice is encouraging"
   end
 
-
   ############################################################
   # ERROR SCENARIOS ------------------------------------------
   ############################################################
@@ -214,12 +213,20 @@ defmodule AppWeb.PageLiveTest do
     assert ret == {:noreply, %{}}
   end
 
+  ############################################################
+  # KnnIndex GenServer testing -------------------------------
+  ############################################################
+
   test "genserver init" do
     path = set_path("indexes_gen_test_1.bin")
     {:ok, file} = File.read(path)
 
     # ------------------------------------------------
-    # happy path
+    # happy path:
+    # - db image table contains an Index file,
+    # - the index file exists in the FileSystem
+    # - both have same length
+
     reset()
 
     next_lock = 1
@@ -249,7 +256,10 @@ defmodule AppWeb.PageLiveTest do
 
     assert 1 == App.KnnIndex.get_count()
     # ------------------------------------------------
-    # case Index file does not exist on Filesystem but exists in DB => create from DB copy.
+    # case:
+    # - Index file exists on Filesystem
+    # - db index table is empty
+
     reset()
 
     assert {:error, "Incoherence on table"} ==
@@ -258,7 +268,11 @@ defmodule AppWeb.PageLiveTest do
              |> elem(0)
 
     # ------------------------------------------------
-    # db es empty but index file is present
+    # case:
+    # - db index table contains a copy of an Index file
+    # - an Index file exists on Filesystem
+    # - but length are different
+
     reset()
 
     path = set_path("indexes_gen_test_2.bin")
@@ -276,7 +290,11 @@ defmodule AppWeb.PageLiveTest do
              |> elem(0)
 
     # ------------------------------------------------
-    # load file from db
+    # case:
+    # - no Index file on Filesyste
+    # - db index table contains Inde file
+    # => file is loaded from db
+
     reset()
 
     %App.HnswlibIndex{}
@@ -294,17 +312,11 @@ defmodule AppWeb.PageLiveTest do
     assert App.KnnIndex.get_index() == App.KnnIndex.load_index() |> elem(0)
 
     # -------------------------------------------------
-    # reset()
-    # path = set_path("ok.bin")
+    # case:
+    # - no Index file in FileSystem
+    # - db index table is not empty but does not contain a file.
+    # => this simulates the state when the process has been stopped without uploading an image
 
-    # assert :error ==
-    #          Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
-    #          |> dbg()
-    #          |> elem(0)
-
-    # ------------------------------------------------
-    # no index file and index table no empty but no file.
-    # because the process has been stopped without uploading an image
     reset()
 
     %App.HnswlibIndex{}
