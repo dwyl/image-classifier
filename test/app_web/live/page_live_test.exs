@@ -376,20 +376,6 @@ defmodule AppWeb.PageLiveTest do
   # GUARD TEST ON AUDIO -------------------------------------
   ############################################################
 
-  # Supervisor.stop(App.Supervisor)
-  # App.Application.start(:normal, [])
-  # App.Repo.delete_all(App.HnswlibIndex)
-  # App.Repo.delete_all(App.Image)
-
-  # path =
-  #   Application.app_dir(:app, ["priv", "static", "uploads"])
-  #   |> Path.join("indexes_empty.bin")
-
-  # Supervisor.start_child(
-  #   App.Supervisor,
-  #   {App.KnnIndex, [space: :cosine, index: path]}
-  # )
-
   test "do not run audio if image bank is empty", %{conn: conn} do
     path = set_path("indexes_empty.bin")
     next_lock = 2
@@ -411,11 +397,10 @@ defmodule AppWeb.PageLiveTest do
     })
     |> App.Repo.insert()
 
-    {:ok, _} =
-      Supervisor.start_child(
-        App.Supervisor,
-        {App.KnnIndex, [space: :cosine, index: path]}
-      )
+    Supervisor.start_child(
+      App.Supervisor,
+      {App.KnnIndex, [space: :cosine, index: path]}
+    )
 
     # Get audio file and add it to the form
     file =
@@ -423,12 +408,23 @@ defmodule AppWeb.PageLiveTest do
       |> Path.join()
       |> build_upload("audio/mp3")
 
-    file_input(lv, "#audio-upload-form", :speech, [file]) |> dbg()
-    #   # Wait for the audio prediction to end
+    audio = file_input(lv, "#audio-upload-form", :speech, [file])
+
+    # Should show an uploaded local file
+    assert render_upload(audio, file.name)
+
+    # Wait for the audio prediction to end
+    AppWeb.SupervisorSupport.wait_for_completion()
+
+    # Wait for the audio transcription to end.
+    # This will spawn another async task
+    assert render_async(lv)
+
+    # Wait for the embedding knn search to end
     AppWeb.SupervisorSupport.wait_for_completion()
 
     # A prediction should have occurred and the label should be shown with the audio transcription
-    assert render(lv) |> Floki.find("#output") |> Floki.text() =~
+    assert render_async(lv) |> Floki.find("#output") |> Floki.text() =~
              "!! The image bank is empty. Please upload some !!"
   end
 end
