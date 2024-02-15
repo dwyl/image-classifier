@@ -92,28 +92,12 @@ defmodule AppWeb.PageLive do
       end
 
     # List to change `example_list` socket assign to show skeleton loading
-    display_example_images =
-      Enum.all?(tasks, fn
-        task when is_map(task) -> Map.get(task, :ref) != nil
-        _ -> false
-      end)
-      |> case do
-        true ->
-          Enum.map(tasks, fn
-            obj -> %{predicting?: true, ref: obj.ref}
-          end)
-
-        false ->
-          nil
-      end
+    display_example_images = Enum.map(tasks, fn obj -> %{predicting?: true, ref: obj.ref} end)
 
     # Updates the socket assigns
     {:noreply, assign(socket, example_list_tasks: tasks, example_list: display_example_images)}
   end
 
-  def handle_event("show_examples", _, socket) do
-    {:noreply, socket}
-  end
 
   @doc """
   Double-checks the MIME type of uploaded file to ensure that the file
@@ -179,7 +163,6 @@ defmodule AppWeb.PageLive do
            {:ok, thumbnail_vimage} <- Vops.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
            # Pre-process the image as tensor
            {:pre_process, {:ok, tensor}} <- {:pre_process, pre_process_image(thumbnail_vimage)} do
-
         image_info = %{
           mimetype: mimetype,
           width: width,
@@ -203,7 +186,6 @@ defmodule AppWeb.PageLive do
             {:ok, %{tensor: tensor, image_info: image_info, path: path}}
 
           {:error, changeset} ->
-            dbg(changeset.errors)
             {:error, changeset.errors}
         end
         |> handle_upload()
@@ -290,12 +272,10 @@ defmodule AppWeb.PageLive do
   as demanded by the signature of callback function used `consume_uploaded_entry`
   """
   def handle_upload({:ok, map}) when is_map(map) do
-
     %{path: path, tensor: tensor, image_info: image_info} = map
 
     Image.upload_image_to_s3(path, image_info.mimetype)
     |> case do
-
       # If the upload is successful, we update the socket assigns with the image info
       {:ok, url} ->
         image_info =
