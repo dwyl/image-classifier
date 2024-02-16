@@ -362,7 +362,7 @@ defmodule AppWeb.PageLiveTest do
     # case:
     # - knn_search with empty Index
     # - knn_search with no index file
-    # - error adding embedding
+    # - Hnwslib error adding embedding, above limit
     # - failure on saving Index to db
     reset()
 
@@ -381,14 +381,67 @@ defmodule AppWeb.PageLiveTest do
     assert {:reply, {:error, "no index found"}, state} ==
              App.KnnIndex.handle_call({:knn_search, nil}, self(), state)
 
-    # error embedding limit
+    # capture Hnwslib error: "number above limit" because returned number is less than k=1
+    # check issue <https://github.com/nmslib/hnswlib/issues/244>
     emb = Nx.iota({384}, type: :f32)
 
     assert :error ==
-             App.KnnIndex.handle_call({:knn_search, emb}, self(), state) |> elem(1) |> elem(0)
+             App.KnnIndex.handle_call({:knn_search, emb}, self(), state)
+             |> elem(1)
+             |> elem(0)
+
+    # -------------------------------
+    # test ok inserting embedding
+    reset()
+    path = set_path("indexes_gen_test_1.bin")
+
+    %App.HnswlibIndex{}
+    |> App.HnswlibIndex.changeset(%{
+      lock_version: next_lock,
+      file: File.read!(path),
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    %{
+      description: nil,
+      width: 445,
+      url: nil,
+      idx: 1,
+      height: 259,
+      sha1: "C3E6725418C904560448D182050AECCD7F1D9E93",
+      mimetype: "image/png"
+    }
+    |> App.Image.insert()
+
+    {:ok, state} = App.KnnIndex.init(space: :cosine, index: path)
+
+    # error embedding limit
+    emb = Nx.iota({384}, type: :f32)
+
+    assert {:ok, 2} ==
+             App.KnnIndex.handle_call({:add_item, emb}, self(), state)
+             |> elem(1)
+
+    # -------------------------------
+    # test error save_in_db if file does not exist
+    reset()
+    path = set_path("indexes_empty.bin")
+
+    %App.HnswlibIndex{}
+    |> App.HnswlibIndex.changeset(%{
+      lock_version: next_lock,
+      file: File.read!(path),
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    {:ok, state} = App.KnnIndex.init(space: :cosine, index: path)
 
     assert :error ==
-             App.KnnIndex.handle_call({:add_item, emb}, self(), state) |> elem(1) |> elem(0)
+             App.KnnIndex.handle_call({:add_item, emb}, self(), state)
+             |> elem(1)
+             |> elem(0)
 
     # Index file does not exist any more on FileSystem
     {index, _, space} = state
