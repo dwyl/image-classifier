@@ -361,6 +361,9 @@ defmodule AppWeb.PageLiveTest do
     # -------------------------------------------------
     # case:
     # - knn_search with empty Index
+    # - knn_search with no index file
+    # - error adding embedding
+    # - failure on saving Index to db
     reset()
 
     path = set_path("indexes_empty.bin")
@@ -378,35 +381,17 @@ defmodule AppWeb.PageLiveTest do
     assert {:reply, {:error, "no index found"}, state} ==
              App.KnnIndex.handle_call({:knn_search, nil}, self(), state)
 
-    # -------------------------------------------------
-    # case
-    # - knn_search with bad input
-
-    reset()
-    path = set_path("indexes_empty.bin")
-
-    %App.HnswlibIndex{}
-    |> App.HnswlibIndex.changeset(%{
-      lock_version: next_lock,
-      file: File.read!(path),
-      id: 1
-    })
-    |> App.Repo.insert()
-
-    {:ok, state} = App.KnnIndex.init(space: :cosine, index: path)
-
+    # error embedding limit
     emb = Nx.iota({384}, type: :f32)
+
+    assert :error ==
+             App.KnnIndex.handle_call({:knn_search, emb}, self(), state) |> elem(1) |> elem(0)
 
     assert :error ==
              App.KnnIndex.handle_call({:add_item, emb}, self(), state) |> elem(1) |> elem(0)
 
-    # Index file is empty
-    assert :error ==
-             App.KnnIndex.handle_call({:knn_search, emb}, self(), state) |> elem(1) |> elem(0)
-
+    # Index file does not exist any more on FileSystem
     {index, _, space} = state
-
-    # Filesystem error: Index file does not exist
     set_path("indexes_test.bin") |> File.rm()
 
     assert :error ==
