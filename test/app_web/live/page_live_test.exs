@@ -221,6 +221,7 @@ defmodule AppWeb.PageLiveTest do
 
   @tag timeout: 120_000
   test "genserver init" do
+    # File.mkdir_p!(Application.app_dir(:app, ["priv", "static", "uploads"]))
     path = set_path("indexes_gen_test_1.bin")
     {:ok, file} = File.read(path)
 
@@ -376,6 +377,46 @@ defmodule AppWeb.PageLiveTest do
 
     assert {:reply, {:error, "no index found"}, state} ==
              App.KnnIndex.handle_call({:knn_search, nil}, self(), state)
+
+    # -------------------------------------------------
+    # case
+    # - knn_search with bad input
+
+    reset()
+    path = set_path("indexes_empty.bin")
+
+    %App.HnswlibIndex{}
+    |> App.HnswlibIndex.changeset(%{
+      lock_version: next_lock,
+      file: File.read!(path),
+      id: 1
+    })
+    |> App.Repo.insert()
+
+    {:ok, state} = App.KnnIndex.init(space: :cosine, index: path)
+
+    emb = Nx.iota({384}, type: :f32)
+
+    assert :error ==
+             App.KnnIndex.handle_call({:add_item, emb}, self(), state) |> elem(1) |> elem(0)
+
+    assert :error ==
+             App.KnnIndex.handle_call({:knn_search, emb}, self(), state) |> elem(1) |> elem(0)
+
+    {index, _, space} = state
+
+    # Filesystem error: Index file does not exist
+    set_path("indexes_test.bin") |> File.rm()
+
+    assert :error ==
+             App.KnnIndex.handle_call(
+               :save_index_to_db,
+               self(),
+               {index, %App.HnswlibIndex{id: 1, lock_version: 2}, space}
+             )
+             |> dbg()
+             |> elem(1)
+             |> elem(0)
   end
 
   # -------------
@@ -446,8 +487,5 @@ defmodule AppWeb.PageLiveTest do
     # A prediction should have occurred and the label should be shown with the audio transcription
     assert render_async(lv) |> Floki.find("#output") |> Floki.text() =~
              "!! The image bank is empty. Please upload some !!"
-  end
-
-  test "GS" do
   end
 end

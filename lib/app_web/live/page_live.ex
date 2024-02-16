@@ -558,7 +558,7 @@ defmodule AppWeb.PageLive do
 
   # Converting image to tensor ----------------
   defp to_tensor(%Vimage{} = image) do
-    Vix.Vips.Image.write_to_tensor(image)
+    Vimage.write_to_tensor(image)
     |> case do
       {:ok, %Vix.Tensor{} = tensor} ->
         {:ok, tensor}

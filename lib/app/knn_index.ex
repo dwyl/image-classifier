@@ -100,14 +100,16 @@ defmodule App.KnnIndex do
 
   @impl true
   def handle_call(:save_index_to_db, _, {index, index_schema, space} = state) do
-    with {:ok, file} <-
-           File.read(@saved_index),
-         {:ok, updated_schema} <-
-           index_schema
-           |> App.HnswlibIndex.changeset(%{file: file})
-           |> App.Repo.update() do
-      {:reply, {:ok, updated_schema}, {index, updated_schema, space}}
-    else
+    File.read(@saved_index)
+    |> case do
+      {:ok, file} ->
+        {:ok, updated_schema} =
+          index_schema
+          |> App.HnswlibIndex.changeset(%{file: file})
+          |> App.Repo.update()
+
+        {:reply, {:ok, updated_schema}, {index, updated_schema, space}}
+
       {:error, msg} ->
         {:reply, {:error, msg}, state}
     end
@@ -116,6 +118,7 @@ defmodule App.KnnIndex do
   def handle_call(:get_count, _, {index, _, _} = state) do
     {:ok, count} = HNSWLib.Index.get_current_count(index)
     {:reply, count, state}
+    # HNSWLib.Index.get_current_count(index)
     # |> case do
     #   {:ok, count} ->
     #     {:reply, count, state}
@@ -135,7 +138,7 @@ defmodule App.KnnIndex do
       Logger.info("idx: #{idx}")
       {:reply, {:ok, idx}, state}
     else
-      msg ->
+      {:error, msg} ->
         {:reply, {:error, msg}, state}
     end
   end

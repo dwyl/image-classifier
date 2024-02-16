@@ -19,7 +19,6 @@ defmodule AppWeb.SupervisorSupport do
   defp wait_for_pids(pids) do
     receive do
       {:DOWN, _ref, :process, pid, _reason} ->
-        dbg(pid)
         wait_for_pids(List.delete(pids, pid))
     end
   end
