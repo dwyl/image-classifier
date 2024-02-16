@@ -82,7 +82,10 @@ defmodule AppWeb.PageLiveTest do
   test "Image operations" do
     assert {:error, "test"} == AppWeb.PageLive.pre_process_image({:error, "test"})
     assert :ok == AppWeb.PageLive.predict_example_image("1", "http://example.com")
-    assert {:error, "Failed to get VipsImage"} == AppWeb.PageLive.to_tensor(%Vix.Vips.Image{})
+
+    assert {:error, "Failed to get VipsImage"} ==
+             AppWeb.PageLive.to_tensor(%Vix.Vips.Image{})
+
     assert {:error, "failed to get GObject argument"} == AppWeb.PageLive.srgb(%Vix.Vips.Image{})
   end
 

@@ -19,6 +19,7 @@ config :nx, :default_backend, {EXLA.Backend, client: :host}
 
 # Configures the endpoint
 config :app, AppWeb.Endpoint,
+  adapter: Bandit.PhoenixAdapter,
   url: [host: "localhost"],
   render_errors: [
     formats: [html: AppWeb.ErrorHTML, json: AppWeb.ErrorJSON],

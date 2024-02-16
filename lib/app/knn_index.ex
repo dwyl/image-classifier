@@ -60,12 +60,11 @@ defmodule App.KnnIndex do
         {:ok, index, index_schema} =
           App.HnswlibIndex.maybe_load_index_from_db(space, @dim, @max_elements)
 
+        # |> case do
+        #   {:ok, index, index_schema} -> {:ok, {index, index_schema, space}}
+        #   {:error, msg} -> {:stop, {:error, msg}}
+        # end
         {:ok, {index, index_schema, space}}
-
-      # |> case do
-      #   {:ok, index, index_schema} -> {:ok, {index, index_schema, space}}
-      #   {:error, msg} -> {:stop, {:error, msg}}
-      # end
 
       true ->
         Logger.info("Existing Index")
@@ -170,8 +169,6 @@ defmodule App.KnnIndex do
       {:error, msg} ->
         {:reply, {:error, msg}, state}
     end
-
-    # end
   end
 
   def handle_call(:not_empty, _, {index, _, _} = state) do

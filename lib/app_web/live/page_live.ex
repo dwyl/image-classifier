@@ -559,8 +559,8 @@ defmodule AppWeb.PageLive do
       {:ok, %Vix.Tensor{} = tensor} ->
         {:ok, tensor}
 
-        # {:error, msg} ->
-        #   {:error, msg}
+      {:error, msg} ->
+        {:error, msg}
     end
   end
 
