@@ -57,11 +57,15 @@ defmodule App.KnnIndex do
 
     case File.exists?(index_path) do
       false ->
-        App.HnswlibIndex.maybe_load_index_from_db(space, @dim, @max_elements)
-        |> case do
-          {:ok, index, index_schema} -> {:ok, {index, index_schema, space}}
-          {:error, msg} -> {:stop, {:error, msg}}
-        end
+        {:ok, index, index_schema} =
+          App.HnswlibIndex.maybe_load_index_from_db(space, @dim, @max_elements)
+
+        {:ok, {index, index_schema, space}}
+
+      # |> case do
+      #   {:ok, index, index_schema} -> {:ok, {index, index_schema, space}}
+      #   {:error, msg} -> {:stop, {:error, msg}}
+      # end
 
       true ->
         Logger.info("Existing Index")

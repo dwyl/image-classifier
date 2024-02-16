@@ -59,8 +59,8 @@ defmodule App.HnswlibIndex do
              {:ok, index} <-
                HNSWLib.Index.load_index(space, dim, path) do
           {:ok, index, index_db}
-        else
-          {:error, msg} -> {:error, msg}
+          # else
+          #   {:error, msg} -> {:error, msg}
         end
     end
   end

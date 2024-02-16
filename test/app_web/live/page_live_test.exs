@@ -400,6 +400,7 @@ defmodule AppWeb.PageLiveTest do
     assert :error ==
              App.KnnIndex.handle_call({:add_item, emb}, self(), state) |> elem(1) |> elem(0)
 
+    # Index file is empty
     assert :error ==
              App.KnnIndex.handle_call({:knn_search, emb}, self(), state) |> elem(1) |> elem(0)
 
@@ -414,7 +415,6 @@ defmodule AppWeb.PageLiveTest do
                self(),
                {index, %App.HnswlibIndex{id: 1, lock_version: 2}, space}
              )
-             |> dbg()
              |> elem(1)
              |> elem(0)
   end
