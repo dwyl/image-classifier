@@ -224,9 +224,9 @@ defmodule AppWeb.PageLive do
 
         {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
 
-      msg ->
-        Logger.warning(inspect(msg))
-        {:noreply, socket}
+        # msg ->
+        #   Logger.warning(inspect(msg))
+        #   {:noreply, socket}
     end
   end
 
@@ -290,11 +290,6 @@ defmodule AppWeb.PageLive do
         Logger.warning("Error uploading image: #{inspect(reason)}")
         {:postpone, "Bucket error"}
     end
-  end
-
-  def handle_upload({:error, errors}) do
-    :ok = Logger.warning(inspect(errors))
-    {:postpone, %{error: errors}}
   end
 
   @doc """
@@ -508,8 +503,10 @@ defmodule AppWeb.PageLive do
   def predict_example_image(body, url) do
     with {:vix, {:ok, img_thumb}} <-
            {:vix, Vops.thumbnail_buffer(body, @image_width)},
-         {:pre_process, {:ok, t_img}} <-
-           {:pre_process, pre_process_image(img_thumb)} do
+         #  {:pre_process, {:ok, t_img}} <-
+         #  {:pre_process, pre_process_image(img_thumb)} do
+         {:ok, t_img} <-
+           pre_process_image(img_thumb) do
       # Create an async task to classify the image from unsplash
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
@@ -519,25 +516,28 @@ defmodule AppWeb.PageLive do
       {:vix, {:error, msg}} ->
         :ok = Logger.warning(inspect(msg))
 
-      {:pre_process, {:error, msg}} ->
+      {:error, msg} ->
         :ok = Logger.warning(inspect(msg))
+        # {:pre_process, {:error, msg}} ->
+        #   :ok = Logger.warning(inspect(msg))
     end
   end
 
   def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 5MB."
 
   # If the image has an alpha channel, flatten it:
-  defp flatten(%Vimage{} = image) do
+  def flatten(%Vimage{} = image) do
     case Vimage.has_alpha?(image) do
       true ->
         Vops.flatten(image)
-        |> case do
-          {:ok, img} ->
-            {:ok, img}
 
-          {:error, msg} ->
-            {:error, msg}
-        end
+      # |> case do
+      #   {:ok, img} ->
+      #     {:ok, img}
+
+      #   {:error, msg} ->
+      #     {:error, msg}
+      # end
 
       false ->
         {:ok, image}
@@ -545,7 +545,7 @@ defmodule AppWeb.PageLive do
   end
 
   # Convert the image to sRGB colourspace ----------------
-  defp srgb(%Vimage{} = image) do
+  def srgb(%Vimage{} = image) do
     Vops.colourspace(image, :VIPS_INTERPRETATION_sRGB)
     |> case do
       {:ok, %Vimage{} = srgb_image} ->
@@ -557,14 +557,14 @@ defmodule AppWeb.PageLive do
   end
 
   # Converting image to tensor ----------------
-  defp to_tensor(%Vimage{} = image) do
+  def to_tensor(%Vimage{} = image) do
     Vimage.write_to_tensor(image)
     |> case do
       {:ok, %Vix.Tensor{} = tensor} ->
         {:ok, tensor}
 
-      {:error, msg} ->
-        {:error, msg}
+        # {:error, msg} ->
+        #   {:error, msg}
     end
   end
 
@@ -589,12 +589,12 @@ defmodule AppWeb.PageLive do
         |> Nx.reshape(shape, names: format)
 
       {:ok, %Nx.Tensor{} = final_tensor}
-    else
-      {:error, msg} ->
-        {:error, msg}
+      # else
+      #   {:error, msg} ->
+      #     {:error, msg}
 
-      nil ->
-        {:error, "Image empty"}
+      #   nil ->
+      #     {:error, "Image empty"}
     end
   end
 
