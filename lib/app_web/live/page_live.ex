@@ -503,10 +503,8 @@ defmodule AppWeb.PageLive do
   def predict_example_image(body, url) do
     with {:vix, {:ok, img_thumb}} <-
            {:vix, Vops.thumbnail_buffer(body, @image_width)},
-         #  {:pre_process, {:ok, t_img}} <-
-         #  {:pre_process, pre_process_image(img_thumb)} do
-         {:ok, t_img} <-
-           pre_process_image(img_thumb) do
+         {:pre_process, {:ok, t_img}} <-
+           {:pre_process, pre_process_image(img_thumb)} do
       # Create an async task to classify the image from unsplash
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
@@ -516,8 +514,6 @@ defmodule AppWeb.PageLive do
       {:vix, {:error, msg}} ->
         :ok = Logger.warning(inspect(msg))
 
-      {:error, msg} ->
-        :ok = Logger.warning(inspect(msg))
         # {:pre_process, {:error, msg}} ->
         #   :ok = Logger.warning(inspect(msg))
     end
