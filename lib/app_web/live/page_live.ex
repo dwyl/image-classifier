@@ -511,11 +511,8 @@ defmodule AppWeb.PageLive do
       end)
       |> Map.merge(%{url: url})
     else
-      {:vix, {:error, msg}} ->
+      {_, {:error, msg}} ->
         :ok = Logger.warning(inspect(msg))
-
-        # {:pre_process, {:error, msg}} ->
-        #   :ok = Logger.warning(inspect(msg))
     end
   end
 
@@ -526,15 +523,6 @@ defmodule AppWeb.PageLive do
     case Vimage.has_alpha?(image) do
       true ->
         Vops.flatten(image)
-
-      # |> case do
-      #   {:ok, img} ->
-      #     {:ok, img}
-
-      #   {:error, msg} ->
-      #     {:error, msg}
-      # end
-
       false ->
         {:ok, image}
     end
