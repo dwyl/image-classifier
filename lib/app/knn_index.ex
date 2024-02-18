@@ -18,7 +18,7 @@ defmodule App.KnnIndex do
                  do: Path.join(@upload_dir, "indexes_test.bin"),
                  else: Path.join(@upload_dir, "indexes.bin")
 
-  # client API ------------------
+  # Client API ------------------
   def start_link(args) do
     :ok = File.mkdir_p!(@upload_dir)
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
@@ -51,28 +51,29 @@ defmodule App.KnnIndex do
   # ---------------------------------------------------
   @impl true
   def init(args) do
+
+    # Trying to load the index file
     :ok = File.mkdir_p!(@upload_dir)
     index_path = Keyword.fetch!(args, :index)
     space = Keyword.fetch!(args, :space)
 
     case File.exists?(index_path) do
+
+      # If the index file doesn't exist, we try to load from the database.
       false ->
         {:ok, index, index_schema} =
           App.HnswlibIndex.maybe_load_index_from_db(space, @dim, @max_elements)
 
-        # |> case do
-        #   {:ok, index, index_schema} -> {:ok, {index, index_schema, space}}
-        #   {:error, msg} -> {:stop, {:error, msg}}
-        # end
         {:ok, {index, index_schema, space}}
 
+        # If the index file does exist, we compare the one with teh table and check for incoherences.
       true ->
-        Logger.info("Existing Index")
+        Logger.info("Index file found on disk. Let's compare it with the database...")
 
         App.Repo.get_by(App.HnswlibIndex, id: 1)
         |> case do
           nil ->
-            {:stop, {:error, "Incoherence on table"}}
+            {:stop, {:error, "Error comparing the index file with the one on the database. Incoherence on table."}}
 
           schema ->
             check_integrity(index_path, schema, space)
@@ -81,6 +82,7 @@ defmodule App.KnnIndex do
   end
 
   defp check_integrity(path, schema, space) do
+    # We check the count of the images in the database and the one in the index.
     with db_count <-
            App.Repo.all(App.Image) |> length(),
          {:ok, index} <-
@@ -89,11 +91,13 @@ defmodule App.KnnIndex do
            HNSWLib.Index.get_current_count(index),
          true <-
            index_count == db_count do
-      Logger.info("Integrity: " <> "\u2705")
+      Logger.info("Integrity: " <> "\u2705.")
       {:ok, {index, schema, space}}
+
+    # If it fails, we return an error.
     else
       false ->
-        {:stop, {:error, "Integrity error"}}
+        {:stop, {:error, "Integrity error. The count of images from index differs from the database."}}
 
       {:error, msg} ->
         Logger.warning(inspect(msg))
@@ -103,6 +107,7 @@ defmodule App.KnnIndex do
 
   @impl true
   def handle_call(:save_index_to_db, _, {index, index_schema, space} = state) do
+    # We read the index file and try to update the index on the table as well.
     File.read(@saved_index)
     |> case do
       {:ok, file} ->
@@ -121,25 +126,21 @@ defmodule App.KnnIndex do
   def handle_call(:get_count, _, {index, _, _} = state) do
     {:ok, count} = HNSWLib.Index.get_current_count(index)
     {:reply, count, state}
-    # HNSWLib.Index.get_current_count(index)
-    # |> case do
-    #   {:ok, count} ->
-    #     {:reply, count, state}
-
-    #   {:error, msg} ->
-    #     {:reply, {:error, msg}, state}
-    # end
   end
 
   def handle_call({:add_item, embedding}, _, {index, _, _} = state) do
+
+    # We add the new item to the index and update it.
     with :ok <-
            HNSWLib.Index.add_items(index, embedding),
          {:ok, idx} <-
            HNSWLib.Index.get_current_count(index),
          :ok <-
            HNSWLib.Index.save_index(index, @saved_index) do
+
       Logger.info("idx: #{idx}")
       {:reply, {:ok, idx}, state}
+
     else
       {:error, msg} ->
         {:reply, {:error, msg}, state}
@@ -147,10 +148,12 @@ defmodule App.KnnIndex do
   end
 
   def handle_call({:knn_search, nil}, _, state) do
-    {:reply, {:error, "no index found"}, state}
+    {:reply, {:error, "No index found"}, state}
   end
 
   def handle_call({:knn_search, input}, _, {index, _, _} = state) do
+
+    # We search for the nearest neighbors of the input embedding.
     case HNSWLib.Index.knn_query(index, input, k: 1) do
       {:ok, labels, distances} ->
         Logger.info(inspect(distances))
@@ -163,7 +166,7 @@ defmodule App.KnnIndex do
             App.Repo.get_by(App.Image, %{idx: idx + 1})
           end)
 
-        # possible TODO: add threshold on  "distances"
+        # TODO: add threshold on  "distances"
         {:reply, response, state}
 
       {:error, msg} ->
@@ -174,7 +177,7 @@ defmodule App.KnnIndex do
   def handle_call(:not_empty, _, {index, _, _} = state) do
     case HNSWLib.Index.get_current_count(index) do
       {:ok, 0} ->
-        Logger.warning("Empty index")
+        Logger.warning("Empty index.")
         {:reply, :error, state}
 
       {:ok, _} ->

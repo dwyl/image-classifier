@@ -27,6 +27,11 @@ defmodule App.Image do
     |> Ecto.Changeset.unique_constraint(:idx, name: :images_idx_index)
   end
 
+  @doc """
+  Inserts a new image into the database.
+  Returns `{:ok, image}` if the image was inserted correctly.
+  Returns `{:error, reason}` if the image was not inserted correctly.
+  """
   def insert(params) do
     App.Image.changeset(%App.Image{}, params)
     |> App.Repo.insert()
@@ -102,11 +107,15 @@ defmodule App.Image do
   Otherwise, {:error, reason}.
   """
   def gen_magic_eval(path, accepted_mime) do
+    # Perform the magic evaluation.
     GenMagic.Server.perform(:gen_magic, path)
     |> case do
+
+      # In case it fails, return reason.
       {:error, reason} ->
         {:error, reason}
 
+      # If it succeeds, we check if it's an accepted mime type.
       {:ok,
        %GenMagic.Result{
          mime_type: mime,
@@ -117,6 +126,7 @@ defmodule App.Image do
           do: {:ok, %{mime_type: mime}},
           else: {:error, "Not accepted mime type."}
 
+      # In case the evaluation fails and it's not acceptable.
       {:ok, %GenMagic.Result{} = res} ->
         Logger.warning(%{gen_magic_response: res})
         {:error, "Not acceptable."}
