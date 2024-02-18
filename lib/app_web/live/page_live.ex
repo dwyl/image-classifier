@@ -234,7 +234,6 @@ defmodule AppWeb.PageLive do
   #
   # It saves the file to disk and sends it to the model to be transcribed.
   # It updates the socket assigns.
-  #
   def handle_progress(:speech, entry, %{assigns: assigns} = socket) when entry.done? do
     tmp_wave =
       socket
@@ -288,7 +287,7 @@ defmodule AppWeb.PageLive do
       # If S3 upload fails, we return error
       {:error, reason} ->
         Logger.warning("Error uploading image: #{inspect(reason)}")
-        {:postpone, "Bucket error"}
+        {:postpone, %{error: "Bucket error"}}
     end
   end
 

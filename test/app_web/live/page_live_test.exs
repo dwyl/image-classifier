@@ -190,9 +190,9 @@ defmodule AppWeb.PageLiveTest do
 
     # Get file and add it to the form
     file =
-      [:code.priv_dir(:app), "static", "images", "phoenix.xyz"]
+      [:code.priv_dir(:app), "static", "images", "test2.png"]
       |> Path.join()
-      |> build_upload("image/xyz")
+      |> build_upload("image/png")
 
     image = file_input(lv, "#upload-form", :image_list, [file])
 
