@@ -1,8 +1,6 @@
 defmodule App.HnswlibIndex do
   use Ecto.Schema
-
   alias App.HnswlibIndex
-  # alias App.Repo
 
   require Logger
 
@@ -26,55 +24,61 @@ defmodule App.HnswlibIndex do
     |> Ecto.Changeset.validate_required([:id])
   end
 
+  @doc """
+  Tries to load index from DB.
+  If the table is empty, it creates a new one.
+  If the table is not empty but there's no file, an index is created from scratch.
+  If there's one, we use it and load it to be used throughout the application.
+  """
   @spec maybe_load_index_from_db(atom(), integer(), integer()) ::
           {:ok, index(), index_schema()} | {:error, String.t()}
 
   def maybe_load_index_from_db(space, dim, max_elements) do
-    # check if the table has an entry
+    # Check if the table has an entry
     App.Repo.get_by(HnswlibIndex, id: 1)
     |> case do
+      # If the table is empty
       nil ->
-        # table empty
-        Logger.info("New Index")
+        Logger.info("No index file found in DB. Creating new one...")
         create(space, dim, max_elements)
 
+      # If the table is not empty but has no file
       response when response.file == nil ->
-        # table is not empty but has no file
-        Logger.info("Recreate Index")
-        # recreate the table
-        App.Repo.delete_all(App.HnswlibIndex)
+        Logger.info("Empty index file in DB. Recreating one...")
 
+        # Purge the table and create a new file row in it
+        App.Repo.delete_all(App.HnswlibIndex)
         create(space, dim, max_elements)
 
+      # If the table is not empty and has a file
       index_db ->
-        # table is not empty and has a file
-        Logger.info("Loading Index from DB")
+        Logger.info("Index file found in DB. Loading it...")
 
-        with path <-
-               App.KnnIndex.index_path(),
-             # save on disk
-             :ok <-
-               File.write(path, index_db.file),
-             # load the index file
-             {:ok, index} <-
-               HNSWLib.Index.load_index(space, dim, path) do
+        # We get the path of the index
+        with path <- App.KnnIndex.index_path(),
+             # Save the file on disk
+             :ok <- File.write(path, index_db.file),
+             # And load it
+             {:ok, index} <- HNSWLib.Index.load_index(space, dim, path) do
           {:ok, index, index_db}
-          # else
-          #   {:error, msg} -> {:error, msg}
         end
     end
   end
 
+
   @spec create(atom(), integer(), integer()) :: {:ok, map(), map()} | {:error, binary()}
-  def create(space, dim, max_elements) do
+
+  defp create(space, dim, max_elements) do
+    # Inserting the row in the table
     {:ok, schema} =
       HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
       |> App.Repo.insert()
 
+    # Creates index
     {:ok, index} =
       HNSWLib.Index.new(space, dim, max_elements)
 
-    # build an empty Index for tests
+    # Builds index for testing only
     if Mix.env() == :test do
       empty_index =
         Application.app_dir(:app, ["priv", "static", "uploads"])
@@ -85,15 +89,4 @@ defmodule App.HnswlibIndex do
 
     {:ok, index, schema}
   end
-
-  # HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
-  # |> App.Repo.insert()
-  # |> case do
-  #   {:ok, schema} ->
-  #     HNSWLib.Index.new(space, dim, max_elements)
-  #     |> Tuple.append(schema)
-
-  #   {:error, msg} ->
-  #     {:error, msg}
-  # end
 end
