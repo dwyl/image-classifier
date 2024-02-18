@@ -5,8 +5,6 @@ defmodule AppWeb.PageLive do
   alias Vix.Vips.Image, as: Vimage
   alias Vix.Vips.Operation, as: Vops
 
-  # on_mount {AppWeb.IndexCheck, :default}
-
   defmodule ImageInfo do
     @doc """
     General information for the image that is being analysed.
@@ -77,7 +75,6 @@ defmodule AppWeb.PageLive do
 
   Should be invoked after some seconds when LiveView is mounted.
   """
-
   def handle_event("show_examples", _data, %{assigns: assigns} = socket)
       when is_nil(assigns.task_ref) do
     # Only run if the user hasn't uploaded anything
@@ -99,25 +96,8 @@ defmodule AppWeb.PageLive do
   end
 
   @doc """
-  Double-checks the MIME type of uploaded file to ensure that the file
-  is an image and is not corrupted.
+  Performs magic evaluation to the image MIME type.
   """
-
-  # def check_file(binary, path) do
-  #   with {:image_info, {mimetype, width, height, variant}} <-
-  #          {:image_info, ExImageInfo.info(binary)},
-  #        {:gen_magic, {:ok, %{mime_type: mime}}} <-
-  #          {:gen_magic, App.Image.gen_magic_eval(path, @accepted_mime)} do
-  #     if mimetype == mime,
-  #       do: {:ok, {mimetype, width, height, variant}},
-  #       else: {:error, "MIME types do not correspond"}
-  #   else
-  #     {:image_info, nil} -> {:error, "bad file"}
-  #     {:gen_magic, {:error, reason}} -> {:error, reason}
-  #   end
-  # end
-
-  # Performs magic evaluation to the image MIME type.
   def magic_check(path) do
     App.Image.gen_magic_eval(path, @accepted_mime)
     |> case do
@@ -162,6 +142,7 @@ defmodule AppWeb.PageLive do
            {:ok, thumbnail_vimage} <- Vops.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
            # Pre-process the image as tensor
            {:pre_process, {:ok, tensor}} <- {:pre_process, pre_process_image(thumbnail_vimage)} do
+        # Create image info to be saved as partial image
         image_info = %{
           mimetype: mimetype,
           width: width,
@@ -173,7 +154,7 @@ defmodule AppWeb.PageLive do
           idx: :rand.uniform(1_000_000_000_000) * 1_000
         }
 
-        # save partial image
+        # Save partial image
         App.Image.insert(image_info)
         |> case do
           {:ok, _} ->
@@ -221,12 +202,7 @@ defmodule AppWeb.PageLive do
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
       %{error: errors} ->
         Logger.warning("Error uploading image. #{inspect(errors)}")
-
         {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
-
-        # msg ->
-        #   Logger.warning(inspect(msg))
-        #   {:noreply, socket}
     end
   end
 
@@ -235,6 +211,7 @@ defmodule AppWeb.PageLive do
   # It saves the file to disk and sends it to the model to be transcribed.
   # It updates the socket assigns.
   def handle_progress(:speech, entry, %{assigns: assigns} = socket) when entry.done? do
+    # We consume the audio file
     tmp_wave =
       socket
       |> consume_uploaded_entry(entry, fn %{path: path} ->
@@ -243,6 +220,7 @@ defmodule AppWeb.PageLive do
         {:ok, tmp_wave}
       end)
 
+    # After consuming the audio file, we spawn a task to transcribe the audio
     audio_task =
       Task.Supervisor.async(
         App.TaskSupervisor,
@@ -251,6 +229,7 @@ defmodule AppWeb.PageLive do
         end
       )
 
+    # Update the socket assigns
     {:noreply,
      assign(socket,
        audio_ref: audio_task.ref,
@@ -262,16 +241,16 @@ defmodule AppWeb.PageLive do
      )}
   end
 
-  # intermediate chunk consumption
+  # Intermediate chunk consumption
   def handle_progress(_, _, socket), do: {:noreply, socket}
 
   @doc """
   Called in `handle_progress` to Handle the upload to the bucket and returns the format `{:ok, map}` or {:postpone, message}`
   as demanded by the signature of callback function used `consume_uploaded_entry`
   """
-  def handle_upload({:ok, map}) when is_map(map) do
-    %{path: path, tensor: tensor, image_info: image_info} = map
-
+  def handle_upload({:ok, %{path: path, tensor: tensor, image_info: image_info} = map})
+      when is_map(map) do
+    # Upload the image to S3
     Image.upload_image_to_s3(path, image_info.mimetype)
     |> case do
       # If the upload is successful, we update the socket assigns with the image info
@@ -308,7 +287,7 @@ defmodule AppWeb.PageLive do
     Process.demonitor(ref, [:flush])
     File.rm!(assigns.tmp_wave)
 
-    # compute an normed embedding (cosine case only) on the text result
+    # Compute an normed embedding (cosine case only) on the text result
     # and returns an App.Image{} as the result of a "knn_search"
     with {:not_empty_index, :ok} <-
            {:not_empty_index, App.KnnIndex.not_empty_index()},
@@ -328,7 +307,7 @@ defmodule AppWeb.PageLive do
          tmp_wave: @tmp_wav
        )}
     else
-      # stop transcription if no entries in the Index
+      # Stop transcription if no entries in the Index
       {:not_empty_index, :error} ->
         {:noreply,
          socket
@@ -357,12 +336,10 @@ defmodule AppWeb.PageLive do
 
   # This function is invoked after the async task for captioning models is completed.
   # It flushes the async call and destructures the output of the captioning model.
-
   def handle_info({ref, result}, %{assigns: assigns} = socket) do
     # Flush async call
     Process.demonitor(ref, [:flush])
-    # %{embedding_serving: embedding_serving, index: index} = assigns
-    # %{index: index} = assigns
+
     # You need to change how you destructure the output of the model depending
     # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
     label =
@@ -379,7 +356,7 @@ defmodule AppWeb.PageLive do
     %{image_info: image_info} = assigns
 
     cond do
-      # If the upload task has finished executing, we update the socket assigns.
+      # If the upload task has finished executing, we run the embedding model on the image
       Map.get(assigns, :task_ref) == ref ->
         image =
           %{
@@ -390,15 +367,15 @@ defmodule AppWeb.PageLive do
             sha1: image_info.sha1
           }
 
-        with %{embedding: data} <-
-               Nx.Serving.batched_run(Embedding, label),
-             # compute a normed embedding (cosine case only) on the text result
-             normed_data <-
-               Nx.divide(data, Nx.LinAlg.norm(data)),
+        # Create embedding task
+        with %{embedding: data} <- Nx.Serving.batched_run(Embedding, label),
+             # Compute a normed embedding (cosine case only) on the text result
+             normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
+             # Check the SHA1 of the image
              {:check_used, {:ok, pending_image}} <-
                {:check_used, App.Image.check_sha1(image.sha1)} do
           Ecto.Multi.new()
-          # save updated Image to DB
+          # Save updated Image to DB
           |> Ecto.Multi.run(:update_image, fn _, _ ->
             idx = App.KnnIndex.get_count() + 1
 
@@ -409,7 +386,8 @@ defmodule AppWeb.PageLive do
             })
             |> App.Repo.update()
           end)
-          # save Index file to DB
+
+          # Save Index file to DB
           |> Ecto.Multi.run(:save_index, fn _, _ ->
             {:ok, _idx} = App.KnnIndex.add_item(normed_data)
             App.KnnIndex.save_index_to_db()
@@ -481,6 +459,9 @@ defmodule AppWeb.PageLive do
     end
   end
 
+  @doc """
+  Update the example list assigns after predictions are yielded.
+  """
   def update_example_list(assigns, image, label) do
     Map.get(assigns, :example_list)
     |> Enum.map(fn obj ->
@@ -522,17 +503,22 @@ defmodule AppWeb.PageLive do
 
   def error_to_string(:too_large), do: "Image too large. Upload a smaller image up to 5MB."
 
-  # If the image has an alpha channel, flatten it:
+  @doc """
+  Helper function to flatten an image.
+  """
   def flatten(%Vimage{} = image) do
     case Vimage.has_alpha?(image) do
       true ->
         Vops.flatten(image)
+
       false ->
         {:ok, image}
     end
   end
 
-  # Convert the image to sRGB colourspace ----------------
+  @doc """
+  Helper function to conver the image to sRGB colourspace.
+  """
   def srgb(%Vimage{} = image) do
     Vops.colourspace(image, :VIPS_INTERPRETATION_sRGB)
     |> case do
@@ -544,7 +530,9 @@ defmodule AppWeb.PageLive do
     end
   end
 
-  # Converting image to tensor ----------------
+  @doc """
+  Converting the image to tensor.
+  """
   def to_tensor(%Vimage{} = image) do
     Vimage.write_to_tensor(image)
     |> case do
@@ -556,6 +544,9 @@ defmodule AppWeb.PageLive do
     end
   end
 
+  @doc """
+  Pre-processing a given image.
+  """
   def pre_process_image(%Vimage{} = v_img) do
     with {:ok, %Vimage{} = flattened_image} <-
            flatten(v_img),
@@ -566,7 +557,6 @@ defmodule AppWeb.PageLive do
          data when data != nil <- Map.get(tensor, :data) do
       # We reshape the tensor given a specific format.
       # In this case, we are using {height, width, channels/bands}.
-
       %Vix.Tensor{data: binary, type: type, shape: {x, y, bands}} = tensor
       format = [:height, :width, :bands]
       shape = {x, y, bands}
@@ -577,12 +567,6 @@ defmodule AppWeb.PageLive do
         |> Nx.reshape(shape, names: format)
 
       {:ok, %Nx.Tensor{} = final_tensor}
-      # else
-      #   {:error, msg} ->
-      #     {:error, msg}
-
-      #   nil ->
-      #     {:error, "Image empty"}
     end
   end
 
@@ -590,6 +574,7 @@ defmodule AppWeb.PageLive do
     {:error, msg}
   end
 
+  # Helper function to track the redirected URI from random Unsplash images.
   defp track_redirected(url) do
     # Create request
     req = Req.new(url: url)
