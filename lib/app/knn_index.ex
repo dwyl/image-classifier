@@ -51,14 +51,12 @@ defmodule App.KnnIndex do
   # ---------------------------------------------------
   @impl true
   def init(args) do
-
     # Trying to load the index file
     :ok = File.mkdir_p!(@upload_dir)
     index_path = Keyword.fetch!(args, :index)
     space = Keyword.fetch!(args, :space)
 
     case File.exists?(index_path) do
-
       # If the index file doesn't exist, we try to load from the database.
       false ->
         {:ok, index, index_schema} =
@@ -66,14 +64,16 @@ defmodule App.KnnIndex do
 
         {:ok, {index, index_schema, space}}
 
-        # If the index file does exist, we compare the one with teh table and check for incoherences.
+      # If the index file does exist, we compare the one with teh table and check for incoherences.
       true ->
         Logger.info("Index file found on disk. Let's compare it with the database...")
 
         App.Repo.get_by(App.HnswlibIndex, id: 1)
         |> case do
           nil ->
-            {:stop, {:error, "Error comparing the index file with the one on the database. Incoherence on table."}}
+            {:stop,
+             {:error,
+              "Error comparing the index file with the one on the database. Incoherence on table."}}
 
           schema ->
             check_integrity(index_path, schema, space)
@@ -94,10 +94,11 @@ defmodule App.KnnIndex do
       Logger.info("Integrity: " <> "\u2705.")
       {:ok, {index, schema, space}}
 
-    # If it fails, we return an error.
+      # If it fails, we return an error.
     else
       false ->
-        {:stop, {:error, "Integrity error. The count of images from index differs from the database."}}
+        {:stop,
+         {:error, "Integrity error. The count of images from index differs from the database."}}
 
       {:error, msg} ->
         Logger.warning(inspect(msg))
@@ -129,7 +130,6 @@ defmodule App.KnnIndex do
   end
 
   def handle_call({:add_item, embedding}, _, {index, _, _} = state) do
-
     # We add the new item to the index and update it.
     with :ok <-
            HNSWLib.Index.add_items(index, embedding),
@@ -137,10 +137,8 @@ defmodule App.KnnIndex do
            HNSWLib.Index.get_current_count(index),
          :ok <-
            HNSWLib.Index.save_index(index, @saved_index) do
-
       Logger.info("idx: #{idx}")
       {:reply, {:ok, idx}, state}
-
     else
       {:error, msg} ->
         {:reply, {:error, msg}, state}
@@ -152,7 +150,6 @@ defmodule App.KnnIndex do
   end
 
   def handle_call({:knn_search, input}, _, {index, _, _} = state) do
-
     # We search for the nearest neighbors of the input embedding.
     case HNSWLib.Index.knn_query(index, input, k: 1) do
       {:ok, labels, distances} ->

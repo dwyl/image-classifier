@@ -142,6 +142,9 @@ defmodule App.Models do
     end
   end
 
+  @doc """
+  Loads the embedding model.
+  """
   def embedding() do
     load_offline_model(@embedding_model)
     |> then(fn response ->
@@ -289,7 +292,6 @@ defmodule App.Models do
         info = %{model_info: model_info}
 
         # Load featurizer, tokenizer and generation config if needed
-
         info =
           if Map.get(model, :load_featurizer) do
             {:ok, featurizer} = Bumblebee.load_featurizer(loading_settings)
@@ -316,7 +318,7 @@ defmodule App.Models do
             info
           end
 
-        # # Return a map with the model and respective parameters.
+        # Return a map with the model and respective parameters.
         {:ok, info}
 
       {:error, msg} ->

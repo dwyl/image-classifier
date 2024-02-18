@@ -110,7 +110,6 @@ defmodule App.Image do
     # Perform the magic evaluation.
     GenMagic.Server.perform(:gen_magic, path)
     |> case do
-
       # In case it fails, return reason.
       {:error, reason} ->
         {:error, reason}

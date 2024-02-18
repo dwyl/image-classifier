@@ -65,7 +65,6 @@ defmodule App.HnswlibIndex do
     end
   end
 
-
   @spec create(atom(), integer(), integer()) :: {:ok, map(), map()} | {:error, binary()}
 
   defp create(space, dim, max_elements) do
