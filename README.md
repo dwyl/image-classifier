@@ -4181,7 +4181,7 @@ defmodule App.KnnIndex do
   end
 
   def handle_call({:knn_search, nil}, _, state) do
-    {:reply, {:error, "no index found"}, state}
+    {:reply, {:error, "No index found"}, state}
   end
 
   def handle_call({:knn_search, input}, _, state) do

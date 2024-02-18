@@ -357,7 +357,7 @@ defmodule AppWeb.PageLiveTest do
 
     reset()
 
-    assert {:error, "Incoherence on table"} ==
+    assert {:error, "Error comparing the index file with the one on the database. Incoherence on table."} ==
              Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
              |> elem(1)
              |> elem(0)
@@ -379,7 +379,7 @@ defmodule AppWeb.PageLiveTest do
     })
     |> App.Repo.insert()
 
-    assert {:error, "Integrity error"} ==
+    assert {:error, "Integrity error. The count of images from index differs from the database."} ==
              Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
              |> elem(1)
              |> elem(0)
@@ -469,7 +469,7 @@ defmodule AppWeb.PageLiveTest do
 
     {:ok, state} = App.KnnIndex.init(space: :cosine, index: path)
 
-    assert {:reply, {:error, "no index found"}, state} ==
+    assert {:reply, {:error, "No index found"}, state} ==
              App.KnnIndex.handle_call({:knn_search, nil}, self(), state)
 
     # capture Hnwslib error: "number above limit" because returned number is less than k=1

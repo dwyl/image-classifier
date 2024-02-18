@@ -1,6 +1,5 @@
 defmodule AppWeb.Spinner do
   use Phoenix.Component
-  # use AppWeb, :html
 
   @moduledoc """
   Stateless component to display a spinner.
