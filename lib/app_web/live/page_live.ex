@@ -291,6 +291,11 @@ defmodule AppWeb.PageLive do
     end
   end
 
+  def handle_upload({:error, error}) do
+    Logger.warning("Error creating partial image: #{inspect(error)}")
+    {:postpone, %{error: "Error creating partial image"}}
+  end
+
   @doc """
   Every time an `async task` is created, this function is called.
   We destructure the output of the task and update the socket assigns.
