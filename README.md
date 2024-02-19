@@ -63,8 +63,11 @@ with your voice! 🎙️
       - [10.1 Showing a toast component with error](#101-showing-a-toast-component-with-error)
     - [11. Benchmarking image captioning models](#11-benchmarking-image-captioning-models)
   - [🔍 Semantic search](#-semantic-search)
-    - [Overview of the process](#overview-of-the-process)
-      - [Pre-requisites](#pre-requisites)
+    - [0. Overview of the process](#0-overview-of-the-process)
+      - [0.1 Audio transcription](#01-audio-transcription)
+      - [0.2 Creating embeddings](#02-creating-embeddings)
+      - [0.3 Semantically searching](#03-semantically-searching)
+    - [1. Pre-requisites](#1-pre-requisites)
     - [1. Transcribe an audio recording](#1-transcribe-an-audio-recording)
       - [1.1 Adding a loading spinner](#11-adding-a-loading-spinner)
       - [1.2 Defining `Javascript` hook](#12-defining-javascript-hook)
@@ -3173,8 +3176,8 @@ inside the
 ## 🔍 Semantic search
 
 > Imagine a person wants to see an image that was uploaded
-> under a certain thema.
-> One way to solve this problem is to perform a **_full-text_ search query** on specific words among these captions.
+> under a certain theme.
+> One way to solve this problem is to perform a **_full-text_ search query** on specific words among these image captions.
 
 </div>
 
@@ -3195,7 +3198,7 @@ These techniques are widely used in search engines,
 including in widespread tools like
 [Elastic Search](https://www.elastic.co/).
 
-### Overview of the process
+### 0. Overview of the process
 
 Let's go over the process in detail so we know what to expect.
 
@@ -3212,16 +3215,22 @@ Here's an overview of how semantic search usually works
 
 > Source: https://www.elastic.co/what-is/semantic-search
 
+
+#### 0.1 Audio transcription
+
 Firstly, we will:
 
 - record an audio with [MediaRecorder](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) API.
 - run a **Speech-To-Text** process to produce a text transcription
   from the audio.
 
-We will use - thus load - the _pre-trained_ model [openai/whisper-small](https://huggingface.co/openai/whisper-small)
+We will use - thus loading - the _pre-trained_ model [openai/whisper-small](https://huggingface.co/openai/whisper-small)
 from <https://huggingface.co>
 and use it with the help of the [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5) function.
 We get an `Nx.Serving` that we will use to run this model with an input.
+
+
+#### 0.2 Creating embeddings
 
 We then want to find images whose captions
 approximates this text in terms of meaning.
@@ -3230,41 +3239,61 @@ This is where **embeddings** come into play:
 we encode each transcription as a _vector_ - aka embedding -
 and then use an approximation algorithm to find the closest neighbours.
 Embeddings are basically **vector representations** of certain inputs,
-which in our case, are audio files.
+which in our case, are audio files recorded by the user.
 
-Our next steps will be to prepare the [symmetric semantic search](https://www.sbert.net/examples/applications/semantic-search/README.html#symmetric-vs-asymmetric-semantic-search).
-
-We will use the [transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>) with the [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) pre-trained system available in [Huggingface](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
-
-We transform a text into a vector: we use the sentence-transformer model [`sentence-transformers/paraphrase-MiniLM-L6-v2` ](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) because of its small size.
+Our next steps will be to prepare the 
+[symmetric semantic search](https://www.sbert.net/examples/applications/semantic-search/README.html#symmetric-vs-asymmetric-semantic-search).
+We will use the 
+[transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>) 
+with the [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) 
+pre-trained system available in 
+[Huggingface](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
+We will transform a text into a vector: we use the sentence-transformer model [`sentence-transformers/paraphrase-MiniLM-L6-v2` ](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) because of its small size.
 We will run it with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function.
 This encoding is done for each image caption.
 
-After this, we then run a [**knn_neighbour**](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) search.
-The idea is to work in the embeddings vector space and find the image vectors that are close to the target vector.
+
+#### 0.3 Semantically searching
+
+At this point, we have:
+- the embedding of the recording of the user
+(e.g `"a dog"`).
+- all the embeddings of all the images in our "image bank".
+To search for the images that are related to `"a dog"`,
+we need to apply an algorithm that compares these two embeddings!
+
+For this, we will run a [**knn_neighbour**](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) search.
+The baisc idea is to work in the embeddings vector space 
+and find the image vectors that are close to the target vector.
 
 There are several ways to do this.
 
-We can use the `pgvector`, a vector extension of Postgres. It is used to store vectors (the embeddings) and to run similarity searches. We can then run:
+- We can use the `pgvector`, a vector extension of Postgres. It is used to store vectors (the embeddings) and to run similarity searches. 
+With `pgvector`, we can run
 
-- a full exact search with the [cosine similarity](https://github.com/pgvector/pgvector#distances) operator `<=>`,
-- or use an Approximate Nearest Neighbour seach with the indexing algorithms. The extension proposes [IVFFLAT](https://github.com/pgvector/pgvector#ivfflat) or `[HNSWLIB](https://github.com/pgvector/pgvector#hnsw) algorithms. You can find some explanations on both algorithms [here](https://tembo.io/blog/vector-indexes-in-pgvector) and [there](https://neon.tech/blog/understanding-vector-search-and-hnsw-index-with-pgvector).
+  - a full exact search with the [cosine similarity](https://github.com/pgvector/pgvector#distances) operator `<=>`,
+  - or use an Approximate Nearest Neighbour seach with the indexing algorithms. The extension proposes [`IVFFLAT`](https://github.com/pgvector/pgvector#ivfflat) or [`HNSWLIB`](https://github.com/pgvector/pgvector#hnsw) algorithms. You can find some explanations on both algorithms in https://tembo.io/blog/vector-indexes-in-pgvector and https://neon.tech/blog/understanding-vector-search-and-hnsw-index-with-pgvector.
 
-This requires the `pgvector` extension to be installed in Fly.io. We lacked of resources to do so.
 
-> Note that [Supabase](https://supabase.com/docs/guides/database/extensions/pgvector) can use the pgvector extension, and you can use [Supabase with Fly.io](https://fly.io/docs/reference/supabase/).
+> [!NOTE]
+> Note that [Supabase](https://supabase.com/docs/guides/database/extensions/pgvector) can use the `pgvector` extension, and you can use [Supabase with Fly.io](https://fly.io/docs/reference/supabase/).
 
+> [!WARNING]
 > Note that you need to save the embeddings (as vectors) into the database, so the database will be intensively used. This may lead to scaling problems and potential race conditions.
 
-We can alternatively use the `hnswlib` library and its Elixir binding [HNSWLib](https://github.com/elixir-nx/hnswlib).
+- We can alternatively use the `hnswlib` library and its Elixir binding [HNSWLib](https://github.com/elixir-nx/hnswlib).
 This "externalises" the ANN search from the database as it uses an in-memory file.
-This file needs to be persisted on disk, thus at the expense of using the Filesystem with again potential race conditions.
+This file needs to be persisted on disk, thus at the expense of using the filesystem with again potential race conditions.
 It works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**: this struct will allow us to efficiently retrieve vector data.
 
-We will use this last option.
+**We will use this last option**,
+mostly because we use Fly.io
+and `pgvector` is hard to come by on this platform.
+Additionally, you don't rely on a framework that does the heavylifting for you.
+We're here to learn, aren't we? 😃
 
 We will append incrementally the computed embedding from the captions into the Index.
-We will get an indice that is the order of this embedding in the Index.
+We will get an indice (simply is the order of this embedding in the Index).
 We then run a "knn_search" algorithm; the input will be the embedding of the audio transcript.
 This algorithm will return the most relevant position(s) - `indices` -
 among the `Index` indices that minimize the choosen distance between this input and the existing vectors.
@@ -3284,7 +3313,8 @@ Because the "sentence-transformer" model we've chosen was trained with **_cosine
 this is what we'll use.
 Bumblebee may have options to correctly use this metric, but we used a normalisation process which fits our needs.
 
-#### Pre-requisites
+
+### 1. Pre-requisites
 
 Before starting, let's install some dependencies that we'll need.
 Add these to the `deps` section in `mix.exs`.
@@ -3305,7 +3335,10 @@ end
 And run `mix deps.get`.
 
 **You will also need to install [`ffmpeg`](https://ffmpeg.org/)**.
-Indeed, `Bumblebee` uses `ffmpeg` under the hood to process audio files into tensors.
+`Bumblebee` uses `ffmpeg` under the hood to process audio files into tensors,
+but it uses it *as an external dependency*.
+
+And now we're ready to rock and roll! 🎸
 
 ### 1. Transcribe an audio recording
 
