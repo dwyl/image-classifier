@@ -9,9 +9,6 @@ defmodule App.HnswlibIndex do
   with utility functions
   """
 
-  @type index :: %HNSWLib.Index{space: atom(), dim: integer(), reference: term()}
-  @type index_schema :: %App.HnswlibIndex{file: binary(), lock_version: integer()}
-
   schema "hnswlib_index" do
     field(:file, :binary)
     field(:lock_version, :integer, default: 1)
@@ -30,9 +27,6 @@ defmodule App.HnswlibIndex do
   If the table is not empty but there's no file, an index is created from scratch.
   If there's one, we use it and load it to be used throughout the application.
   """
-  @spec maybe_load_index_from_db(atom(), integer(), integer()) ::
-          {:ok, index(), index_schema()} | {:error, String.t()}
-
   def maybe_load_index_from_db(space, dim, max_elements) do
     # Check if the table has an entry
     App.Repo.get_by(HnswlibIndex, id: 1)
@@ -64,8 +58,6 @@ defmodule App.HnswlibIndex do
         end
     end
   end
-
-  @spec create(atom(), integer(), integer()) :: {:ok, map(), map()} | {:error, binary()}
 
   defp create(space, dim, max_elements) do
     # Inserting the row in the table

@@ -75,7 +75,8 @@ with your voice! 🎙️
       - [2.4 Serving the `Whisper` model](#24-serving-the-whisper-model)
       - [2.5 Handling the model's response and updating elements in the view](#25-handling-the-models-response-and-updating-elements-in-the-view)
     - [3. Embeddings and semantic search](#3-embeddings-and-semantic-search)
-      - [3.1 The HNSWLib Index](#31-the-hnswlib-index)
+      - [3.1 The `HNSWLib` Index (GenServer)](#31-the-hnswlib-index-genserver)
+      - [3.2 Saving the `HNSWLib` Index in the database](#32-saving-the-hnswlib-index-in-the-database)
       - [3.2 The embeding model](#32-the-embeding-model)
     - [4. Using the Index and embedding](#4-using-the-index-and-embedding)
       - [4.0 Working example on how to use `HNSWLib`](#40-working-example-on-how-to-use-hnswlib)
@@ -4082,7 +4083,7 @@ This means the app uses this unique file,
 so this app is only meant to run **on a single node**.
 
 
-#### 3.1 The HNSWLib Index
+#### 3.1 The `HNSWLib` Index (GenServer)
 
 This library [`HNSWLib`](https://github.com/elixir-nx/hnswlib) 
 works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**.
@@ -4324,6 +4325,147 @@ callers to add items to the index file,
 so it is saved.
 
 
+#### 3.2 Saving the `HNSWLib` Index in the database
+
+As you may have seen from the previous GenServer,
+we are calling functions from a module called
+`App.HnswlibIndex` that we have not yet created.
+
+This module pertains to the **schema** that will hold
+information of the `HNSWLib` table.
+This table will only have a single row,
+with the file contents.
+As we've discussed earlier, 
+we will compare the Index file in this row 
+with the one in the filesystem
+to check for any inconsistencies that may arise.
+
+Let's implement this module now!
+
+Inside `lib/app`, create a file called `hnswlib_index.ex`
+and use the following code.
+
+```elixir
+defmodule App.HnswlibIndex do
+  use Ecto.Schema
+  alias App.HnswlibIndex
+
+  require Logger
+
+  @moduledoc """
+  Ecto schema to save the HNSWLib Index file into a singleton table
+  with utility functions
+  """
+
+  schema "hnswlib_index" do
+    field(:file, :binary)
+    field(:lock_version, :integer, default: 1)
+  end
+
+  def changeset(struct \\ %__MODULE__{}, params \\ %{}) do
+    struct
+    |> Ecto.Changeset.cast(params, [:id, :file])
+    |> Ecto.Changeset.optimistic_lock(:lock_version)
+    |> Ecto.Changeset.validate_required([:id])
+  end
+
+  @doc """
+  Tries to load index from DB.
+  If the table is empty, it creates a new one.
+  If the table is not empty but there's no file, an index is created from scratch.
+  If there's one, we use it and load it to be used throughout the application.
+  """
+  def maybe_load_index_from_db(space, dim, max_elements) do
+    # Check if the table has an entry
+    App.Repo.get_by(HnswlibIndex, id: 1)
+    |> case do
+      # If the table is empty
+      nil ->
+        Logger.info("No index file found in DB. Creating new one...")
+        create(space, dim, max_elements)
+
+      # If the table is not empty but has no file
+      response when response.file == nil ->
+        Logger.info("Empty index file in DB. Recreating one...")
+
+        # Purge the table and create a new file row in it
+        App.Repo.delete_all(App.HnswlibIndex)
+        create(space, dim, max_elements)
+
+      # If the table is not empty and has a file
+      index_db ->
+        Logger.info("Index file found in DB. Loading it...")
+
+        # We get the path of the index
+        with path <- App.KnnIndex.index_path(),
+             # Save the file on disk
+             :ok <- File.write(path, index_db.file),
+             # And load it
+             {:ok, index} <- HNSWLib.Index.load_index(space, dim, path) do
+          {:ok, index, index_db}
+        end
+    end
+  end
+
+  defp create(space, dim, max_elements) do
+    # Inserting the row in the table
+    {:ok, schema} =
+      HnswlibIndex.changeset(%__MODULE__{}, %{id: 1})
+      |> App.Repo.insert()
+
+    # Creates index
+    {:ok, index} =
+      HNSWLib.Index.new(space, dim, max_elements)
+
+    # Builds index for testing only
+    if Mix.env() == :test do
+      empty_index =
+        Application.app_dir(:app, ["priv", "static", "uploads"])
+        |> Path.join("indexes_empty.bin")
+
+      HNSWLib.Index.save_index(index, empty_index)
+    end
+
+    {:ok, index, schema}
+  end
+end
+```
+
+In this module:
+
+- we are creating **two fields**: `lock_version`, 
+to simply check the version of the file;
+and `file`, 
+the binary content of the index file.
+
+- `lock_version` will be extremely useful to 
+perform [**optmistic locking**](https://stackoverflow.com/questions/129329/optimistic-vs-pessimistic-locking),
+which is what we do in the `changeset/2` function.
+This will allows us to prevent deadlocking
+when two different people upload the same image at the same time,
+and overcome any race condition that may occur.
+This will maintain the data consistenty in the Index file.
+
+- `maybe_load_index_from_db/3` fetches the singleton row
+on this table and checks if the file exists in the row.
+If it doesn't, it creates a new one.
+Otherwise, it just loads the existing one inside the row.
+
+- `create/3` creates a new index file.
+It's a private function that encapsulates creating
+the Index file so it can be used in the singleton row 
+inside the table.
+
+
+And that's it!
+We've added additional code to conditionally create different indexex
+according to the environment 
+(useful for testing),
+but you can safely ignore those conditional calls
+if you're not interested in testing
+(though you should 😛).
+
+
 #### 3.2 The embeding model
 
 We provide a serving for the embedding model in the `App.Models` module. 
@@ -4535,7 +4677,7 @@ and not necessary to for our app.
 
 > [!NOTE]
 >
-> This whole section is entirely optional.
+> This whole section is *entirely optional*.
 > It will just delve more deeply in embedding
 > and provide you with a one-file working example
 > where you can play around vector embeddings
@@ -4779,7 +4921,7 @@ def mount(_, _, socket) do
     search_result: nil,
     tmp_wave: @tmp_wav,
     )
-    |> alow_upload(:speech,...)
+    |> allow_upload(:speech,...)
     [...]
   }
 end
@@ -4977,7 +5119,7 @@ def changeset(image, params \\ %{}) do
 end
 ```
 
-[TODO]: give some explanations on this normalization, the handle_knn etc...
+[TODO]: falta o image (ver migration para adicionar sha1, ver a migration acima para corrigir) e depois o page_live
 
 
 
