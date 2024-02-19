@@ -85,11 +85,14 @@ with your voice! 🎙️
 
 ## Why? 🤷
 
-Building our [app](https://github.com/dwyl/app), we consider `images` an _essential_ medium of communication.
+Building our [app](https://github.com/dwyl/app), 
+we consider `images` an _essential_ medium of communication.
 
-You may have a lots of images in your account, and you may want to find a way to retrieve the most appropriate one.
+You personally may have a collection of images that you want to caption 
+and semantically retrieve them fast.
 
-By adding a way of captioning images, we make it _easy_ for people to suggest meta tags that describe images so they become **searchable**. We expose further how this can be achieved.
+By adding a way of captioning images, we make it _easy_ for people to suggest meta tags that describe images so they become **searchable**. 
+
 
 ## What? 💭
 
@@ -98,49 +101,66 @@ This run-through will create a simple
 that will allow you to choose/drag an image
 and automatically caption the image.
 
-Furthermore, the app will allow the user to record an audio which describes the image(s) you want to find.
+In addition to this,
+the app will allow the user to record an audio 
+which describes the image they want to find.
 
-The audio will be transcribed into a text, similar to the caption.
+The audio will be transcribed into text
+and be semantically queryable.
+We do this by encoding the image captions
+as vectors and running `knn search` on them.
 
-We then encode these texts as vectors and run a _knn_ search.
 
 ## Who? 👤
 
 This tutorial is aimed at `Phoenix` beginners
-that want to start to use machine learning capabilities of the Elixir langugage within a `Phoenix` application.
-We propose to use pre-trained models from Hugging Face via `Bumblebee` and grasp how to:
+that want to start exploring the machine learning capabilities 
+of the Elixir language within a `Phoenix` application.
+We propose to use pre-trained models from Hugging Face via `Bumblebee` 
+and grasp how to:
 
-- run a model, in particular image captioning
-- how to use embeddings
-- how to run a semantic search using an Approximate Nearest Neighbour algorithm.
+- run a model, in particular image captioning.
+- how to use embeddings.
+- how to run a semantic search using an 
+[Approximate Nearest Neighbour](https://towardsdatascience.com/comprehensive-guide-to-approximate-nearest-neighbors-algorithms-8b94f057d6b6) 
+algorithm.
 
 If you are completely new to `Phoenix` and `LiveView`,
 we recommend you follow the **`LiveView` _Counter_ Tutorial**:
 
 [dwyl/phoenix-liveview-counter-tutorial](https://github.com/dwyl/phoenix-liveview-counter-tutorial)
 
+
 ## How? 💻
 
 In these chapters, we'll go over the development process of this small application.
 You'll learn how to do this _yourself_, so grab some coffee and let's get cracking!
 
+This section will be divided into two sections.
+One will go over **image captioning**
+while the second one will expand the application
+by adding **semantic search**.
+
+
 ## Prerequisites
 
 This tutorial requires you have `Elixir` and `Phoenix` installed.
 
-If you you don't, please see [how to install Elixir](https://github.com/dwyl/learn-elixir#installation) and [Phoenix](https://hexdocs.pm/phoenix/installation.html#phoenix).
+If you don't, please see [how to install Elixir](https://github.com/dwyl/learn-elixir#installation) and [Phoenix](https://hexdocs.pm/phoenix/installation.html#phoenix).
 
-This guide assumes you know the basics of `Phoenix` and have _some_ knowledge of how it works.
+This guide assumes you know the basics of `Phoenix` 
+and have _some_ knowledge of how it works.
 If you don't, we _highly suggest_ you follow our other tutorials first, e.g: [github.com/dwyl/**phoenix-chat-example**](https://github.com/dwyl/phoenix-chat-example)
 
 In addition to this, **_some_ knowledge of `AWS`** - what it is, what an `S3` bucket is/does - **is assumed**.
 
 > [!NOTE]
-> if you have questions or get stuck,
+> If you have questions or get stuck,
 > please open an issue!
 > [/dwyl/image-classifier/issues](https://github.com/dwyl/image-classifier/issues)
 
 <div align="center">
+
 
 ## 🌄 Image Captioning in `Elixir`
 
