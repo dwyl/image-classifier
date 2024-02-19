@@ -68,20 +68,19 @@ with your voice! 🎙️
       - [0.2 Creating embeddings](#02-creating-embeddings)
       - [0.3 Semantically searching](#03-semantically-searching)
     - [1. Pre-requisites](#1-pre-requisites)
-    - [1. Transcribe an audio recording](#1-transcribe-an-audio-recording)
+    - [2. Transcribe an audio recording](#2-transcribe-an-audio-recording)
       - [1.1 Adding a loading spinner](#11-adding-a-loading-spinner)
-      - [1.2 Defining `Javascript` hook](#12-defining-javascript-hook)
-      - [1.3 Handling audio upload in `LiveView`](#13-handling-audio-upload-in-liveview)
-      - [1.4 Serving the `Whisper` model](#14-serving-the-whisper-model)
-      - [1.5 Handling the model's response and updating elements in the view](#15-handling-the-models-response-and-updating-elements-in-the-view)
-    - [Embeddings and semantic search](#embeddings-and-semantic-search)
-      - [The HNSWLib Index](#the-hnswlib-index)
-      - [The embeding model](#the-embeding-model)
-    - [Using the Index and embedding](#using-the-index-and-embedding)
-      - [`on_mount` hook](#on_mount-hook)
-      - [Computation of embeddings](#computation-of-embeddings)
-      - [Worked example on how to use HNSWLib](#worked-example-on-how-to-use-hnswlib)
-        - [Notes on vector spaces](#notes-on-vector-spaces)
+      - [2.2 Defining `Javascript` hook](#22-defining-javascript-hook)
+      - [2.3 Handling audio upload in `LiveView`](#23-handling-audio-upload-in-liveview)
+      - [2.4 Serving the `Whisper` model](#24-serving-the-whisper-model)
+      - [2.5 Handling the model's response and updating elements in the view](#25-handling-the-models-response-and-updating-elements-in-the-view)
+    - [3. Embeddings and semantic search](#3-embeddings-and-semantic-search)
+      - [3.1 The HNSWLib Index](#31-the-hnswlib-index)
+      - [3.2 The embeding model](#32-the-embeding-model)
+    - [4. Using the Index and embedding](#4-using-the-index-and-embedding)
+      - [4.0 Working example on how to use `HNSWLib`](#40-working-example-on-how-to-use-hnswlib)
+        - [4.0.1 Notes on vector spaces](#401-notes-on-vector-spaces)
+      - [4.1 Computing the embeddings in our app](#41-computing-the-embeddings-in-our-app)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -3340,7 +3339,7 @@ but it uses it *as an external dependency*.
 
 And now we're ready to rock and roll! 🎸
 
-### 1. Transcribe an audio recording
+### 2. Transcribe an audio recording
 
 > **Source:** <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>
 
@@ -3425,7 +3424,7 @@ so this part of your code will shrink to:
 <% end %>
 ```
 
-#### 1.2 Defining `Javascript` hook
+#### 2.2 Defining `Javascript` hook
 
 We next define the hook in a new JS file, located in the `assets/js` folder.
 The important part is the `Phoenix.js` function `upload`,
@@ -3513,7 +3512,7 @@ let liveSocket = new LiveSocket("/live", Socket, {
 });
 ```
 
-#### 1.3 Handling audio upload in `LiveView`
+#### 2.3 Handling audio upload in `LiveView`
 
 We now need to add some server-side code.
 
@@ -3590,13 +3589,17 @@ end
 
 And that's it for the Liveview portion!
 
-#### 1.4 Serving the `Whisper` model
+#### 2.4 Serving the `Whisper` model
 
-Now that we are adding several models, we will run an extra check on the models to shutdown the app in case of a problem with the models as it makes no sense to continue.
+Now that we are adding several models, 
+let's refactor our `models.ex` module 
+that manages the models.
+Since we're dealing with multiple models,
+we want our app to shutdown if there's any problem loading them.
 
 We now add the model `Whisper` in the
 `lib/app/application.ex`
-so it's available throughout the application in runtime.
+so it's available throughout the application on runtime.
 
 ```elixir
 # lib/app/application.ex
@@ -3644,6 +3647,7 @@ downloaded locally and used in our application.
 
 To implement the functions above,
 we change the `lib/app/models.ex` module so it looks like so.
+
 
 ```elixir
 defmodule ModelInfo do
@@ -3994,6 +3998,8 @@ defmodule App.Models do
 end
 ```
 
+
+
 That's a lot! But we just need to focus on some new parts we've added:
 
 - we've created **`audio_serving_test/1`** and
@@ -4006,7 +4012,7 @@ That's a lot! But we just need to focus on some new parts we've added:
 Now we're successfully serving audio-to-text capabilities
 in our application!
 
-#### 1.5 Handling the model's response and updating elements in the view
+#### 2.5 Handling the model's response and updating elements in the view
 
 We expect the response of this task to be
 in the following form:
@@ -4050,98 +4056,103 @@ And that's it for this section!
 Our application is now able to **record audio**
 and **transcribe it**. 🎉
 
-### Embeddings and semantic search
+### 3. Embeddings and semantic search
 
-We want to encode every caption and the input text into an embedding which is a vector of a specific vector space.
+We want to encode every caption and the input text 
+into an embedding which is a vector of a specific vector space.
 In other words, we encode a string into a list of numbers.
 
-We use a transformer-based pre-trained model SBERT to compute an embedding for each caption.
-We picked-up the transformer "sentence-transformers/paraphrase-MiniLM-L6-v2" model.
+We use a transformer-based pre-trained model `SBERT` to compute an embedding for each caption.
+We chose the transformer `"sentence-transformers/paraphrase-MiniLM-L6-v2"` model.
+
 The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function that returns an `%Nx.Serving{}` struct.
-This transformer uses a 384 dimensional vector space.
-Since this transformer is trained with a cosine metric, we embed the vector space of embeddings with the same distance.
+This transformer uses a **`384`** dimensional vector space.
+Since this transformer is trained with a `cosine metric`, 
+we embed the vector space of embeddings with the same distance.
 You can read more about [cosine_similarity here](https://en.wikipedia.org/wiki/Cosine_similarity).
-If you are curious, you can read further down on this.
+
 
 This model is loaded and served by an `Nx.Serving` started in the Application modeule like all other models.
 
-We instantiate the HNSWLib index with a `GenServer`.
-It is started in the Application module.
-We will use an Index file.
+Afterwards, we instantiate the HNSWLib index with a `GenServer`.
+It is started in the Application module (`application.ex`).
+We will use an Index file that is saved locally in our file system.
 This file will be updated any time we append an embedding.
-This means the app is uses this unique file so is meant to run on a **single node**.
+This means the app uses this unique file,
+so this app is only meant to run **on a single node**.
 
-#### The HNSWLib Index
 
-This library works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**.
+#### 3.1 The HNSWLib Index
+
+This library [`HNSWLib`](https://github.com/elixir-nx/hnswlib) 
+works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**.
 We instantiate the Index file via a file in a `GenServer` which holds the index in the state.
 When the app starts, we either read or create this file. The file is saved in the "/priv/static/uploads" folder.
 The GenServer runs also all the client calls to the index.
 
 Because we are deploying with Fly.io, we need to persist the Index file in the database because the machine - thus its attached volume - is pruned when inactive.
 
-It is crucial to save the correspondance between the Image table and the Index file to retrieve the correct images.
+It is crucial to save the correspondance between the `Image` table and the Index file to retrieve the correct images.
+In simple terms, **the file in the `Index` table in the DB must correspond to the Index file in the system.**
 
-We therefor disable a user to load several times the same file as otherwise, we would have the several indexes for the same picture.
-This is done with a SHA computation.
+We therefore disable a user to load several times the same file as otherwise, 
+we would have the several indexes for the same picture.
+This is done through **SHA computation**.
 
-Since computations using models is a long run process, and since several users may interact with the app,
+Since computations using models is a long run process, 
+and because several users may interact with the app,
 we need several steps to ensure that the information is synchronized between the database and the index file.
 
 We also endow the vector space with a `:cosine` pseudo-metric.
 
-Add the following GenServer file: it will load the Index file, and also provides a client API to interact with the Index which is hold in the state of the GenServer.
+Add the following `GenServer` file:
+it will load the Index file, 
+and also provide a client API to interact with the Index,
+ which is held in the state of the GenServer.
 
-This solution works for a single node.
+Again, this solution works for a single node *only*.
 
 ```elixir
-# /lib/app/knn_index.ex
 defmodule App.KnnIndex do
   use GenServer
 
   @moduledoc """
   A GenServer to load and handle the Index file for HNSWLib.
-  It loads from the FileSystem if existing or from the table HnswlibIndex.
+  It loads the index from the FileSystem if existing or from the table HnswlibIndex.
   It creates an new one if no Index file is found in the FileSystem
   and if the table HnswlibIndex is empty.
-
-
+  It holds the index and the App.Image singleton table in the state.
   """
-  @indexes "indexes.bin"
-  @saved_index Path.expand("priv/static/uploads/" <> @indexes)
-  @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
 
-  # client API ------------------
-  def start_link(space) do
+  require Logger
+
+  @dim 384
+  @max_elements 200
+  @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
+  @saved_index if Application.compile_env(:app, :knnindex_indices_test, false),
+                 do: Path.join(@upload_dir, "indexes_test.bin"),
+                 else: Path.join(@upload_dir, "indexes.bin")
+
+  # Client API ------------------
+  def start_link(args) do
     :ok = File.mkdir_p!(@upload_dir)
-    GenServer.start_link(__MODULE__, space, name: __MODULE__)
+    GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
-  def get_index_path do
-    # Path.join([@upload_dir, @indexes])
+  def index_path do
     @saved_index
   end
 
-  def load_index do
-    GenServer.call(__MODULE__, :load)
+  def save_index_to_db do
+    GenServer.call(__MODULE__, :save_index_to_db)
   end
 
-  @doc """
-  Debugging function to check the Idnex current count
-  """
   def get_count do
     GenServer.call(__MODULE__, :get_count)
   end
 
-  @doc """
-  Debugging function to print the Index
-  """
-  def get_index do
-    GenServer.call(__MODULE__, :get_index)
-  end
-
   def add_item(embedding) do
-    GenServer.call(__MODULE__, {:add, embedding})
+    GenServer.call(__MODULE__, {:add_item, embedding})
   end
 
   def knn_search(input) do
@@ -4152,84 +4163,99 @@ defmodule App.KnnIndex do
     GenServer.call(__MODULE__, :not_empty)
   end
 
-  def index_file do
-    @saved_index
-  end
-
-  def check_integrity do
-    index_nb =
-      App.KnnIndex.load_index()
-      |> HNSWLib.Index.get_current_count()
-      |> elem(1)
-
-    db_nb = App.Repo.all(App.Image) |> length()
-
-    if index_nb == db_nb,
-      do: true,
-      else: false
-  end
-
   # ---------------------------------------------------
   @impl true
-  def init(space) do
-    File.mkdir_p!(@upload_dir)
+  def init(args) do
+    # Trying to load the index file
+    :ok = File.mkdir_p!(@upload_dir)
+    index_path = Keyword.fetch!(args, :index)
+    space = Keyword.fetch!(args, :space)
 
-    path = get_index_path()
-    dim = 384
-    max_elements = 200
-
-    require Logger
-
-    case File.exists?(path) do
+    case File.exists?(index_path) do
+      # If the index file doesn't exist, we try to load from the database.
       false ->
-        App.HnswlibIndex.maybe_load_index_from_db(space, dim, max_elements)
-        |> case do
-          {:ok, index} -> {:ok, index}
-          {:error, msg} -> {:ok, {:error, msg}}
-        end
+        {:ok, index, index_schema} =
+          App.HnswlibIndex.maybe_load_index_from_db(space, @dim, @max_elements)
 
+        {:ok, {index, index_schema, space}}
+
+      # If the index file does exist, we compare the one with teh table and check for incoherences.
       true ->
-        Logger.info("Existing Index")
-        {:ok, _index} = HNSWLib.Index.load_index(space, dim, path)
+        Logger.info("Index file found on disk. Let's compare it with the database...")
+
+        App.Repo.get_by(App.HnswlibIndex, id: 1)
+        |> case do
+          nil ->
+            {:stop,
+             {:error,
+              "Error comparing the index file with the one on the database. Incoherence on table."}}
+
+          schema ->
+            check_integrity(index_path, schema, space)
+        end
+    end
+  end
+
+  defp check_integrity(path, schema, space) do
+    # We check the count of the images in the database and the one in the index.
+    with db_count <-
+           App.Repo.all(App.Image) |> length(),
+         {:ok, index} <-
+           HNSWLib.Index.load_index(space, @dim, path),
+         {:ok, index_count} <-
+           HNSWLib.Index.get_current_count(index),
+         true <-
+           index_count == db_count do
+      Logger.info("Integrity: " <> "\u2705.")
+      {:ok, {index, schema, space}}
+
+      # If it fails, we return an error.
+    else
+      false ->
+        {:stop,
+         {:error, "Integrity error. The count of images from index differs from the database."}}
+
+      {:error, msg} ->
+        Logger.warning(inspect(msg))
+        {:stop, {:error, msg}}
     end
   end
 
   @impl true
-  def handle_call(:load, _, {:error, :badarg} = state) do
-    App.HnswlibIndex.maybe_load_index_from_db(:cosine, 384, 200)
+  def handle_call(:save_index_to_db, _, {index, index_schema, space} = state) do
+    # We read the index file and try to update the index on the table as well.
+    File.read(@saved_index)
     |> case do
-      {:ok, index} ->
-        {:reply, index, state}
+      {:ok, file} ->
+        {:ok, updated_schema} =
+          index_schema
+          |> App.HnswlibIndex.changeset(%{file: file})
+          |> App.Repo.update()
+
+        {:reply, {:ok, updated_schema}, {index, updated_schema, space}}
 
       {:error, msg} ->
-        {:stop, {:error, msg}, state}
+        {:reply, {:error, msg}, state}
     end
   end
 
-  def handle_call(:load, _from, state) do
-    {:reply, state, state}
-  end
-
-  def handle_call(:get_count, _, state) do
-    {:ok, count} = HNSWLib.Index.get_current_count(state)
+  def handle_call(:get_count, _, {index, _, _} = state) do
+    {:ok, count} = HNSWLib.Index.get_current_count(index)
     {:reply, count, state}
   end
 
-  def handle_call(:get_index, _, state) do
-    {:reply, state, state}
-  end
-
-  def handle_call({:add, embedding}, _, state) do
+  def handle_call({:add_item, embedding}, _, {index, _, _} = state) do
+    # We add the new item to the index and update it.
     with :ok <-
-           HNSWLib.Index.add_items(state, embedding),
+           HNSWLib.Index.add_items(index, embedding),
          {:ok, idx} <-
-           HNSWLib.Index.get_current_count(state),
+           HNSWLib.Index.get_current_count(index),
          :ok <-
-           HNSWLib.Index.save_index(state, @saved_index) do
-      idx |> dbg()
+           HNSWLib.Index.save_index(index, @saved_index) do
+      Logger.info("idx: #{idx}")
       {:reply, {:ok, idx}, state}
     else
-      msg ->
+      {:error, msg} ->
         {:reply, {:error, msg}, state}
     end
   end
@@ -4238,24 +4264,11 @@ defmodule App.KnnIndex do
     {:reply, {:error, "No index found"}, state}
   end
 
-  def handle_call({:knn_search, input}, _, state) do
-    # refactored to denest function as per Credo
-    # case HNSWLib.Index.get_current_count(index) do
-    # {:ok, 0} ->
-    # {:error, "no entries in index"}
-
-    # {:ok, _c} ->
-    # check the embeddings
-    # {:ok, l} = HNSWLib.Index.get_current_count(index) |> dbg()
-
-    # for i <- 0..(l - 1) do
-    #   {:ok, dt} = HNSWLib.Index.get_items(index, [i])
-    #   Nx.stack(Enum.map(dt, fn d -> Nx.from_binary(d, :f32) end)) |> dbg()
-    # end
-
-    case HNSWLib.Index.knn_query(state, input, k: 1) do
+  def handle_call({:knn_search, input}, _, {index, _, _} = state) do
+    # We search for the nearest neighbors of the input embedding.
+    case HNSWLib.Index.knn_query(index, input, k: 1) do
       {:ok, labels, distances} ->
-        dbg(distances)
+        Logger.info(inspect(distances))
 
         response =
           labels[0]
@@ -4265,18 +4278,18 @@ defmodule App.KnnIndex do
             App.Repo.get_by(App.Image, %{idx: idx + 1})
           end)
 
+        # TODO: add threshold on  "distances"
         {:reply, response, state}
 
       {:error, msg} ->
         {:reply, {:error, msg}, state}
     end
-
-    # end
   end
 
-  def handle_call(:not_empty, _, state) do
-    case HNSWLib.Index.get_current_count(state) do
+  def handle_call(:not_empty, _, {index, _, _} = state) do
+    case HNSWLib.Index.get_current_count(index) do
       {:ok, 0} ->
+        Logger.warning("Empty index.")
         {:reply, :error, state}
 
       {:ok, _} ->
@@ -4287,9 +4300,34 @@ end
 
 ```
 
-#### The embeding model
 
-We provide a serving for the embedding model in the "App.Models" module. It should look like this:
+Let's unpack a bit of what we are doing here.
+
+- we first are **defining the module constants**.
+In here, we add the dimensions of the embedding vector space
+(these are dependent on the model you choose).
+Check with the model you've used to tweak this settings optimally.
+
+- define the upload directory where **the index file will be saved inside the filesystem**.
+  
+- when the GenServer is initialized (`init/1` function),
+we perform a number of *integrity verifications*,
+checking if both the `Index` file in the filesystem
+and the file in the `Index` table 
+(from now on, this table will be called `HnswlibIndex`, 
+under the name of the same schema).
+This validations essentially make sure the content 
+of both files are the same.
+
+- the other functions provide a basic API for 
+callers to add items to the index file,
+so it is saved.
+
+
+#### 3.2 The embeding model
+
+We provide a serving for the embedding model in the `App.Models` module. 
+It should look like this:
 
 ```elixir
 #App.Models
@@ -4355,7 +4393,7 @@ def verify_and_download_models() do
 You then add the `Nx.Serving` for the embeddings:
 
 ```elixir
-#Application.ex
+#application.ex
 
 children = [
   ...,
@@ -4368,267 +4406,140 @@ children = [
 ]
 ```
 
-### Using the Index and embedding
-
-The [paragraph](#worked-example-on-how-to-use-hnswlib) displays a worked example.
-
-#### `on_mount` hook
-
-We firstly add an `on_mount` hook to the Liveview to check that the index and the database are synced.
-This happens when the index count and the length of the table "images" are equal.
-There is no point to continue if this is not the case.
-We declared the hook in the Liveview rather than with a `live_session` in the router.
+Your `application.ex` file should look like so:
 
 ```elixir
-defmodule AppWeb.IndexCheck do
-  import Phoenix.LiveView
-  use AppWeb, :verified_routes
-
+defmodule App.Application do
+  # See https://hexdocs.pm/elixir/Application.html
+  # for more information on OTP Applications
+  @moduledoc false
   require Logger
+  use Application
 
-  @moduledoc """
-  Checks if the length of the Image table is equal to the index count of the Hnswlib Index file.
-  Redirects to 404 page if not.
-  """
-  def on_mount(:default, _params, _session, socket) do
-    App.KnnIndex.check_integrity()
+  @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
+
+  @saved_index if Application.compile_env(:app, :knnindex_indices_test, false),
+                 do: Path.join(@upload_dir, "indexes_test.bin"),
+                 else: Path.join(@upload_dir, "indexes.bin")
+
+  def check_models_on_startup do
+    App.Models.verify_and_download_models()
     |> case do
-      true ->
-        {:cont, socket}
+      {:error, msg} ->
+        Logger.warning(msg)
+        System.stop(0)
 
-      false ->
-        Logger.warning("Index Integrity Error")
-        {:halt, redirect(socket, to: ~p"/404")}
+      :ok ->
+        Logger.info("Models: " <> "\u2705")
+        :ok
     end
+  end
+
+  @impl true
+  def start(_type, _args) do
+    :ok = check_models_on_startup()
+
+    children = [
+      # Start the Telemetry supervisor
+      AppWeb.Telemetry,
+      # Setup DB
+      App.Repo,
+      # Start the PubSub system
+      {Phoenix.PubSub, name: App.PubSub},
+      # Nx serving for the embedding
+      {Nx.Serving, serving: App.Models.embedding(), name: Embedding, batch_size: 1},
+      # Nx serving for Speech-to-Text
+      {Nx.Serving,
+       serving:
+         if Application.get_env(:app, :use_test_models) == true do
+           App.Models.audio_serving_test()
+         else
+           App.Models.audio_serving()
+         end,
+       name: Whisper},
+      # Nx serving for image classifier
+      {Nx.Serving,
+       serving:
+         if Application.get_env(:app, :use_test_models) == true do
+           App.Models.caption_serving_test()
+         else
+           App.Models.caption_serving()
+         end,
+       name: ImageClassifier},
+      {GenMagic.Server, name: :gen_magic},
+
+      # Adding a supervisor
+      {Task.Supervisor, name: App.TaskSupervisor},
+      # Start the Endpoint (http/https)
+      AppWeb.Endpoint
+      # Start a worker by calling: App.Worker.start_link(arg)
+      # {App.Worker, arg}
+    ]
+
+    # We are starting the HNSWLib Index GenServer only during testing.
+    # Because this GenServer needs the database to be seeded first,
+    # we only add it when we're not testing.
+    # When testing, you need to spawn this process manually (it is done in the test_helper.exs file).
+    children =
+      if Application.get_env(:app, :start_genserver, true) == true do
+        Enum.concat(children, [{App.KnnIndex, [space: :cosine, index: @saved_index]}])
+      else
+        children
+      end
+
+    # See https://hexdocs.pm/elixir/Supervisor.html
+    # for other strategies and supported options
+    opts = [strategy: :one_for_one, name: App.Supervisor]
+    Supervisor.start_link(children, opts)
+  end
+
+  # Tell Phoenix to update the endpoint configuration
+  # whenever the application is updated.
+  @impl true
+  def config_change(changed, _new, removed) do
+    AppWeb.Endpoint.config_change(changed, removed)
+    :ok
   end
 end
 ```
 
-Then we declare it in the Liveview:
+> [!NOTE]
+>
+> We have added a few alterations to how the supervision tree
+> in `application.ex` is initialized.
+> This is because we *test our code*,
+> so that's why you see some of these changes above.
+>
+> If you don't want to change test the code,
+> you can ignore the conditional changes that are made
+> to the supervision tree according to the environment
+> (which we do to check if the code is being tested or not).
 
-```elixir
-defmodule AppWeb.PageLive do
-  use AppWeb, :live_view
-  ...
 
-  on_mount {AppWeb.IndexCheck, :default}
+### 4. Using the Index and embedding
 
-  def mount(....)
-```
+In this section we'll go over how to use the Index 
+and the embeddings and tie everything together to 
+have a working application 😍.
 
-#### Computation of embeddings
+If you want to better understand embeddings and
+how to use `HNSWLib`,
+the math behind it and see a working example
+of running an embedding model,
+you can check the next section.
+However, *it is entirely optional* 
+and not necessary to for our app.
 
-```elixir
-@tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
-def mount(_, _, socket) do
-  {:ok,
-    socket
-    |> assign(
-    ...,
-    # Related to the Audio
-    transcription: nil,
-    micro_off: false,
-    speech_spin: false,
-    search_result: nil,
-    tmp_wave: @tmp_wav,
-    )
-    |> alow_upload(:speech,...)
-    [...]
-  }
-end
-```
+#### 4.0 Working example on how to use `HNSWLib`
 
-Recall that every time you upload an image, you get back an URL from our bucket and you compute a caption.
-We will now compute an embedding from this string and save it into the Index. This is done in the handle_info callback.
-
-Update the Liveview `handle_info` callback where we handle the captioning results:
-
-```elixir
-def handle_info({ref, result}, %{assigns: assigns} = socket) do
-  # Flush async call
-    Process.demonitor(ref, [:flush])
-
-    cond do
-      # If the upload task has finished executing,
-      # we update the socket assigns.
-      Map.get(assigns, :task_ref) == ref ->
-        image =
-          %{
-            url: assigns.image_info.url,
-            width: assigns.image_info.width,
-            height: assigns.image_info.height,
-            description: label
-          }
-
-        with %{embedding: data} <-
-               Nx.Serving.batched_run(Embedding, label),
-             # compute a normed embedding (cosine case only) on the text result
-             normed_data <-
-               Nx.divide(data, Nx.LinAlg.norm(data)),
-             {:check_used, {:ok, pending_image}} <-
-               {:check_used, App.Image.check_before_append_to_index(image.sha1)} do
-          {:ok, idx}  =
-            App.KnnIndex.add_item(normed_data) do
-          # save the App.Image to the DB
-          Map.merge(image, %{idx: idx, caption: label})
-          |> App.Image.insert()
-
-          {:noreply,
-           socket
-           |> assign(
-            running?: false,
-            task_ref: nil,
-            label: label
-           )
-          }
-        else
-          {:error, msg} ->
-            {:noreply,
-             socket
-             |> put_flash(:error, msg)
-             |> assign(
-              running?: false,
-              task_ref: nil,
-              label: nil
-            )
-          }
-        end
-      [...]
-    end
-end
-```
-
-Every time we produce an audio file, we transcribe it into a text.
-We then compute the embedding of the audio input transcription and run an ANN search.
-The last step should return a (possibly) populated `%App.Image{}` struct with a look-up in the database.
-We then update the "search_result" assign with it and display the transcription.
-
-Modify the following handler:
-
-```elixir
-def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} = socket)
-      when assigns.audio_ref == ref do
-  Process.demonitor(ref, [:flush])
-  File.rm!(@tmp_wav)
-
-  # compute an normed embedding (cosine case only) on the text result
-  # and returns an App.Image{} as the result of a "knn_search"
-   with %{embedding: input_embedding} <-
-           Nx.Serving.batched_run(Embedding, text),
-         normed_input_embedding <-
-           Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
-         {:not_empty_index, :ok} <-
-           {:not_empty_index, App.KnnIndex.not_empty_index()},
-         #  {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
-         %App.Image{} = result <-
-           App.KnnIndex.knn_search(normed_input_embedding) do
-
-    {:noreply,
-       assign(socket,
-         transcription: String.trim(text),
-         micro_off: false,
-         speech_spin: false,
-         search_result: result,
-         audio_ref: nil,
-         tmp_wave: @tmp_wav
-       )}
-  # record without entries
-      {:not_empty_index, :error} ->
-        Logger.debug("No entries in Index")
-
-        {:noreply,
-         assign(socket,
-           micro_off: false,
-           search_result: nil,
-           speech_spin: false,
-           audio_ref: nil,
-           tmp_wave: @tmp_wav
-         )}
-
-      nil ->
-        {:noreply,
-         assign(socket,
-           transcription: String.trim(text),
-           micro_off: false,
-           search_result: nil,
-           speech_spin: false,
-           audio_ref: nil,
-           tmp_wave: @tmp_wav
-         )}
-    end
-end
-```
-
-We next come back to the `knn_search` function we defined in the "KnnIndex" GenServer.
-The "approximate nearest neighbour" search function uses the function `HNSWLib.Index.knn_query/3`.
-It returns a tuple `{:ok, indices, distances}` where "indices" and "distances" are lists.
-The length is the number of neighbours you want to find parametrized by the `k` parameter.
-With `k=1`, we ask for a single neighbour.
-
-> You may further use a cut-off distance to exclude responses that might not be meaningful.
-
-We will now display the found image with the URL field of the `%App.Image{}` struct.
-
-Add this to "page_live.html.heex":
-
-```html
-# /lib/app_Web/live/page_live.html.heex
-
-<div :if="{@search_result}">
-  <img src="{@search_result.url}" alt="found_image" />
-</div>
-```
-
-We will save the index found We will add a column to the `:images` table. We run a Mix task to generate a timestamped file:
-
-```bash
-mix ecto.gen.migration add_idx_to_images
-```
-
-In the "/priv/repo" folder, open the newly created file and add:
-
-```elixir
-defmodule App.Repo.Migrations.AddIdxToImages do
-  use Ecto.Migration
-
-  def change do
-    alter table(:images) do
-      add(:idx, :integer, default: 0)
-    end
-  end
-end
-```
-
-and run the migration.
-
-Modify the App.Image struct and the changeset:
-
-```elixir
-schema "images" do
-  ...
-  field(:idx, :integer)
-
-  timestamps(type: :utc_datetime)
-end
-
-def changeset(image, params \\ %{}) do
-  image
-  |> Ecto.Changeset.cast(
-    params,
-    [:url, :description, :width, :height, :idx]
-  )
-  |> Ecto.Changeset.validate_required(
-    [:url, :description, :width, :height]
-  )
-
-  ...
-end
-```
-
-[TODO]: give some explanations on this normalization, the handle_knn etc...
-
-#### Worked example on how to use HNSWLib
+> [!NOTE]
+>
+> This whole section is entirely optional.
+> It will just delve more deeply in embedding
+> and provide you with a one-file working example
+> where you can play around vector embeddings
+> and get a feel of how everything works.
 
 You can endow the vector space with the following metrics by setting the `space` argument from the list:
 
@@ -4636,7 +4547,7 @@ You can endow the vector space with the following metrics by setting the `space`
 
 The first is the standard euclidean metric, the second the inner product, and the third the pseudo-metric "cosine similarity".
 
-We use the small model "sentence-transformers/paraphrase-MiniLM-L6-v2" to compute embeddings from text.
+We use the small model `"sentence-transformers/paraphrase-MiniLM-L6-v2"` to compute embeddings from text.
 We then use it with `Nx.Serving` to run the model.
 
 ```elixir
@@ -4704,7 +4615,7 @@ HNSWLib.Index.save_index(index, "my_index.bin")
 #{:ok, 1}
 ```
 
-You should see a file "my_index.bin" is your current directory.
+You should see a file `"my_index.bin"` is your current directory.
 
 When you append an entry one by one, you can get the final indice of the Index with:
 
@@ -4801,9 +4712,11 @@ The result is:
   ]
 ```
 
-You should recover the first embedding.
+You should now be able to 
+recover the first embedding.
 
-##### Notes on vector spaces
+
+##### 4.0.1 Notes on vector spaces
 
 A vector space of embeddings can be equiped with an (euclidean) _inner product_. If $u=(u_1,\dots,u_n)$ and $v=(v_1,\dots,v_n)$ are two embeddings, the (euclidean) inner product is defined as:
 
@@ -4825,7 +4738,7 @@ You will remark that the norm of any embedding $\frac1{||u||}u$ is 1. We say tha
 
 The previous formula shows that the inner product of normalised (aka unit) embeddings is the `cosine` of the angle between these "normalised" embeddings.
 
-Source: <https://en.wikipedia.org/wiki/Cosine_similarity>
+> Source: <https://en.wikipedia.org/wiki/Cosine_similarity>
 
 _Note that this is not a distance._
 
@@ -4847,6 +4760,226 @@ This is commonly known as the **cosine distance** _when the embeddings are norma
 Finally, note that since we are dealing with finite dimensional vector spaces, all the norms are equivalent (in some precise mathematical way). This means that the limit points are always the same. However, the values of the distances can be quite different, and a "clusterisation" processes can give significantly different results.
 
 The first hint to which norm to choose is to take the norm used to train the model.
+
+
+#### 4.1 Computing the embeddings in our app
+
+```elixir
+@tmp_wav Path.expand("priv/static/uploads/tmp.wav")
+
+def mount(_, _, socket) do
+  {:ok,
+    socket
+    |> assign(
+    ...,
+    # Related to the Audio
+    transcription: nil,
+    micro_off: false,
+    speech_spin: false,
+    search_result: nil,
+    tmp_wave: @tmp_wav,
+    )
+    |> alow_upload(:speech,...)
+    [...]
+  }
+end
+```
+
+Recall that every time you upload an image, you get back an URL from our bucket and you compute a caption.
+We will now compute an embedding from this string and save it into the Index. This is done in the `handle_info` callback.
+
+Update the Liveview `handle_info` callback where we handle the captioning results:
+
+```elixir
+def handle_info({ref, result}, %{assigns: assigns} = socket) do
+  # Flush async call
+    Process.demonitor(ref, [:flush])
+
+    cond do
+      # If the upload task has finished executing,
+      # we update the socket assigns.
+      Map.get(assigns, :task_ref) == ref ->
+        image =
+          %{
+            url: assigns.image_info.url,
+            width: assigns.image_info.width,
+            height: assigns.image_info.height,
+            description: label
+          }
+
+        with %{embedding: data} <-
+               Nx.Serving.batched_run(Embedding, label),
+             # compute a normed embedding (cosine case only) on the text result
+             normed_data <-
+               Nx.divide(data, Nx.LinAlg.norm(data)),
+             {:check_used, {:ok, pending_image}} <-
+               {:check_used, App.Image.check_before_append_to_index(image.sha1)} do
+          {:ok, idx}  =
+            App.KnnIndex.add_item(normed_data) do
+          # save the App.Image to the DB
+          Map.merge(image, %{idx: idx, caption: label})
+          |> App.Image.insert()
+
+          {:noreply,
+           socket
+           |> assign(
+            running?: false,
+            task_ref: nil,
+            label: label
+           )
+          }
+        else
+          {:error, msg} ->
+            {:noreply,
+             socket
+             |> put_flash(:error, msg)
+             |> assign(
+              running?: false,
+              task_ref: nil,
+              label: nil
+            )
+          }
+        end
+      [...]
+    end
+end
+```
+
+Every time we produce an audio file, we transcribe it into a text.
+We then compute the embedding of the audio input transcription and run an ANN search.
+The last step should return a (possibly) populated `%App.Image{}` struct with a look-up in the database.
+We then update the `"search_result"` assign with it and display the transcription.
+
+Modify the following handler:
+
+```elixir
+def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} = socket)
+      when assigns.audio_ref == ref do
+  Process.demonitor(ref, [:flush])
+  File.rm!(@tmp_wav)
+
+  # compute an normed embedding (cosine case only) on the text result
+  # and returns an App.Image{} as the result of a "knn_search"
+   with %{embedding: input_embedding} <-
+           Nx.Serving.batched_run(Embedding, text),
+         normed_input_embedding <-
+           Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
+         {:not_empty_index, :ok} <-
+           {:not_empty_index, App.KnnIndex.not_empty_index()},
+         #  {:not_empty_index, App.HnswlibIndex.not_empty_index(index)},
+         %App.Image{} = result <-
+           App.KnnIndex.knn_search(normed_input_embedding) do
+
+    {:noreply,
+       assign(socket,
+         transcription: String.trim(text),
+         micro_off: false,
+         speech_spin: false,
+         search_result: result,
+         audio_ref: nil,
+         tmp_wave: @tmp_wav
+       )}
+  # record without entries
+      {:not_empty_index, :error} ->
+        Logger.debug("No entries in Index")
+
+        {:noreply,
+         assign(socket,
+           micro_off: false,
+           search_result: nil,
+           speech_spin: false,
+           audio_ref: nil,
+           tmp_wave: @tmp_wav
+         )}
+
+      nil ->
+        {:noreply,
+         assign(socket,
+           transcription: String.trim(text),
+           micro_off: false,
+           search_result: nil,
+           speech_spin: false,
+           audio_ref: nil,
+           tmp_wave: @tmp_wav
+         )}
+    end
+end
+```
+
+We next come back to the `knn_search` function we defined in the "KnnIndex" GenServer.
+The "approximate nearest neighbour" search function uses the function `HNSWLib.Index.knn_query/3`.
+It returns a tuple `{:ok, indices, distances}` where "indices" and "distances" are lists.
+The length is the number of neighbours you want to find parametrized by the `k` parameter.
+With `k=1`, we ask for a single neighbour.
+
+> [!NOTE]
+> 
+> You may further use a cut-off distance to exclude responses that might not be meaningful.
+
+We will now display the found image with the URL field of the `%App.Image{}` struct.
+
+Add this to `"page_live.html.heex"`:
+
+```html
+<!-- /lib/app_Web/live/page_live.html.heex -->
+
+<div :if="{@search_result}">
+  <img src="{@search_result.url}" alt="found_image" />
+</div>
+```
+
+Now we'll save save the index found.
+Let's add a column to the `Image` table.
+To do this, run a `mix` task to generate a timestamped file.
+
+```bash
+mix ecto.gen.migration add_idx_to_images
+```
+
+In the `"/priv/repo"` folder, open the newly created file and add:
+
+```elixir
+defmodule App.Repo.Migrations.AddIdxToImages do
+  use Ecto.Migration
+
+  def change do
+    alter table(:images) do
+      add(:idx, :integer, default: 0)
+    end
+  end
+end
+```
+
+and run the migration
+by running `mix ecto.migrate`.
+
+Modify the `App.Image` struct and the changeset:
+
+```elixir
+schema "images" do
+  ...
+  field(:idx, :integer)
+
+  timestamps(type: :utc_datetime)
+end
+
+def changeset(image, params \\ %{}) do
+  image
+  |> Ecto.Changeset.cast(
+    params,
+    [:url, :description, :width, :height, :idx]
+  )
+  |> Ecto.Changeset.validate_required(
+    [:url, :description, :width, :height]
+  )
+
+  ...
+end
+```
+
+[TODO]: give some explanations on this normalization, the handle_knn etc...
+
+
 
 ## _Please_ star the repo! ⭐️
 
