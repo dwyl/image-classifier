@@ -220,6 +220,7 @@ to the `deps` section.
 
 - [**`Nx`**](https://hexdocs.pm/nx/Nx.html) is a library that allows us to work with
   [`Numerical Elixir`](https://github.com/elixir-nx/), the Elixir's way of doing [numerical computing](https://www.hilarispublisher.com/open-access/introduction-to-numerical-computing-2168-9679-1000423.pdf). It supports tensors and numericla computations.
+
 - [**`EXLA`**](https://hexdocs.pm/exla/EXLA.html) is the Elixir implementation of [Google's XLA](https://www.tensorflow.org/xla/),
   a compiler that provides faster linear algebra calculations
   with `TensorFlow` models.
@@ -237,11 +238,11 @@ config :nx, default_backend: EXLA.Backend
 
 ### 2. Adding `LiveView` capabilities to our project
 
+As it stands, our project is not using `LiveView`.
+Let's fix this.
+
 This will launch a super-powered process that establishes a websocket connection
 between the server and the browser.
-
-As it stands,,our project is not using `LiveView`.
-Let's fix this.
 
 In `lib/app_web/router.ex`, change the `scope "/"` to the following.
 
