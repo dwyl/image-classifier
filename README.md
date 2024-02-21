@@ -78,10 +78,12 @@ with your voice! 🎙️
       - [3.1 The `HNSWLib` Index (GenServer)](#31-the-hnswlib-index-genserver)
       - [3.2 Saving the `HNSWLib` Index in the database](#32-saving-the-hnswlib-index-in-the-database)
       - [3.2 The embeding model](#32-the-embeding-model)
-    - [4. Using the Index and embedding](#4-using-the-index-and-embedding)
+    - [4. Using the Index and embeddings](#4-using-the-index-and-embeddings)
       - [4.0 Working example on how to use `HNSWLib`](#40-working-example-on-how-to-use-hnswlib)
         - [4.0.1 Notes on vector spaces](#401-notes-on-vector-spaces)
       - [4.1 Computing the embeddings in our app](#41-computing-the-embeddings-in-our-app)
+        - [4.1.1 Changing the `Image` schema so it's embeddable](#411-changing-the-image-schema-so-its-embeddable)
+        - [4.1.2 Using embeddings in semantic search](#412-using-embeddings-in-semantic-search)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -4658,7 +4660,7 @@ end
 > (which we do to check if the code is being tested or not).
 
 
-### 4. Using the Index and embedding
+### 4. Using the Index and embeddings
 
 In this section we'll go over how to use the Index 
 and the embeddings and tie everything together to 
@@ -5070,7 +5072,10 @@ Add this to `"page_live.html.heex"`:
 </div>
 ```
 
-Now we'll save save the index found.
+
+##### 4.1.1 Changing the `Image` schema so it's embeddable
+
+Now we'll save the index found.
 Let's add a column to the `Image` table.
 To do this, run a `mix` task to generate a timestamped file.
 
@@ -5087,6 +5092,7 @@ defmodule App.Repo.Migrations.AddIdxToImages do
   def change do
     alter table(:images) do
       add(:idx, :integer, default: 0)
+      add(:sha1, :string)
     end
   end
 end
@@ -5098,28 +5104,90 @@ by running `mix ecto.migrate`.
 Modify the `App.Image` struct and the changeset:
 
 ```elixir
+@primary_key {:id, :id, autogenerate: true}
 schema "images" do
-  ...
+  field(:description, :string)
+  field(:width, :integer)
+  field(:url, :string)
+  field(:height, :integer)
   field(:idx, :integer)
+  field(:sha1, :string)
 
   timestamps(type: :utc_datetime)
 end
 
 def changeset(image, params \\ %{}) do
   image
-  |> Ecto.Changeset.cast(
-    params,
-    [:url, :description, :width, :height, :idx]
-  )
-  |> Ecto.Changeset.validate_required(
-    [:url, :description, :width, :height]
-  )
-
-  ...
+  |> Ecto.Changeset.cast(params, [:url, :description, :width, :height, :idx, :sha1])
+  |> Ecto.Changeset.validate_required([:width, :height])
+  |> Ecto.Changeset.unique_constraint(:sha1, name: :images_sha1_index)
+  |> Ecto.Changeset.unique_constraint(:idx, name: :images_idx_index)
 end
 ```
 
-[TODO]: falta o image (ver migration para adicionar sha1, ver a migration acima para corrigir) e depois o page_live
+We've added the fields `idx` and `sha1` to the image schema.
+The former pertains to the index of the image
+within the `HNSWLIB` index file,
+so we can look for the image.
+The latter pertains to the `sha1` representation of the image.
+This will allow us to check if two images are the same,
+so we can avoid adding duplicate images
+and save some throughput in our application.
+
+In our `changeset/2` function,
+we've fundamentally added two `unique_constraint/3` functions
+to check for the uniqueness of the newly added
+`idx` and `sha1` function.
+These are enforced at database level so we don't have
+duplicated images.
+
+In addition to these changes, 
+we are going to need functions to
+**calculate the `sha1` of the image**.
+Add the following functions to the same file.
+
+```elixir
+  def calc_sha1(file_binary) do
+    :crypto.hash(:sha, file_binary)
+    |> Base.encode16()
+  end
+
+  def check_sha1(sha1) when is_binary(sha1) do
+    App.Repo.get_by(App.Image, %{sha1: sha1})
+    |> case do
+      nil ->
+        nil
+
+      %App.Image{} = image ->
+        {:ok, image}
+    end
+  end
+```
+
+- `calc_sha1/1` uses the `:crypto` package to hash the file binary
+and encode it.
+- `check_sha1/1` fetches an image according to a given `sha1` code
+and returns the result.
+
+And that's all we need to deal with our images!
+
+
+##### 4.1.2 Using embeddings in semantic search
+
+Now that we have:
+- all the embeddings models ready to be used.
+- our Index files correctly created and maintained through
+filesystem and in the database in the `hnswlib_index` schema.
+- the needed `sha1` functions to check dupliated images.
+
+It's time to bring everything together and use all of these tools
+to implement semantic search into our application.
+
+We are going to be working inside `lib/app_web/live/page_live.ex` from now on.
+
+First, 
+
+[TODO]: falta o image  e depois o page_live
 
 
 
