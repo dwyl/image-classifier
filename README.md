@@ -504,7 +504,7 @@ defmodule AppWeb.PageLive do
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(label: nil, running?: false, task_ref: nil)
+     |> assign(label: nil, upload_running?: false, task_ref: nil)
      |> allow_upload(:image_list,
        accept: ~w(image/*),
        auto_upload: true,
@@ -544,7 +544,7 @@ end
 - when `mount/3`ing the LiveView,
   we are creating three socket assigns:
   `label` pertains to the model prediction;
-  `running?` is a boolean referring to whether the model is running or not;
+  `upload_running?` is a boolean referring to whether the model is running or not;
   `task_ref` refers to the reference of the task that was created for image classification
   (we'll delve into this further later down the line).
   Additionally, we are using the `allow_upload/3` function to define our upload configuration.
@@ -682,7 +682,7 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
     task = Task.async(fn -> Nx.Serving.batched_run(ImageClassifier, tensor) end)
 
     # Update socket assigns to show spinner whilst task is running
-    {:noreply, assign(socket, running?: true, task_ref: task.ref)}
+    {:noreply, assign(socket, upload_running?: true, task_ref: task.ref)}
 end
 
 @impl true
@@ -695,7 +695,7 @@ def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket) do
   %{predictions: [%{label: label}]} = result
 
   # Update the socket assigns with result and stopping spinner.
-  {:noreply, assign(socket, label: label, running?: false)}
+  {:noreply, assign(socket, label: label, upload_running?: false)}
 end
 ```
 
@@ -722,7 +722,7 @@ to call our `Nx.Serving` build function `ImageClassifier` we've defined earlier,
 thus initiating a batched run with the image tensor.
 While the task is spawned,
 we update the socket assigns with the reference to the task (`:task_ref`)
-and update the `:running?` assign to `true`,
+and update the `:upload_running?` assign to `true`,
 so we can show a spinner or a loading animation.
 
 When the task is spawned using `Task.async/1`,
@@ -747,7 +747,7 @@ and we can discard an exit message.
 
 In this same function, we destructure the prediction
 from the model and assign it to the socket assign `:label`
-and set `:running?` to `false`.
+and set `:upload_running?` to `false`.
 
 Quite beautiful, isn't it?
 With this, we don't have to worry if the person closes the browser tab.
@@ -1023,7 +1023,7 @@ and change it to this.
         >
           <span>Description: </span>
           <!-- Spinner -->
-          <%= if @running? do %>
+          <%= if @upload_running? do %>
           <div role="status">
             <div
               class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 "
@@ -1048,7 +1048,7 @@ and change it to this.
 In these changes,
 we've added the output of the model in the form of text.
 We are rendering a spinner
-if the `:running?` socket assign is set to true.
+if the `:upload_running?` socket assign is set to true.
 Otherwise,
 we add the `:label`, which holds the prediction made by the model.
 
@@ -1179,7 +1179,7 @@ when mounting the `LiveView`!
   def mount(_params, _session, socket) do
     {:ok,
      socket
-     |> assign(label: nil, running?: false, task_ref: nil)
+     |> assign(label: nil, upload_running?: false, task_ref: nil)
      |> allow_upload(:image_list,
        accept: ~w(image/*),
        auto_upload: true,
@@ -1274,7 +1274,7 @@ pertaining to the [base64](https://en.wikipedia.org/wiki/Base64) representation
 of the image in `lib/app_web/live_page/live.ex`
 
 ```elixir
-     |> assign(label: nil, running?: false, task_ref: nil, image_preview_base64: nil)
+     |> assign(label: nil, upload_running?: false, task_ref: nil, image_preview_base64: nil)
 ```
 
 We've added `image_preview_base64`
@@ -1306,7 +1306,7 @@ change the `handle_progress/3` function to the following.
       base64 = "data:image/png;base64, " <> Base.encode64(file_binary)
 
       # Update socket assigns to show spinner whilst task is running
-      {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64)}
+      {:noreply, assign(socket, upload_running?: true, task_ref: task.ref, image_preview_base64: base64)}
   end
 ```
 
@@ -1487,7 +1487,7 @@ that is called after the async task is completed.
 
     %{results: [%{text: label}]} = result # change this line
 
-    {:noreply, assign(socket, label: label, running?: false)}
+    {:noreply, assign(socket, label: label, upload_running?: false)}
   end
 ```
 
@@ -1716,7 +1716,7 @@ change the socket assigns to the following.
     |> assign(
       # Related to the file uploaded by the user
       label: nil,
-      running?: false,
+      upload_running?: false,
       task_ref: nil,
       image_preview_base64: nil,
 
@@ -1879,7 +1879,7 @@ Let's change it like so.
 
       # If the upload task has finished executing, we update the socket assigns.
       Map.get(assigns, :task_ref) == ref ->
-        {:noreply, assign(socket, label: label, running?: false)}
+        {:noreply, assign(socket, label: label, upload_running?: false)}
 
       # If the example task has finished executing, we upload the socket assigns.
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
@@ -1899,7 +1899,7 @@ Let's change it like so.
         {:noreply,
          assign(socket,
            example_list: updated_example_list,
-           running?: false,
+           upload_running?: false,
            display_list?: true
          )}
     end
@@ -2081,7 +2081,7 @@ and change it to the following piece of code.
         >
           <span>Description: </span>
           <!-- Spinner -->
-          <%= if @running? do %>
+          <%= if @upload_running? do %>
           <div role="status">
             <div
               class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 "
@@ -2316,7 +2316,7 @@ in `handle_info/3`.
     cond do
 
       Map.get(assigns, :task_ref) == ref ->
-        {:noreply, assign(socket, label: label, running?: false)}
+        {:noreply, assign(socket, label: label, upload_running?: false)}
 
       img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
 
@@ -2335,7 +2335,7 @@ in `handle_info/3`.
         {:noreply,
          assign(socket,
            example_list: updated_example_list,
-           running?: false,
+           upload_running?: false,
            display_list?: true
          )}
     end
@@ -2672,7 +2672,7 @@ Let's add to it when the LiveView is mounting!
 ```elixir
      |> assign(
        label: nil,
-       running?: false,
+       upload_running?: false,
        task_ref: nil,
        image_info: nil, # add this line
        image_preview_base64: nil,
@@ -2726,7 +2726,7 @@ and change the function to the following.
       base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
 
       # Change this line so `image_info` is defined when the image is uploaded
-      {:noreply, assign(socket, running?: true, task_ref: task.ref, image_preview_base64: base64, image_info: image_info)}
+      {:noreply, assign(socket, upload_running?: true, task_ref: task.ref, image_preview_base64: base64, image_info: image_info)}
     #else
     #  {:noreply, socket}
     #end
@@ -2792,7 +2792,7 @@ so simply change `handle_info/2` function
         Image.insert(image)
 
         # Update socket assigns
-        {:noreply, assign(socket, label: label, running?: false)}
+        {:noreply, assign(socket, label: label, upload_running?: false)}
 
 
     # ...
@@ -3060,7 +3060,7 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
 
     {:noreply,
       assign(socket,
-        running?: true,
+        upload_running?: true,
         task_ref: task.ref,
         image_preview_base64: base64,
         image_info: image_info
@@ -3398,7 +3398,7 @@ In `page_live_html.heex`, add the following snippet of code.
     class="bg-blue-500 hover:bg-blue-700 text-white font-bold px-4 rounded"
     type="button"
     phx-hook="Audio"
-    disabled="{@micro_off}"
+    disabled="{@mic_off?}"
   >
     <Heroicons.microphone
       outline
@@ -3409,7 +3409,7 @@ In `page_live_html.heex`, add the following snippet of code.
 </form>
 <p class="flex flex-col items-center">
   <audio id="audio" controls></audio>
-  <AppWeb.Spinner.spin spin="{@speech_spin}" />
+  <AppWeb.Spinner.spin spin="{@audio_running?}" />
 </p>
 ```
 
@@ -3418,7 +3418,7 @@ so this part of your code will shrink to:
 
 ```elixir
 <!-- Spinner -->
-<AppWeb.Spinner.spin spin={@running?} />
+<AppWeb.Spinner.spin spin={@upload_running?} />
 
 <%= if @label do %>
   <span class="text-gray-700 font-light"><%= @label %></span>
@@ -3542,9 +3542,9 @@ def mount(_,_,socket) do
   |> assign(
     ...,
     transcription: nil,
-    micro_off: false,
-    speech_spin: false,
-    tmp_wave: @tmp_wav
+    mic_off?: false,
+    audio_running?: false,
+    tmp_wav: @tmp_wav
   )
   |> allow_upload(:speech,
     accept: :any,
@@ -3564,12 +3564,12 @@ We named the serving `"Whisper"`.
 
 ```elixir
 def handle_progress(:speech, entry, %{assigns: assigns} = socket) when entry.done? do
-  tmp_wave =
+  tmp_wav =
       socket
       |> consume_uploaded_entry(entry, fn %{path: path} ->
-        tmp_wave = assigns.tmp_wave <> Ecto.UUID.generate() <> ".wav"
-        :ok = File.cp!(path, tmp_wave)
-        {:ok, tmp_wave}
+        tmp_wav = assigns.tmp_wav <> Ecto.UUID.generate() <> ".wav"
+        :ok = File.cp!(path, tmp_wav)
+        {:ok, tmp_wav}
       end)
 
   audio_task =
@@ -3583,9 +3583,9 @@ def handle_progress(:speech, entry, %{assigns: assigns} = socket) when entry.don
   {:noreply, socket
   |> assign(
     audio_ref: audio_task.ref,
-    micro_off: true,
-    speech_spin: true,
-    tmp_wave: tmp_wave,
+    mic_off?: true,
+    audio_running?: true,
+    tmp_wav: tmp_wav,
   )}
 end
 ```
@@ -4047,10 +4047,10 @@ def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns}
   {:noreply,
     assign(socket,
       transcription: String.trim(text),
-      micro_off: false,
-      speech_spin: false,
+      mic_off?: false,
+      audio_running?: false,
       audio_ref: nil,
-      tmp_wave: @tmp_wav
+      tmp_wav: @tmp_wav
     )}
 end
 ```
@@ -4918,10 +4918,10 @@ def mount(_, _, socket) do
     ...,
     # Related to the Audio
     transcription: nil,
-    micro_off: false,
-    speech_spin: false,
-    search_result: nil,
-    tmp_wave: @tmp_wav,
+    mic_off?: false,
+    audio_running?: false,
+    audio_search_result: nil,
+    tmp_wav: @tmp_wav,
     )
     |> allow_upload(:speech,...)
     [...]
@@ -4967,7 +4967,7 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
           {:noreply,
            socket
            |> assign(
-            running?: false,
+            upload_running?: false,
             task_ref: nil,
             label: label
            )
@@ -4978,7 +4978,7 @@ def handle_info({ref, result}, %{assigns: assigns} = socket) do
              socket
              |> put_flash(:error, msg)
              |> assign(
-              running?: false,
+              upload_running?: false,
               task_ref: nil,
               label: nil
             )
@@ -4992,7 +4992,7 @@ end
 Every time we produce an audio file, we transcribe it into a text.
 We then compute the embedding of the audio input transcription and run an ANN search.
 The last step should return a (possibly) populated `%App.Image{}` struct with a look-up in the database.
-We then update the `"search_result"` assign with it and display the transcription.
+We then update the `"audio_search_result"` assign with it and display the transcription.
 
 Modify the following handler:
 
@@ -5017,11 +5017,11 @@ def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} 
     {:noreply,
        assign(socket,
          transcription: String.trim(text),
-         micro_off: false,
-         speech_spin: false,
-         search_result: result,
+         mic_off?: false,
+         audio_running?: false,
+         audio_search_result: result,
          audio_ref: nil,
-         tmp_wave: @tmp_wav
+         tmp_wav: @tmp_wav
        )}
   # record without entries
       {:not_empty_index, :error} ->
@@ -5029,22 +5029,22 @@ def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} 
 
         {:noreply,
          assign(socket,
-           micro_off: false,
-           search_result: nil,
-           speech_spin: false,
+           mic_off?: false,
+           audio_search_result: nil,
+           audio_running?: false,
            audio_ref: nil,
-           tmp_wave: @tmp_wav
+           tmp_wav: @tmp_wav
          )}
 
       nil ->
         {:noreply,
          assign(socket,
            transcription: String.trim(text),
-           micro_off: false,
-           search_result: nil,
-           speech_spin: false,
+           mic_off?: false,
+           audio_search_result: nil,
+           audio_running?: false,
            audio_ref: nil,
-           tmp_wave: @tmp_wav
+           tmp_wav: @tmp_wav
          )}
     end
 end
@@ -5067,8 +5067,8 @@ Add this to `"page_live.html.heex"`:
 ```html
 <!-- /lib/app_Web/live/page_live.html.heex -->
 
-<div :if="{@search_result}">
-  <img src="{@search_result.url}" alt="found_image" />
+<div :if="{@audio_search_result}">
+  <img src="{@audio_search_result.url}" alt="found_image" />
 </div>
 ```
 
@@ -5185,7 +5185,77 @@ to implement semantic search into our application.
 
 We are going to be working inside `lib/app_web/live/page_live.ex` from now on.
 
-First, 
+First, we are going to update our socket assigns on `mount/3`.
+
+```elixir
+  @impl true
+  def mount(_params, _session, socket) do
+    {:ok,
+     socket
+     |> assign(
+       # Related to the file uploaded by the user
+       label: nil,
+       upload_running?: false,
+       task_ref: nil,
+       image_info: nil,
+       image_preview_base64: nil,
+
+       # Related to the list of image examples
+       example_list_tasks: [],
+       example_list: [],
+       display_list?: false,
+
+       # Related to the Audio
+       transcription: nil,
+       mic_off?: false,
+       audio_running?: false,
+       audio_search_result: nil,
+       tmp_wav: @tmp_wav
+     )
+     |> allow_upload(:image_list,
+       accept: ~w(image/*),
+       auto_upload: true,
+       progress: &handle_progress/3,
+       max_entries: 1,
+       chunk_size: 64_000,
+       max_file_size: 5_000_000
+     )
+     |> allow_upload(:speech,
+       accept: :any,
+       auto_upload: true,
+       progress: &handle_progress/3,
+       max_entries: 1
+     )}
+  end
+```
+
+To reiterate:
+
+- we've added a few fields related to audio.
+  - `transcription` will pertain to the result of the audio transcription
+that will occur after transcribing the audio from the person.
+  - `mic_off?` is simply a toggle to visually show the person
+that the microphone is recording or not.
+  - `audio_running?` is a boolean to show the person
+if the audio transcription and semantic searching is occuring (loading).
+  - `audio_search_result` is the result of the image
+that is closest semantically to the image's label from the 
+transcribed audio.
+  - `tmp_wav` is the path of the temporary audio file
+that is saved in the filesystem while the audio is being transcribed.
+
+- additionally, we also have added
+`allow_upload/3` pertaining to the audio upload
+(it is tagged as `:speech` and is being handled
+in the same function as the upload `:image_list`).
+
+These are the socket assigns
+that will allow us to dynamically update the person using our app
+with what the app is doing.
+
+
+
+
 
 [TODO]: falta o image  e depois o page_live
 

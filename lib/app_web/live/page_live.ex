@@ -19,6 +19,7 @@ defmodule AppWeb.PageLive do
   The aspect ratio is maintained.
   """
   @image_width 640
+
   @accepted_mime ~w(image/jpeg image/jpg image/png image/webp)
   @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
 
@@ -29,24 +30,22 @@ defmodule AppWeb.PageLive do
      |> assign(
        # Related to the file uploaded by the user
        label: nil,
-       running?: false,
+       upload_running?: false,
        task_ref: nil,
        image_info: nil,
        image_preview_base64: nil,
-       db_image: nil,
 
        # Related to the list of image examples
        example_list_tasks: [],
        example_list: [],
        display_list?: false,
 
-       # Related to the Audio
+       # Related to the audio from the user
        transcription: nil,
-       micro_off: false,
-       speech_spin: false,
-       search_result: nil,
-       tmp_wave: @tmp_wav
-       #  index: App.KnnIndex.load_index()
+       mic_off?: false,
+       audio_running?: false,
+       audio_search_result: nil,
+       tmp_wav: @tmp_wav
      )
      |> allow_upload(:image_list,
        accept: ~w(image/*),
@@ -193,7 +192,7 @@ defmodule AppWeb.PageLive do
 
         {:noreply,
          assign(socket,
-           running?: true,
+           upload_running?: true,
            task_ref: task.ref,
            image_preview_base64: base64,
            image_info: image_info
@@ -212,12 +211,12 @@ defmodule AppWeb.PageLive do
   # It updates the socket assigns.
   def handle_progress(:speech, entry, %{assigns: assigns} = socket) when entry.done? do
     # We consume the audio file
-    tmp_wave =
+    tmp_wav =
       socket
       |> consume_uploaded_entry(entry, fn %{path: path} ->
-        tmp_wave = assigns.tmp_wave <> Ecto.UUID.generate() <> ".wav"
-        :ok = File.cp!(path, tmp_wave)
-        {:ok, tmp_wave}
+        tmp_wav = assigns.tmp_wav <> Ecto.UUID.generate() <> ".wav"
+        :ok = File.cp!(path, tmp_wav)
+        {:ok, tmp_wav}
       end)
 
     # After consuming the audio file, we spawn a task to transcribe the audio
@@ -225,7 +224,7 @@ defmodule AppWeb.PageLive do
       Task.Supervisor.async(
         App.TaskSupervisor,
         fn ->
-          Nx.Serving.batched_run(Whisper, {:file, tmp_wave})
+          Nx.Serving.batched_run(Whisper, {:file, tmp_wav})
         end
       )
 
@@ -233,10 +232,10 @@ defmodule AppWeb.PageLive do
     {:noreply,
      assign(socket,
        audio_ref: audio_task.ref,
-       micro_off: true,
-       tmp_wave: tmp_wave,
-       speech_spin: true,
-       search_result: nil,
+       mic_off?: true,
+       tmp_wav: tmp_wav,
+       audio_running?: true,
+       audio_search_result: nil,
        transcription: nil
      )}
   end
@@ -285,7 +284,7 @@ defmodule AppWeb.PageLive do
   def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
       when assigns.audio_ref == ref do
     Process.demonitor(ref, [:flush])
-    File.rm!(assigns.tmp_wave)
+    File.rm!(assigns.tmp_wav)
 
     # Compute an normed embedding (cosine case only) on the text result
     # and returns an App.Image{} as the result of a "knn_search"
@@ -300,11 +299,11 @@ defmodule AppWeb.PageLive do
       {:noreply,
        assign(socket,
          transcription: String.trim(text),
-         micro_off: false,
-         speech_spin: false,
-         search_result: result,
+         mic_off?: false,
+         audio_running?: false,
+         audio_search_result: result,
          audio_ref: nil,
-         tmp_wave: @tmp_wav
+         tmp_wav: @tmp_wav
        )}
     else
       # Stop transcription if no entries in the Index
@@ -313,23 +312,23 @@ defmodule AppWeb.PageLive do
          socket
          |> push_event("toast", %{message: "No images yet"})
          |> assign(
-           micro_off: false,
+           mic_off?: false,
            transcription: "!! The image bank is empty. Please upload some !!",
-           search_result: nil,
-           speech_spin: false,
+           audio_search_result: nil,
+           audio_running?: false,
            audio_ref: nil,
-           tmp_wave: @tmp_wav
+           tmp_wav: @tmp_wav
          )}
 
       nil ->
         {:noreply,
          assign(socket,
            transcription: String.trim(text),
-           micro_off: false,
-           search_result: nil,
-           speech_spin: false,
+           mic_off?: false,
+           audio_search_result: nil,
+           audio_running?: false,
            audio_ref: nil,
-           tmp_wave: @tmp_wav
+           tmp_wav: @tmp_wav
          )}
     end
   end
@@ -399,7 +398,7 @@ defmodule AppWeb.PageLive do
                socket
                |> push_event("toast", %{message: "Invalid entry"})
                |> assign(
-                 running?: false,
+                 upload_running?: false,
                  task_ref: nil,
                  label: nil
                )}
@@ -409,7 +408,7 @@ defmodule AppWeb.PageLive do
                socket
                |> push_event("toast", %{message: "Please retry"})
                |> assign(
-                 running?: false,
+                 upload_running?: false,
                  task_ref: nil,
                  label: nil
                )}
@@ -418,7 +417,7 @@ defmodule AppWeb.PageLive do
               {:noreply,
                socket
                |> assign(
-                 running?: false,
+                 upload_running?: false,
                  task_ref: nil,
                  label: label
                )}
@@ -429,7 +428,7 @@ defmodule AppWeb.PageLive do
              socket
              |> push_event("toast", %{message: "Race condition"})
              |> assign(
-               running?: false,
+               upload_running?: false,
                task_ref: nil,
                label: nil
              )}
@@ -439,7 +438,7 @@ defmodule AppWeb.PageLive do
              socket
              |> push_event("toast", %{message: msg})
              |> assign(
-               running?: false,
+               upload_running?: false,
                task_ref: nil,
                label: nil
              )}
@@ -453,7 +452,7 @@ defmodule AppWeb.PageLive do
         {:noreply,
          assign(socket,
            example_list: updated_example_list,
-           running?: false,
+           upload_running?: false,
            display_list?: true
          )}
     end
