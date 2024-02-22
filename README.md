@@ -84,6 +84,9 @@ with your voice! 🎙️
       - [4.1 Computing the embeddings in our app](#41-computing-the-embeddings-in-our-app)
         - [4.1.1 Changing the `Image` schema so it's embeddable](#411-changing-the-image-schema-so-its-embeddable)
         - [4.1.2 Using embeddings in semantic search](#412-using-embeddings-in-semantic-search)
+          - [4.1.2.1 Mount socket assigns](#4121-mount-socket-assigns)
+          - [4.1.2.2 Consuming image uploads](#4122-consuming-image-uploads)
+          - [4.1.2.3 Using the embeddings to semantically search images](#4123-using-the-embeddings-to-semantically-search-images)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -5185,9 +5188,17 @@ to implement semantic search into our application.
 
 We are going to be working inside `lib/app_web/live/page_live.ex` from now on.
 
+
+###### 4.1.2.1 Mount socket assigns
+
 First, we are going to update our socket assigns on `mount/3`.
 
 ```elixir
+
+  @image_width 640
+  @accepted_mime ~w(image/jpeg image/jpg image/png image/webp)
+  @tmp_wav Path.expand("priv/static/uploads/tmp.wav")
+
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -5254,10 +5265,342 @@ that will allow us to dynamically update the person using our app
 with what the app is doing.
 
 
+###### 4.1.2.2 Consuming image uploads
+
+As you can see, we are using `handle_progress/3` 
+with `allow_upload/3`.
+As we know, `handle_progress/3` is called whenever an upload
+(be it an image or recording of the person's voice).
+We define two different declarations for how we want to
+process `:image` uploads and `:speech` uploads.
+
+Let's start with the first one.
+
+We have added `sha1` and `idx` as fields to our image schema.
+Therefore, we are going to need to make some changes
+to the `handle_progress/3` of the `:image_list`.
+Change it like so:
+
+```elixir
+def handle_progress(:image_list, entry, socket) when entry.done? do
+    # We consume the entry only if the entry is done uploading from the image
+    # and if consuming the entry was successful.
+    consume_uploaded_entry(socket, entry, fn %{path: path} ->
+      with {:magic, {:ok, %{mime_type: mime}}} <- {:magic, magic_check(path)},
+           # Check if file can be properly read
+           {:read, {:ok, file_binary}} <- {:read, File.read(path)},
+           # Check the image info
+           {:image_info, {mimetype, width, height, _variant}} <-
+             {:image_info, ExImageInfo.info(file_binary)},
+           # Check mime type
+           {:check_mime, :ok} <- {:check_mime, check_mime(mime, mimetype)},
+           # Get SHA1 code from the image and check it
+           sha1 <- App.Image.calc_sha1(file_binary),
+           {:sha_check, nil} <- {:sha_check, App.Image.check_sha1(sha1)},
+           # Get image and resize
+           {:ok, thumbnail_vimage} <- Vops.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
+           # Pre-process the image as tensor
+           {:pre_process, {:ok, tensor}} <- {:pre_process, pre_process_image(thumbnail_vimage)} do
+        # Create image info to be saved as partial image
+        image_info = %{
+          mimetype: mimetype,
+          width: width,
+          height: height,
+          sha1: sha1,
+          description: nil,
+          url: nil,
+          # set a random big int to the "idx" field
+          idx: :rand.uniform(1_000_000_000_000) * 1_000
+        }
+
+        # Save partial image
+        App.Image.insert(image_info)
+        |> case do
+          {:ok, _} ->
+            image_info =
+              Map.merge(image_info, %{
+                file_binary: file_binary
+              })
+
+            {:ok, %{tensor: tensor, image_info: image_info, path: path}}
+
+          {:error, changeset} ->
+            {:error, changeset.errors}
+        end
+        |> handle_upload()
+      else
+        {:magic, {:error, msg}} -> {:postpone, %{error: msg}}
+        {:read, msg} -> {:postpone, %{error: inspect(msg)}}
+        {:image_info, nil} -> {:postpone, %{error: "image_info error"}}
+        {:check_mime, :error} -> {:postpone, %{error: "Bad mime type"}}
+        {:sha_check, {:ok, %App.Image{}}} -> {:postpone, %{error: "Image already uploaded"}}
+        {:pre_process, {:error, _msg}} -> {:postpone, %{error: "pre_processing error"}}
+        {:error, reason} -> {:postpone, %{error: inspect(reason)}}
+      end
+    end)
+    |> case do
+      # If consuming the entry was successful, we spawn a task to classify the image
+      # and update the socket assigns
+      %{tensor: tensor, image_info: image_info} ->
+        task =
+          Task.Supervisor.async(App.TaskSupervisor, fn ->
+            Nx.Serving.batched_run(ImageClassifier, tensor)
+          end)
+
+        # Encode the image to base64
+        base64 = "data:image/png;base64, " <> Base.encode64(image_info.file_binary)
+
+        {:noreply,
+         assign(socket,
+           upload_running?: true,
+           task_ref: task.ref,
+           image_preview_base64: base64,
+           image_info: image_info
+         )}
+
+      # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
+      %{error: errors} ->
+        Logger.warning("Error uploading image. #{inspect(errors)}")
+        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
+    end
+  end
+```
+
+Let's go over these changes.
+Some of these is code that has been written prior,
+but for clarification, we'll go over them again.
+
+- we use `consume_uploaded_entry/3` to consume the image
+that the person uploads.
+To consume the image successfully,
+the image goes through an array of validations.
+  - we use `magic_check/1` to check the MIME type of the image validity.
+  - we use read the contents of the image using `ExImageInfo.info/1`.
+  - we check if the MIME type is valid using `check_mime/2`.
+  - we calculate the `sha1` with the `App.Image.calc_sha1/1` function
+we've developed earlier.
+  - we resize the image and scale it down to the same width
+of the images that are trained using the image captioning model we've chosen
+(to yield better results and to save memory bandwith).
+We use `Vix.Operations.thumbnail/3` to resize the image.
+  - finally, we convert the resized image to a tensor using 
+`pre_process_image/1` so it can be consumed by our image captioning model.
+
+- after these series of validations,
+we use the image info we've obtained earlier to
+**create an "early-save" of the image**.
+With this, we are saving the image and associating it with
+the `sha1` that was retrieved from the image contents.
+We are doing this "partial image saving" 
+in case two same images are being uploaded at the same time.
+Because we are enforcing `sha1` to be unique at database level,
+this race condition is solved by the database to us optimistically.
+
+- afterwards, we call `handle_upload/0`.
+This function will upload the image to the `S3` bucket.
+We are going to implement this function in just a second 😉.
+
+- if the upload is successful,
+using the tensor and the image information from the previous steps,
+we spawn the async task to run the model.
+This step should be familiar to you,
+since we've already implemented this.
+Finally, we update the socket assigns accordingly.
+
+- we handle all possible errors in the `else` statement of the
+`with` flow control statement before the image is uploaded.
+
+Hopefully this demystifies some of the code we've just implemented!
+
+Because we are using `handle_upload/0` in this function 
+to upload the image to our `S3` bucket,
+let's do it right now!
+
+```elixir
+def handle_upload({:ok, %{path: path, tensor: tensor, image_info: image_info} = map})
+    when is_map(map) do
+  # Upload the image to S3
+  Image.upload_image_to_s3(path, image_info.mimetype)
+  |> case do
+    # If the upload is successful, we update the socket assigns with the image info
+    {:ok, url} ->
+      image_info =
+        struct(
+          %ImageInfo{},
+          Map.merge(image_info, %{url: url})
+        )
+
+      {:ok, %{tensor: tensor, image_info: image_info}}
+
+    # If S3 upload fails, we return error
+    {:error, reason} ->
+      Logger.warning("Error uploading image: #{inspect(reason)}")
+      {:postpone, %{error: "Bucket error"}}
+  end
+end
+
+def handle_upload({:error, error}) do
+  Logger.warning("Error creating partial image: #{inspect(error)}")
+  {:postpone, %{error: "Error creating partial image"}}
+end
+```
+
+This function is fairly easy to understand.
+We upload the image by calling `Image.upload_image_to_s3/2` and,
+if successful,
+we add the returning URL to the image struct.
+Otherwise, we handle the error and return it.
+
+After this small detour,
+let's implement the `handle_progress/3` 
+for the **`:speech` uploads**,
+that is, the audio the person records.
+
+```elixir
+  def handle_progress(:speech, entry, %{assigns: assigns} = socket) when entry.done? do
+    # We consume the audio file
+    tmp_wav =
+      socket
+      |> consume_uploaded_entry(entry, fn %{path: path} ->
+        tmp_wav = assigns.tmp_wav <> Ecto.UUID.generate() <> ".wav"
+        :ok = File.cp!(path, tmp_wav)
+        {:ok, tmp_wav}
+      end)
+
+    # After consuming the audio file, we spawn a task to transcribe the audio
+    audio_task =
+      Task.Supervisor.async(
+        App.TaskSupervisor,
+        fn ->
+          Nx.Serving.batched_run(Whisper, {:file, tmp_wav})
+        end
+      )
+
+    # Update the socket assigns
+    {:noreply,
+     assign(socket,
+       audio_ref: audio_task.ref,
+       mic_off?: true,
+       tmp_wav: tmp_wav,
+       audio_running?: true,
+       audio_search_result: nil,
+       transcription: nil
+     )}
+  end
+```
+
+As we know, this function is called after the upload is completed.
+In the case of audio uploads, 
+the hook is called by the person recording their voice
+in `assets/js/app.js`.
+Similarly to the `handle_progress/3` function of the `:image_list` uploads,
+we also use `consume_uploaded_entry/3` to consume the audio file.
+
+- we consume the audio file and save it in our filesystem 
+as an `.wav` file.
+- we spawn the async task and use the `whisper` audio transcription model
+with the audio file we've just saved.
+- we update the socket assigns accordingly.
+
+Pretty simple, right?
+
+
+###### 4.1.2.3 Using the embeddings to semantically search images
+
+In this section, we'll finally use 
+our embedding model and semantically search for our images!
+
+As you've seen in the previous section,
+we've spawn the task to transcribe the audio into the `whipser` model.
+Now we need a handler!
+For this scenario, 
+add the following function.
+
+```elixir
+  @impl true
+  def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
+      when assigns.audio_ref == ref do
+    Process.demonitor(ref, [:flush])
+    File.rm!(assigns.tmp_wav)
+
+    # Compute an normed embedding (cosine case only) on the text result
+    # and returns an App.Image{} as the result of a "knn_search"
+    with {:not_empty_index, :ok} <-
+           {:not_empty_index, App.KnnIndex.not_empty_index()},
+         %{embedding: input_embedding} <-
+           Nx.Serving.batched_run(Embedding, text),
+         %Nx.Tensor{} = normed_input_embedding <-
+           Nx.divide(input_embedding, Nx.LinAlg.norm(input_embedding)),
+         %App.Image{} = result <-
+           App.KnnIndex.knn_search(normed_input_embedding) do
+      {:noreply,
+       assign(socket,
+         transcription: String.trim(text),
+         mic_off?: false,
+         audio_running?: false,
+         audio_search_result: result,
+         audio_ref: nil,
+         tmp_wav: @tmp_wav
+       )}
+    else
+      # Stop transcription if no entries in the Index
+      {:not_empty_index, :error} ->
+        {:noreply,
+         socket
+         |> push_event("toast", %{message: "No images yet"})
+         |> assign(
+           mic_off?: false,
+           transcription: "!! The image bank is empty. Please upload some !!",
+           audio_search_result: nil,
+           audio_running?: false,
+           audio_ref: nil,
+           tmp_wav: @tmp_wav
+         )}
+
+      nil ->
+        {:noreply,
+         assign(socket,
+           transcription: String.trim(text),
+           mic_off?: false,
+           audio_search_result: nil,
+           audio_running?: false,
+           audio_ref: nil,
+           tmp_wav: @tmp_wav
+         )}
+    end
+  end
+```
+
+Let's break down this function:
+
+- given the **recording text transcription**:
+  - we check if the Index file holding is *not empty*.
+  - we use the text transcription and run it 
+**through the embedding model** and get its result.
+  - with the embedding we've received from the model,
+we **normalize it**.
+  - with the normalized embedding,
+we **run it through a `knn search`.
+For this, we call the `App.KnnIndex.knn_search/1` function
+we've defined in the `App.KnnIndex` GenServer
+we've implemented earlier on.
+  - the `knn search` returns the closest semantical image 
+(through the image caption)
+from the audio transcription. 
+  - upon success of this process, we update the socket assigns.
+  - otherwise, we handle each error case accordingly
+and update the socket assigns.
+
+And that's it!
+We just add to sequentially call the functions
+that we've implemented prior!
 
 
 
-[TODO]: falta o image  e depois o page_live
+
+
+
+[TODO]: e depois o page_live
 
 
 
