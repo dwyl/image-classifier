@@ -281,7 +281,7 @@ defmodule App.Models do
           {:ok, map()} | {:error, String.t()}
 
   defp load_offline_model(model) do
-    Logger.info("Loading #{model.name}...")
+    Logger.info("ℹ️ Loading #{model.name}...")
 
     # Loading model
     loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: true}
@@ -330,7 +330,7 @@ defmodule App.Models do
   # It will load the model and the respective the featurizer, tokenizer and generation config if needed.
   @spec download_model(map()) :: {:ok, map()} | {:error, binary()}
   defp download_model(model) do
-    Logger.info("Downloading #{model.name}...")
+    Logger.info("ℹ️ Downloading #{model.name}...")
 
     # Download model
     downloading_settings = {:hf, model.name, cache_dir: model.cache_path}
@@ -370,7 +370,7 @@ defmodule App.Models do
         {:error, msg} -> {:error, msg}
       end
     else
-      Logger.info("No download: #{model.name}")
+      Logger.info("ℹ️ No download needed: #{model.name}")
       :ok
     end
   end

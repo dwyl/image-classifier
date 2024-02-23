@@ -15,11 +15,11 @@ defmodule App.Application do
     App.Models.verify_and_download_models()
     |> case do
       {:error, msg} ->
-        Logger.warning(msg)
+        Logger.error("⚠️ #{msg}")
         System.stop(0)
 
       :ok ->
-        Logger.info("Models: " <> "\u2705")
+        Logger.info("ℹ️ Models: ✅")
         :ok
     end
   end

@@ -33,12 +33,12 @@ defmodule App.HnswlibIndex do
     |> case do
       # If the table is empty
       nil ->
-        Logger.info("No index file found in DB. Creating new one...")
+        Logger.info("ℹ️ No index file found in DB. Creating new one...")
         create(space, dim, max_elements)
 
       # If the table is not empty but has no file
       response when response.file == nil ->
-        Logger.info("Empty index file in DB. Recreating one...")
+        Logger.info("ℹ️ Empty index file in DB. Recreating one...")
 
         # Purge the table and create a new file row in it
         App.Repo.delete_all(App.HnswlibIndex)
@@ -46,7 +46,7 @@ defmodule App.HnswlibIndex do
 
       # If the table is not empty and has a file
       index_db ->
-        Logger.info("Index file found in DB. Loading it...")
+        Logger.info("ℹ️ Index file found in DB. Loading it...")
 
         # We get the path of the index
         with path <- App.KnnIndex.index_path(),

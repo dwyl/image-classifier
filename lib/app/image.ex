@@ -127,7 +127,7 @@ defmodule App.Image do
 
       # In case the evaluation fails and it's not acceptable.
       {:ok, %GenMagic.Result{} = res} ->
-        Logger.warning(%{gen_magic_response: res})
+        Logger.warning("⚠️ MIME type error: #{inspect(res)}")
         {:error, "Not acceptable."}
     end
   end

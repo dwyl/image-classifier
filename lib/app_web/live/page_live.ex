@@ -200,7 +200,7 @@ defmodule AppWeb.PageLive do
 
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
       %{error: errors} ->
-        Logger.warning("Error uploading image. #{inspect(errors)}")
+        Logger.warning("⚠️ Error uploading image. #{inspect(errors)}")
         {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
     end
   end
@@ -264,13 +264,13 @@ defmodule AppWeb.PageLive do
 
       # If S3 upload fails, we return error
       {:error, reason} ->
-        Logger.warning("Error uploading image: #{inspect(reason)}")
+        Logger.warning("⚠️ Error uploading image: #{inspect(reason)}")
         {:postpone, %{error: "Bucket error"}}
     end
   end
 
   def handle_upload({:error, error}) do
-    Logger.warning("Error creating partial image: #{inspect(error)}")
+    Logger.warning("⚠️ Error creating partial image: #{inspect(error)}")
     {:postpone, %{error: "Error creating partial image"}}
   end
 
@@ -496,7 +496,7 @@ defmodule AppWeb.PageLive do
       |> Map.merge(%{url: url})
     else
       {_, {:error, msg}} ->
-        :ok = Logger.warning(inspect(msg))
+        :ok = Logger.error("⚠️ #{msg}")
     end
   end
 

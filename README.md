@@ -2972,7 +2972,7 @@ Add the following function in the module App.Image:
 
       {:ok, %GenMagic.Result{} = res} ->
         require Logger
-        Logger.warning(%{gen_magic_response: res})
+        Logger.warning("⚠️ MIME type error: #{inspect(res)}")
         {:error, "Not acceptable."}
     end
   end
@@ -3074,7 +3074,7 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
     # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
   else
     %{error: reason} ->
-      Logger.info("Error uploading image. #{inspect(reason)}")
+      Logger.warning("⚠️ Error uploading image. #{inspect(reason)}")
       {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{reason}"})}
 
     _ ->
@@ -3616,7 +3616,7 @@ def check_models_on_startup do
   App.Models.verify_and_download_models()
   |> case do
     {:error, msg} ->
-      Logger.warning(msg)
+      Logger.error("⚠️ #{msg}")
       System.stop(0)
 
     :ok ->
@@ -3908,7 +3908,7 @@ defmodule App.Models do
   # It will load the model and the respective the featurizer, tokenizer and generation config if needed,
   # and return a map with all of these at the end.
   defp load_offline_model(model) do
-    Logger.info("Loading #{model.name}...")
+    Logger.info("ℹ️ Loading #{model.name}...")
 
     # Loading model
     loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: true}
@@ -3957,7 +3957,7 @@ defmodule App.Models do
   # Downloads the models according to a given %ModelInfo struct.
   # It will load the model and the respective the featurizer, tokenizer and generation config if needed.
   defp download_model(model) do
-    Logger.info("Downloading #{model.name}...")
+    Logger.info("ℹ️ Downloading #{model.name}...")
 
     # Download model
     downloading_settings = {:hf, model.name, cache_dir: model.cache_path}
@@ -3999,7 +3999,7 @@ defmodule App.Models do
       end
     else
       _ ->
-        Logger.info("No dowlnoad")
+        # No download
         :ok
     end
   end
@@ -4189,7 +4189,7 @@ defmodule App.KnnIndex do
 
       # If the index file does exist, we compare the one with teh table and check for incoherences.
       true ->
-        Logger.info("Index file found on disk. Let's compare it with the database...")
+        Logger.info("ℹ️ Index file found on disk. Let's compare it with the database...")
 
         App.Repo.get_by(App.HnswlibIndex, id: 1)
         |> case do
@@ -4214,7 +4214,7 @@ defmodule App.KnnIndex do
            HNSWLib.Index.get_current_count(index),
          true <-
            index_count == db_count do
-      Logger.info("Integrity: " <> "\u2705.")
+      Logger.info("ℹ️ Integrity: ✅")
       {:ok, {index, schema, space}}
 
       # If it fails, we return an error.
@@ -4224,7 +4224,7 @@ defmodule App.KnnIndex do
          {:error, "Integrity error. The count of images from index differs from the database."}}
 
       {:error, msg} ->
-        Logger.warning(inspect(msg))
+        Logger.error("⚠️ #{msg}")
         {:stop, {:error, msg}}
     end
   end
@@ -4260,7 +4260,7 @@ defmodule App.KnnIndex do
            HNSWLib.Index.get_current_count(index),
          :ok <-
            HNSWLib.Index.save_index(index, @saved_index) do
-      Logger.info("idx: #{idx}")
+      
       {:reply, {:ok, idx}, state}
     else
       {:error, msg} ->
@@ -4275,8 +4275,7 @@ defmodule App.KnnIndex do
   def handle_call({:knn_search, input}, _, {index, _, _} = state) do
     # We search for the nearest neighbors of the input embedding.
     case HNSWLib.Index.knn_query(index, input, k: 1) do
-      {:ok, labels, distances} ->
-        Logger.info(inspect(distances))
+      {:ok, labels, _distances} ->
 
         response =
           labels[0]
@@ -4297,7 +4296,7 @@ defmodule App.KnnIndex do
   def handle_call(:not_empty, _, {index, _, _} = state) do
     case HNSWLib.Index.get_current_count(index) do
       {:ok, 0} ->
-        Logger.warning("Empty index.")
+        Logger.warning("⚠️ Empty index.")
         {:reply, :error, state}
 
       {:ok, _} ->
@@ -4388,12 +4387,12 @@ defmodule App.HnswlibIndex do
     |> case do
       # If the table is empty
       nil ->
-        Logger.info("No index file found in DB. Creating new one...")
+        Logger.info("ℹ️ No index file found in DB. Creating new one...")
         create(space, dim, max_elements)
 
       # If the table is not empty but has no file
       response when response.file == nil ->
-        Logger.info("Empty index file in DB. Recreating one...")
+        Logger.info("ℹ️ Empty index file in DB. Recreating one...")
 
         # Purge the table and create a new file row in it
         App.Repo.delete_all(App.HnswlibIndex)
@@ -4401,7 +4400,7 @@ defmodule App.HnswlibIndex do
 
       # If the table is not empty and has a file
       index_db ->
-        Logger.info("Index file found in DB. Loading it...")
+        Logger.info("ℹ️ Index file found in DB. Loading it...")
 
         # We get the path of the index
         with path <- App.KnnIndex.index_path(),
@@ -4575,11 +4574,11 @@ defmodule App.Application do
     App.Models.verify_and_download_models()
     |> case do
       {:error, msg} ->
-        Logger.warning(msg)
+        Logger.error("⚠️ #{msg}")
         System.stop(0)
 
       :ok ->
-        Logger.info("Models: " <> "\u2705")
+        Logger.info("ℹ️ Models: ✅")
         :ok
     end
   end
@@ -5030,8 +5029,6 @@ def handle_info({ref, %{chunks: [%{text: text}]} = result}, %{assigns: assigns} 
        )}
   # record without entries
       {:not_empty_index, :error} ->
-        Logger.debug("No entries in Index")
-
         {:noreply,
          assign(socket,
            mic_off?: false,
@@ -5362,7 +5359,7 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
 
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
       %{error: errors} ->
-        Logger.warning("Error uploading image. #{inspect(errors)}")
+        Logger.warning("⚠️ Error uploading image. #{inspect(errors)}")
         {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
     end
   end
@@ -5436,13 +5433,13 @@ def handle_upload({:ok, %{path: path, tensor: tensor, image_info: image_info} = 
 
     # If S3 upload fails, we return error
     {:error, reason} ->
-      Logger.warning("Error uploading image: #{inspect(reason)}")
+      Logger.warning("⚠️ Error uploading image: #{inspect(reason)}")
       {:postpone, %{error: "Bucket error"}}
   end
 end
 
 def handle_upload({:error, error}) do
-  Logger.warning("Error creating partial image: #{inspect(error)}")
+  Logger.warning("⚠️ Error creating partial image: #{inspect(error)}")
   {:postpone, %{error: "Error creating partial image"}}
 end
 ```

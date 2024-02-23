@@ -120,7 +120,7 @@ defmodule Benchmark do
 
     # Go over each image and make prediction
     Enum.each(vips_images_with_captions, fn image ->
-      Logger.info("Benchmarking image #{image.id}...")
+      Logger.info("📊 Benchmarking image #{image.id}...")
 
       # Run the prediction
       {time_in_microseconds, prediction} =
