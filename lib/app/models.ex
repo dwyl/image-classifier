@@ -84,14 +84,9 @@ defmodule App.Models do
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
 
-        with {:ok, _} <-
-               download_model(@captioning_test_model),
-             # Download captioning test model model
-             {:ok, _} <-
-               download_model(@embedding_model),
-             # Download whisper model
-             {:ok, _} <-
-               download_model(@audio_test_model) do
+        with :ok <- download_model(@captioning_test_model),
+             :ok <- download_model(@embedding_model),
+             :ok <- download_model(@audio_test_model) do
           :ok
         else
           {:error, msg} -> {:error, msg}
@@ -101,12 +96,9 @@ defmodule App.Models do
         # Delete any cached pre-existing models
         File.rm_rf!(@models_folder_path)
 
-        with {:ok, _} <-
-               download_model(@captioning_prod_model),
-             {:ok, _} <-
-               download_model(@audio_prod_model),
-             {:ok, _} <-
-               download_model(@embedding_model) do
+        with :ok <- download_model(@captioning_prod_model),
+             :ok <- download_model(@audio_prod_model),
+             :ok <- download_model(@embedding_model) do
           :ok
         else
           {:error, msg} -> {:error, msg}
@@ -116,12 +108,9 @@ defmodule App.Models do
         # Check if the prod model cache directory exists or if it's not empty.
         # If so, we download the prod models.
 
-        with :ok <-
-               check_folder_and_download(@captioning_prod_model),
-             :ok <-
-               check_folder_and_download(@audio_prod_model),
-             :ok <-
-               check_folder_and_download(@embedding_model) do
+        with :ok <- check_folder_and_download(@captioning_prod_model),
+             :ok <- check_folder_and_download(@audio_prod_model),
+             :ok <- check_folder_and_download(@embedding_model) do
           :ok
         else
           {:error, msg} -> {:error, msg}
@@ -131,10 +120,9 @@ defmodule App.Models do
         # Check if the test model cache directory exists or if it's not empty.
         # If so, we download the test models.
 
-        with :ok <-
-               check_folder_and_download(@captioning_test_model),
-             :ok <-
-               check_folder_and_download(@audio_test_model) do
+        with :ok <- check_folder_and_download(@captioning_test_model),
+             :ok <- check_folder_and_download(@audio_test_model),
+             :ok <- check_folder_and_download(@embedding_model) do
           :ok
         else
           {:error, msg} -> {:error, msg}
@@ -351,6 +339,8 @@ defmodule App.Models do
           {:ok, _} = Bumblebee.load_generation_config(downloading_settings)
         end
 
+        :ok
+
       {:error, msg} ->
         {:error, msg}
     end
@@ -366,7 +356,7 @@ defmodule App.Models do
     if File.ls(model_location) == {:error, :enoent} or File.ls(model_location) == {:ok, []} do
       download_model(model)
       |> case do
-        {:ok, %Bumblebee.Text.GenerationConfig{}} -> :ok
+        :ok -> :ok
         {:error, msg} -> {:error, msg}
       end
     else
