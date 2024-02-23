@@ -5,7 +5,7 @@ defmodule App.MixProject do
     [
       app: :app,
       version: "0.1.0",
-      elixir: "~> 1.16",
+      elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -51,12 +51,12 @@ defmodule App.MixProject do
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.4"},
-      # {:plug_cowboy, "~> 2.7"},
       {:bandit, "~> 1.0"},
+      {:plug_cowboy, "~> 2.7.0"},
 
       # HTTP Request
       {:httpoison, "~> 2.2"},
-      {:req, "0.4.8"},
+      {:req, "0.4.11"},
       {:mime, "~> 2.0.5"},
       {:ex_image_info, "~> 0.2.4"},
       {:gen_magic, "~> 1.1.1"},
