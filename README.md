@@ -87,6 +87,8 @@ with your voice! 🎙️
           - [4.1.2.1 Mount socket assigns](#4121-mount-socket-assigns)
           - [4.1.2.2 Consuming image uploads](#4122-consuming-image-uploads)
           - [4.1.2.3 Using the embeddings to semantically search images](#4123-using-the-embeddings-to-semantically-search-images)
+          - [4.1.2.4 Creating embeddings when uploading images](#4124-creating-embeddings-when-uploading-images)
+          - [4.1.2.5 Update the LiveView view](#4125-update-the-liveview-view)
   - [_Please_ star the repo! ⭐️](#please-star-the-repo-️)
 
 <br />
@@ -5596,12 +5598,433 @@ We just add to sequentially call the functions
 that we've implemented prior!
 
 
+###### 4.1.2.4 Creating embeddings when uploading images
+
+Now that we have *used* the embeddings,
+there's one thing we forgot:
+**we forgot to keep track of the embeddings of each image that is uploaded**.
+These embeddings are saved in the Index file.
+
+To fix this, we need to create an embedding of the image
+after it is uploaded and captioned.
+Head over to the `handle_info/2` pertaining to the image captioning,
+and change it to the following piece of code:
+
+```elixir
+  def handle_info({ref, result}, %{assigns: assigns} = socket) do
+    # Flush async call
+    Process.demonitor(ref, [:flush])
+
+    # You need to change how you destructure the output of the model depending
+    # on the model you've chosen for `prod` and `test` envs on `models.ex`.)
+    label =
+      case Application.get_env(:app, :use_test_models, false) do
+        true ->
+          App.Models.extract_captioning_test_label(result)
+
+        # coveralls-ignore-start
+        false ->
+          App.Models.extract_captioning_prod_label(result)
+          # coveralls-ignore-stop
+      end
+
+    %{image_info: image_info} = assigns
+
+    cond do
+      # If the upload task has finished executing, we run the embedding model on the image
+      Map.get(assigns, :task_ref) == ref ->
+        image =
+          %{
+            url: image_info.url,
+            width: image_info.width,
+            height: image_info.height,
+            description: label,
+            sha1: image_info.sha1
+          }
+
+        # Create embedding task
+        with %{embedding: data} <- Nx.Serving.batched_run(Embedding, label),
+             # Compute a normed embedding (cosine case only) on the text result
+             normed_data <- Nx.divide(data, Nx.LinAlg.norm(data)),
+             # Check the SHA1 of the image
+             {:check_used, {:ok, pending_image}} <-
+               {:check_used, App.Image.check_sha1(image.sha1)} do
+          Ecto.Multi.new()
+          # Save updated Image to DB
+          |> Ecto.Multi.run(:update_image, fn _, _ ->
+            idx = App.KnnIndex.get_count() + 1
+
+            Ecto.Changeset.change(pending_image, %{
+              idx: idx,
+              description: image.description,
+              url: image.url
+            })
+            |> App.Repo.update()
+          end)
+
+          # Save Index file to DB
+          |> Ecto.Multi.run(:save_index, fn _, _ ->
+            {:ok, _idx} = App.KnnIndex.add_item(normed_data)
+            App.KnnIndex.save_index_to_db()
+          end)
+          |> App.Repo.transaction()
+          |> case do
+            {:error, :update_image, _changeset, _} ->
+              {:noreply,
+               socket
+               |> push_event("toast", %{message: "Invalid entry"})
+               |> assign(
+                 upload_running?: false,
+                 task_ref: nil,
+                 label: nil
+               )}
+
+            {:error, :save_index, _, _} ->
+              {:noreply,
+               socket
+               |> push_event("toast", %{message: "Please retry"})
+               |> assign(
+                 upload_running?: false,
+                 task_ref: nil,
+                 label: nil
+               )}
+
+            {:ok, _} ->
+              {:noreply,
+               socket
+               |> assign(
+                 upload_running?: false,
+                 task_ref: nil,
+                 label: label
+               )}
+          end
+        else
+          {:check_used, nil} ->
+            {:noreply,
+             socket
+             |> push_event("toast", %{message: "Race condition"})
+             |> assign(
+               upload_running?: false,
+               task_ref: nil,
+               label: nil
+             )}
+
+          {:error, msg} ->
+            {:noreply,
+             socket
+             |> push_event("toast", %{message: msg})
+             |> assign(
+               upload_running?: false,
+               task_ref: nil,
+               label: nil
+             )}
+        end
+
+      # If the example task has finished executing, we upload the socket assigns.
+      img = Map.get(assigns, :example_list_tasks) |> Enum.find(&(&1.ref == ref)) ->
+        # Update the element in the `example_list` enum to turn "predicting?" to `false`
+        updated_example_list = update_example_list(assigns, img, label)
+
+        {:noreply,
+         assign(socket,
+           example_list: updated_example_list,
+           upload_running?: false,
+           display_list?: true
+         )}
+    end
+  end
+```
+
+Let's go over the flow of this function:
+
+- we extract the captioning label from the result of the image captioning model.
+This code is the same as it was before.
+- afterwards we get the label
+and **feed it into the embedding model**.
+- the embedding model yields the embedding,
+*we normalize it* and **check if the `sha1` code of the image is already being used**.
+- if these three processes occur successfuly, 
+we **save the updated image to the database**,
+**update the Index file count (we increment it)**
+and **save the index file to the database**.
+- we update the socket assigns accordingly.
+- if any of the previous calls fail,
+we handle these error scenarios 
+and update the socket assigns.
+
+And that's it!
+Our app is fully loaded with semantic search capabilities! 🔋
 
 
+###### 4.1.2.5 Update the LiveView view
 
+All that's left is updating our view.
+We are going to add basic elements 
+to make this transition as smooth as possible.
 
-[TODO]: e depois o page_live
+Head over to `lib/app_web/live/page_live.html.heex`
+and update it as so:
 
+```html
+<div class="hidden" id="tracker_el" phx-hook="ActivityTracker" />
+<div class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-24 lg:px-8 xl:px-28 xl:py-32">
+  <div class="flex flex-col justify-start">
+    <div class="flex justify-center items-center w-full">
+      <div class="2xl:space-y-12">
+        <div class="mx-auto max-w-2xl lg:text-center">
+          <p>
+            <span class="rounded-full w-fit bg-brand/5 px-2 py-1 text-[0.8125rem] font-medium text-center leading-6 text-brand">
+              <a
+                href="https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                🔥 LiveView
+              </a>
+              +
+              <a
+                href="https://github.com/elixir-nx/bumblebee"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                🐝 Bumblebee
+              </a>
+            </span>
+          </p>
+          <p class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+            Caption your image!
+          </p>
+          <h3 class="mt-6 text-lg leading-8 text-gray-600">
+            Upload your own image (up to 5MB) and perform image captioning with
+            <a
+              href="https://elixir-lang.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="font-mono font-medium text-sky-500"
+            >
+              Elixir
+            </a>
+            !
+          </h3>
+          <p class="text-lg leading-8 text-gray-400">
+            Powered with
+            <a
+              href="https://elixir-lang.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="font-mono font-medium text-sky-500"
+            >
+              HuggingFace🤗
+            </a>
+            transformer models,
+            you can run this project locally and perform machine learning tasks with a handful lines of code.
+          </p>
+        </div>
+        <div></div>
+        <div class="border-gray-900/10">
+          <!-- File upload section -->
+          <div class="col-span-full">
+            <div
+              class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10"
+              phx-drop-target={@uploads.image_list.ref}
+            >
+              <div class="text-center">
+                <!-- Show image preview -->
+                <%= if @image_preview_base64 do %>
+                  <form id="upload-form" phx-change="noop" phx-submit="noop">
+                    <label class="cursor-pointer">
+                      <%= if not @upload_running? do %>
+                        <.live_file_input upload={@uploads.image_list} class="hidden" />
+                      <% end %>
+                      <img src={@image_preview_base64} />
+                    </label>
+                  </form>
+                <% else %>
+                  <svg
+                    class="mx-auto h-12 w-12 text-gray-300"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <div class="mt-4 flex text-sm leading-6 text-gray-600">
+                    <label
+                      for="file-upload"
+                      class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500"
+                    >
+                      <form id="upload-form" phx-change="noop" phx-submit="noop">
+                        <label class="cursor-pointer">
+                          <.live_file_input upload={@uploads.image_list} class="hidden" /> Upload
+                        </label>
+                      </form>
+                    </label>
+                    <p class="pl-1">or drag and drop</p>
+                  </div>
+                  <p class="text-xs leading-5 text-gray-600">PNG, JPG, GIF up to 5MB</p>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Show errors -->
+        <%= for entry <- @uploads.image_list.entries do %>
+          <div class="mt-2">
+            <%= for err <- upload_errors(@uploads.image_list, entry) do %>
+              <div class="rounded-md bg-red-50 p-4 mb-2">
+                <div class="flex">
+                  <div class="flex-shrink-0">
+                    <svg
+                      class="h-5 w-5 text-red-400"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                  </div>
+                  <div class="ml-3">
+                    <h3 class="text-sm font-medium text-red-800">
+                      <%= error_to_string(err) %>
+                    </h3>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+        <!-- Prediction text -->
+        <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
+          <span>Description: </span>
+          <!-- conditional Spinner or display caption text or waiting text-->
+          <AppWeb.Spinner.spin spin={@upload_running?} />
+          <%= if @label do %>
+            <span class="text-gray-700 font-light"><%= @label %></span>
+          <% else %>
+            <span class="text-gray-300 font-light">Waiting for image input.</span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+    <!-- Audio -->
+    <br />
+    <div class="mx-auto max-w-2xl lg">
+      <h2 class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl text-center">
+        Semantic search using an audio
+      </h2>
+      <br />
+      <p>
+        Please record a phrase. You can listen to your audio. It will be transcripted automatically into a text and appear below. The semantic search for matching images will then run automatically and the found image appear below.
+      </p>
+      <br />
+      <form id="audio-upload-form" phx-change="noop" class="flex flex-col items-center">
+        <.live_file_input upload={@uploads.speech} class="hidden" />
+        <button
+          id="record"
+          class="bg-blue-500 hover:bg-blue-700 text-white font-bold px-4 rounded flex"
+          type="button"
+          phx-hook="Audio"
+          disabled={@mic_off?}
+        >
+          <Heroicons.microphone
+            outline
+            class="w-6 h-6 text-white font-bold group-active:animate-pulse"
+          />
+          <span id="text">Record</span>
+        </button>
+      </form>
+      <br />
+      <p class="flex flex-col items-center">
+        <audio id="audio" controls></audio>
+      </p>
+      <br />
+      <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
+        <span>Transcription: </span>
+        <AppWeb.Spinner.spin spin={@audio_running?} />
+        <%= if @transcription do %>
+          <span id="output" class="text-gray-700 font-light"><%= @transcription %></span>
+        <% else %>
+          <span class="text-gray-300 font-light">Waiting for audio input.</span>
+        <% end %>
+      </div>
+      <br />
+
+      <div :if={@audio_search_result}>
+        <div class="border-gray-900/10">
+          <div class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
+            <img src={@audio_search_result.url} alt="found_image" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Examples -->
+    <%= if @display_list? do %>
+      <div class="flex flex-col">
+        <h3 class="mt-10 text-xl lg:text-center font-light tracking-tight text-gray-900 lg:text-2xl">
+          Examples
+        </h3>
+        <div class="flex flex-row justify-center my-8">
+          <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2">
+            <%= for example_img <- @example_list do %>
+              <!-- Loading skeleton if it is predicting -->
+              <%= if example_img.predicting? == true do %>
+                <div
+                  role="status"
+                  class="flex items-center justify-center w-full h-full max-w-sm bg-gray-300 rounded-lg animate-pulse"
+                >
+                  <img src={~p"/images/spinner.svg"} alt="spinner" />
+                  <span class="sr-only">Loading...</span>
+                </div>
+              <% else %>
+                <div>
+                  <img
+                    id={example_img.url}
+                    src={example_img.url}
+                    class="rounded-2xl object-cover"
+                  />
+                  <h3 class="mt-1 text-lg leading-8 text-gray-900 text-center">
+                    <%= example_img.label %>
+                  </h3>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+```
+
+As you may have noticed,
+we've made some changes to the Audio portion of the HTML.
+
+- we check if the `@transcription` assign exists.
+If so, we display the text to the person.
+- we check if the `@audio_search_result` assign is not `nil`.
+If that's the case, the image that is semantically closest
+to the audio transcription is shown to the person.
+
+And that's it!
+We are simply showing the person
+the results. 
+
+And with that, you've successfully added
+semantic searching into the application!
+Give yourself a pat on the back! 👏
+
+You've expanded your knowledge in key areas of machine learning
+and artificial intelligence,
+that is increasingly becoming more prevalent!
 
 
 ## _Please_ star the repo! ⭐️
