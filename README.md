@@ -3200,6 +3200,10 @@ These techniques are widely used in search engines,
 including in widespread tools like
 [Elastic Search](https://www.elastic.co/).
 
+Wew will use the following tool chain:
+
+![tool-chain drawio](https://github.com/ndrean/image-classifier/assets/6793008/f5aad51b-2d49-4184-b5a4-07236449c821)
+
 ### 0. Overview of the process
 
 Let's go over the process in detail so we know what to expect.
