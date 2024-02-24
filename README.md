@@ -95,14 +95,13 @@ with your voice! 🎙️
 
 ## Why? 🤷
 
-Building our [app](https://github.com/dwyl/app), 
+Building our [app](https://github.com/dwyl/app),
 we consider `images` an _essential_ medium of communication.
 
-You personally may have a collection of images that you want to caption 
+You personally may have a collection of images that you want to caption
 and semantically retrieve them fast.
 
-By adding a way of captioning images, we make it _easy_ for people to suggest meta tags that describe images so they become **searchable**. 
-
+By adding a way of captioning images, we make it _easy_ for people to suggest meta tags that describe images so they become **searchable**.
 
 ## What? 💭
 
@@ -112,7 +111,7 @@ that will allow you to choose/drag an image
 and automatically caption the image.
 
 In addition to this,
-the app will allow the user to record an audio 
+the app will allow the user to record an audio
 which describes the image they want to find.
 
 The audio will be transcribed into text
@@ -120,26 +119,24 @@ and be semantically queryable.
 We do this by encoding the image captions
 as vectors and running `knn search` on them.
 
-
 ## Who? 👤
 
 This tutorial is aimed at `Phoenix` beginners
-that want to start exploring the machine learning capabilities 
+that want to start exploring the machine learning capabilities
 of the Elixir language within a `Phoenix` application.
-We propose to use pre-trained models from Hugging Face via `Bumblebee` 
+We propose to use pre-trained models from Hugging Face via `Bumblebee`
 and grasp how to:
 
 - run a model, in particular image captioning.
 - how to use embeddings.
-- how to run a semantic search using an 
-[Approximate Nearest Neighbour](https://towardsdatascience.com/comprehensive-guide-to-approximate-nearest-neighbors-algorithms-8b94f057d6b6) 
-algorithm.
+- how to run a semantic search using an
+  [Approximate Nearest Neighbour](https://towardsdatascience.com/comprehensive-guide-to-approximate-nearest-neighbors-algorithms-8b94f057d6b6)
+  algorithm.
 
 If you are completely new to `Phoenix` and `LiveView`,
 we recommend you follow the **`LiveView` _Counter_ Tutorial**:
 
 [dwyl/phoenix-liveview-counter-tutorial](https://github.com/dwyl/phoenix-liveview-counter-tutorial)
-
 
 ## How? 💻
 
@@ -151,14 +148,13 @@ One will go over **image captioning**
 while the second one will expand the application
 by adding **semantic search**.
 
-
 ## Prerequisites
 
 This tutorial requires you have `Elixir` and `Phoenix` installed.
 
 If you don't, please see [how to install Elixir](https://github.com/dwyl/learn-elixir#installation) and [Phoenix](https://hexdocs.pm/phoenix/installation.html#phoenix).
 
-This guide assumes you know the basics of `Phoenix` 
+This guide assumes you know the basics of `Phoenix`
 and have _some_ knowledge of how it works.
 If you don't, we _highly suggest_ you follow our other tutorials first, e.g: [github.com/dwyl/**phoenix-chat-example**](https://github.com/dwyl/phoenix-chat-example)
 
@@ -170,7 +166,6 @@ In addition to this, **_some_ knowledge of `AWS`** - what it is, what an `S3` bu
 > [/dwyl/image-classifier/issues](https://github.com/dwyl/image-classifier/issues)
 
 <div align="center">
-
 
 ## 🌄 Image Captioning in `Elixir`
 
@@ -3222,7 +3217,6 @@ Here's an overview of how semantic search usually works
 
 > Source: https://www.elastic.co/what-is/semantic-search
 
-
 #### 0.1 Audio transcription
 
 Firstly, we will:
@@ -3236,7 +3230,6 @@ from <https://huggingface.co>
 and use it with the help of the [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5) function.
 We get an `Nx.Serving` that we will use to run this model with an input.
 
-
 #### 0.2 Creating embeddings
 
 We then want to find images whose captions
@@ -3248,39 +3241,38 @@ and then use an approximation algorithm to find the closest neighbours.
 Embeddings are basically **vector representations** of certain inputs,
 which in our case, are audio files recorded by the user.
 
-Our next steps will be to prepare the 
+Our next steps will be to prepare the
 [symmetric semantic search](https://www.sbert.net/examples/applications/semantic-search/README.html#symmetric-vs-asymmetric-semantic-search).
-We will use the 
-[transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>) 
-with the [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models) 
-pre-trained system available in 
+We will use the
+[transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>)
+with the [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models)
+pre-trained system available in
 [Huggingface](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
 We will transform a text into a vector: we use the sentence-transformer model [`sentence-transformers/paraphrase-MiniLM-L6-v2` ](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) because of its small size.
 We will run it with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function.
 This encoding is done for each image caption.
 
-
 #### 0.3 Semantically searching
 
 At this point, we have:
+
 - the embedding of the recording of the user
-(e.g `"a dog"`).
+  (e.g `"a dog"`).
 - all the embeddings of all the images in our "image bank".
-To search for the images that are related to `"a dog"`,
-we need to apply an algorithm that compares these two embeddings!
+  To search for the images that are related to `"a dog"`,
+  we need to apply an algorithm that compares these two embeddings!
 
 For this, we will run a [**knn_neighbour**](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) search.
-The baisc idea is to work in the embeddings vector space 
+The baisc idea is to work in the embeddings vector space
 and find the image vectors that are close to the target vector.
 
 There are several ways to do this.
 
-- We can use the `pgvector`, a vector extension of Postgres. It is used to store vectors (the embeddings) and to run similarity searches. 
-With `pgvector`, we can run
+- We can use the `pgvector`, a vector extension of Postgres. It is used to store vectors (the embeddings) and to run similarity searches.
+  With `pgvector`, we can run
 
   - a full exact search with the [cosine similarity](https://github.com/pgvector/pgvector#distances) operator `<=>`,
   - or use an Approximate Nearest Neighbour seach with the indexing algorithms. The extension proposes [`IVFFLAT`](https://github.com/pgvector/pgvector#ivfflat) or [`HNSWLIB`](https://github.com/pgvector/pgvector#hnsw) algorithms. You can find some explanations on both algorithms in https://tembo.io/blog/vector-indexes-in-pgvector and https://neon.tech/blog/understanding-vector-search-and-hnsw-index-with-pgvector.
-
 
 > [!NOTE]
 > Note that [Supabase](https://supabase.com/docs/guides/database/extensions/pgvector) can use the `pgvector` extension, and you can use [Supabase with Fly.io](https://fly.io/docs/reference/supabase/).
@@ -3289,9 +3281,9 @@ With `pgvector`, we can run
 > Note that you need to save the embeddings (as vectors) into the database, so the database will be intensively used. This may lead to scaling problems and potential race conditions.
 
 - We can alternatively use the `hnswlib` library and its Elixir binding [HNSWLib](https://github.com/elixir-nx/hnswlib).
-This "externalises" the ANN search from the database as it uses an in-memory file.
-This file needs to be persisted on disk, thus at the expense of using the filesystem with again potential race conditions.
-It works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**: this struct will allow us to efficiently retrieve vector data.
+  This "externalises" the ANN search from the database as it uses an in-memory file.
+  This file needs to be persisted on disk, thus at the expense of using the filesystem with again potential race conditions.
+  It works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**: this struct will allow us to efficiently retrieve vector data.
 
 **We will use this last option**,
 mostly because we use Fly.io
@@ -3320,7 +3312,6 @@ Because the "sentence-transformer" model we've chosen was trained with **_cosine
 this is what we'll use.
 Bumblebee may have options to correctly use this metric, but we used a normalisation process which fits our needs.
 
-
 ### 1. Pre-requisites
 
 Before starting, let's install some dependencies that we'll need.
@@ -3343,7 +3334,7 @@ And run `mix deps.get`.
 
 **You will also need to install [`ffmpeg`](https://ffmpeg.org/)**.
 `Bumblebee` uses `ffmpeg` under the hood to process audio files into tensors,
-but it uses it *as an external dependency*.
+but it uses it _as an external dependency_.
 
 And now we're ready to rock and roll! 🎸
 
@@ -3599,8 +3590,8 @@ And that's it for the Liveview portion!
 
 #### 2.4 Serving the `Whisper` model
 
-Now that we are adding several models, 
-let's refactor our `models.ex` module 
+Now that we are adding several models,
+let's refactor our `models.ex` module
 that manages the models.
 Since we're dealing with multiple models,
 we want our app to shutdown if there's any problem loading them.
@@ -3655,7 +3646,6 @@ downloaded locally and used in our application.
 
 To implement the functions above,
 we change the `lib/app/models.ex` module so it looks like so.
-
 
 ```elixir
 defmodule ModelInfo do
@@ -4004,7 +3994,6 @@ defmodule App.Models do
 end
 ```
 
-
 That's a lot! But we just need to focus on some new parts we've added:
 
 - we've created **`audio_serving_test/1`** and
@@ -4063,7 +4052,7 @@ and **transcribe it**. 🎉
 
 ### 3. Embeddings and semantic search
 
-We want to encode every caption and the input text 
+We want to encode every caption and the input text
 into an embedding which is a vector of a specific vector space.
 In other words, we encode a string into a list of numbers.
 
@@ -4072,10 +4061,9 @@ We chose the transformer `"sentence-transformers/paraphrase-MiniLM-L6-v2"` model
 
 The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function that returns an `%Nx.Serving{}` struct.
 This transformer uses a **`384`** dimensional vector space.
-Since this transformer is trained with a `cosine metric`, 
+Since this transformer is trained with a `cosine metric`,
 we embed the vector space of embeddings with the same distance.
 You can read more about [cosine_similarity here](https://en.wikipedia.org/wiki/Cosine_similarity).
-
 
 This model is loaded and served by an `Nx.Serving` started in the Application modeule like all other models.
 
@@ -4086,10 +4074,9 @@ This file will be updated any time we append an embedding.
 This means the app uses this unique file,
 so this app is only meant to run **on a single node**.
 
-
 #### 3.1 The `HNSWLib` Index (GenServer)
 
-This library [`HNSWLib`](https://github.com/elixir-nx/hnswlib) 
+This library [`HNSWLib`](https://github.com/elixir-nx/hnswlib)
 works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**.
 We instantiate the Index file via a file in a `GenServer` which holds the index in the state.
 When the app starts, we either read or create this file. The file is saved in the "/priv/static/uploads" folder.
@@ -4100,22 +4087,22 @@ Because we are deploying with Fly.io, we need to persist the Index file in the d
 It is crucial to save the correspondance between the `Image` table and the Index file to retrieve the correct images.
 In simple terms, **the file in the `Index` table in the DB must correspond to the Index file in the system.**
 
-We therefore disable a user to load several times the same file as otherwise, 
+We therefore disable a user to load several times the same file as otherwise,
 we would have the several indexes for the same picture.
 This is done through **SHA computation**.
 
-Since computations using models is a long run process, 
+Since computations using models is a long run process,
 and because several users may interact with the app,
 we need several steps to ensure that the information is synchronized between the database and the index file.
 
 We also endow the vector space with a `:cosine` pseudo-metric.
 
 Add the following `GenServer` file:
-it will load the Index file, 
+it will load the Index file,
 and also provide a client API to interact with the Index,
- which is held in the state of the GenServer.
+which is held in the state of the GenServer.
 
-Again, this solution works for a single node *only*.
+Again, this solution works for a single node _only_.
 
 ```elixir
 defmodule App.KnnIndex do
@@ -4172,7 +4159,6 @@ defmodule App.KnnIndex do
   @impl true
   def init(args) do
     # Trying to load the index file
-    :ok = File.mkdir_p!(@upload_dir)
     index_path = Keyword.fetch!(args, :index)
     space = Keyword.fetch!(args, :space)
 
@@ -4257,7 +4243,7 @@ defmodule App.KnnIndex do
            HNSWLib.Index.get_current_count(index),
          :ok <-
            HNSWLib.Index.save_index(index, @saved_index) do
-      
+
       {:reply, {:ok, idx}, state}
     else
       {:error, msg} ->
@@ -4304,29 +4290,26 @@ end
 
 ```
 
-
 Let's unpack a bit of what we are doing here.
 
 - we first are **defining the module constants**.
-In here, we add the dimensions of the embedding vector space
-(these are dependent on the model you choose).
-Check with the model you've used to tweak this settings optimally.
+  In here, we add the dimensions of the embedding vector space
+  (these are dependent on the model you choose).
+  Check with the model you've used to tweak this settings optimally.
 
 - define the upload directory where **the index file will be saved inside the filesystem**.
-  
 - when the GenServer is initialized (`init/1` function),
-we perform a number of *integrity verifications*,
-checking if both the `Index` file in the filesystem
-and the file in the `Index` table 
-(from now on, this table will be called `HnswlibIndex`, 
-under the name of the same schema).
-This validations essentially make sure the content 
-of both files are the same.
+  we perform a number of _integrity verifications_,
+  checking if both the `Index` file in the filesystem
+  and the file in the `Index` table
+  (from now on, this table will be called `HnswlibIndex`,
+  under the name of the same schema).
+  This validations essentially make sure the content
+  of both files are the same.
 
-- the other functions provide a basic API for 
-callers to add items to the index file,
-so it is saved.
-
+- the other functions provide a basic API for
+  callers to add items to the index file,
+  so it is saved.
 
 #### 3.2 Saving the `HNSWLib` Index in the database
 
@@ -4338,8 +4321,8 @@ This module pertains to the **schema** that will hold
 information of the `HNSWLib` table.
 This table will only have a single row,
 with the file contents.
-As we've discussed earlier, 
-we will compare the Index file in this row 
+As we've discussed earlier,
+we will compare the Index file in this row
 with the one in the filesystem
 to check for any inconsistencies that may arise.
 
@@ -4436,42 +4419,40 @@ end
 
 In this module:
 
-- we are creating **two fields**: `lock_version`, 
-to simply check the version of the file;
-and `file`, 
-the binary content of the index file.
+- we are creating **two fields**: `lock_version`,
+  to simply check the version of the file;
+  and `file`,
+  the binary content of the index file.
 
-- `lock_version` will be extremely useful to 
-perform [**optmistic locking**](https://stackoverflow.com/questions/129329/optimistic-vs-pessimistic-locking),
-which is what we do in the `changeset/2` function.
-This will allows us to prevent deadlocking
-when two different people upload the same image at the same time,
-and overcome any race condition that may occur.
-This will maintain the data consistenty in the Index file.
+- `lock_version` will be extremely useful to
+  perform [**optmistic locking**](https://stackoverflow.com/questions/129329/optimistic-vs-pessimistic-locking),
+  which is what we do in the `changeset/2` function.
+  This will allows us to prevent deadlocking
+  when two different people upload the same image at the same time,
+  and overcome any race condition that may occur.
+  This will maintain the data consistenty in the Index file.
 
 - `maybe_load_index_from_db/3` fetches the singleton row
-on this table and checks if the file exists in the row.
-If it doesn't, it creates a new one.
-Otherwise, it just loads the existing one inside the row.
+  on this table and checks if the file exists in the row.
+  If it doesn't, it creates a new one.
+  Otherwise, it just loads the existing one inside the row.
 
 - `create/3` creates a new index file.
-It's a private function that encapsulates creating
-the Index file so it can be used in the singleton row 
-inside the table.
-
+  It's a private function that encapsulates creating
+  the Index file so it can be used in the singleton row
+  inside the table.
 
 And that's it!
 We've added additional code to conditionally create different indexex
-according to the environment 
+according to the environment
 (useful for testing),
 but you can safely ignore those conditional calls
 if you're not interested in testing
 (though you should 😛).
 
-
 #### 3.2 The embeding model
 
-We provide a serving for the embedding model in the `App.Models` module. 
+We provide a serving for the embedding model in the `App.Models` module.
 It should look like this:
 
 ```elixir
@@ -4652,7 +4633,7 @@ end
 >
 > We have added a few alterations to how the supervision tree
 > in `application.ex` is initialized.
-> This is because we *test our code*,
+> This is because we _test our code_,
 > so that's why you see some of these changes above.
 >
 > If you don't want to change test the code,
@@ -4660,11 +4641,10 @@ end
 > to the supervision tree according to the environment
 > (which we do to check if the code is being tested or not).
 
-
 ### 4. Using the Index and embeddings
 
-In this section we'll go over how to use the Index 
-and the embeddings and tie everything together to 
+In this section we'll go over how to use the Index
+and the embeddings and tie everything together to
 have a working application 😍.
 
 If you want to better understand embeddings and
@@ -4672,15 +4652,14 @@ how to use `HNSWLib`,
 the math behind it and see a working example
 of running an embedding model,
 you can check the next section.
-However, *it is entirely optional* 
+However, _it is entirely optional_
 and not necessary to for our app.
-
 
 #### 4.0 Working example on how to use `HNSWLib`
 
 > [!NOTE]
 >
-> This whole section is *entirely optional*.
+> This whole section is _entirely optional_.
 > It will just delve more deeply in embedding
 > and provide you with a one-file working example
 > where you can play around vector embeddings
@@ -4857,9 +4836,8 @@ The result is:
   ]
 ```
 
-You should now be able to 
+You should now be able to
 recover the first embedding.
-
 
 ##### 4.0.1 Notes on vector spaces
 
@@ -4905,7 +4883,6 @@ This is commonly known as the **cosine distance** _when the embeddings are norma
 Finally, note that since we are dealing with finite dimensional vector spaces, all the norms are equivalent (in some precise mathematical way). This means that the limit points are always the same. However, the values of the distances can be quite different, and a "clusterisation" processes can give significantly different results.
 
 The first hint to which norm to choose is to take the norm used to train the model.
-
 
 #### 4.1 Computing the embeddings in our app
 
@@ -5056,7 +5033,7 @@ The length is the number of neighbours you want to find parametrized by the `k` 
 With `k=1`, we ask for a single neighbour.
 
 > [!NOTE]
-> 
+>
 > You may further use a cut-off distance to exclude responses that might not be meaningful.
 
 We will now display the found image with the URL field of the `%App.Image{}` struct.
@@ -5070,7 +5047,6 @@ Add this to `"page_live.html.heex"`:
   <img src="{@audio_search_result.url}" alt="found_image" />
 </div>
 ```
-
 
 ##### 4.1.1 Changing the `Image` schema so it's embeddable
 
@@ -5140,7 +5116,7 @@ to check for the uniqueness of the newly added
 These are enforced at database level so we don't have
 duplicated images.
 
-In addition to these changes, 
+In addition to these changes,
 we are going to need functions to
 **calculate the `sha1` of the image**.
 Add the following functions to the same file.
@@ -5164,26 +5140,25 @@ Add the following functions to the same file.
 ```
 
 - `calc_sha1/1` uses the `:crypto` package to hash the file binary
-and encode it.
+  and encode it.
 - `check_sha1/1` fetches an image according to a given `sha1` code
-and returns the result.
+  and returns the result.
 
 And that's all we need to deal with our images!
-
 
 ##### 4.1.2 Using embeddings in semantic search
 
 Now that we have:
+
 - all the embeddings models ready to be used.
 - our Index files correctly created and maintained through
-filesystem and in the database in the `hnswlib_index` schema.
+  filesystem and in the database in the `hnswlib_index` schema.
 - the needed `sha1` functions to check dupliated images.
 
 It's time to bring everything together and use all of these tools
 to implement semantic search into our application.
 
 We are going to be working inside `lib/app_web/live/page_live.ex` from now on.
-
 
 ###### 4.1.2.1 Mount socket assigns
 
@@ -5239,31 +5214,31 @@ First, we are going to update our socket assigns on `mount/3`.
 To reiterate:
 
 - we've added a few fields related to audio.
+
   - `transcription` will pertain to the result of the audio transcription
-that will occur after transcribing the audio from the person.
+    that will occur after transcribing the audio from the person.
   - `mic_off?` is simply a toggle to visually show the person
-that the microphone is recording or not.
+    that the microphone is recording or not.
   - `audio_running?` is a boolean to show the person
-if the audio transcription and semantic searching is occuring (loading).
+    if the audio transcription and semantic searching is occuring (loading).
   - `audio_search_result` is the result of the image
-that is closest semantically to the image's label from the 
-transcribed audio.
+    that is closest semantically to the image's label from the
+    transcribed audio.
   - `tmp_wav` is the path of the temporary audio file
-that is saved in the filesystem while the audio is being transcribed.
+    that is saved in the filesystem while the audio is being transcribed.
 
 - additionally, we also have added
-`allow_upload/3` pertaining to the audio upload
-(it is tagged as `:speech` and is being handled
-in the same function as the upload `:image_list`).
+  `allow_upload/3` pertaining to the audio upload
+  (it is tagged as `:speech` and is being handled
+  in the same function as the upload `:image_list`).
 
 These are the socket assigns
 that will allow us to dynamically update the person using our app
 with what the app is doing.
 
-
 ###### 4.1.2.2 Consuming image uploads
 
-As you can see, we are using `handle_progress/3` 
+As you can see, we are using `handle_progress/3`
 with `allow_upload/3`.
 As we know, `handle_progress/3` is called whenever an upload
 (be it an image or recording of the person's voice).
@@ -5367,48 +5342,49 @@ Some of these is code that has been written prior,
 but for clarification, we'll go over them again.
 
 - we use `consume_uploaded_entry/3` to consume the image
-that the person uploads.
-To consume the image successfully,
-the image goes through an array of validations.
+  that the person uploads.
+  To consume the image successfully,
+  the image goes through an array of validations.
+
   - we use `magic_check/1` to check the MIME type of the image validity.
   - we use read the contents of the image using `ExImageInfo.info/1`.
   - we check if the MIME type is valid using `check_mime/2`.
   - we calculate the `sha1` with the `App.Image.calc_sha1/1` function
-we've developed earlier.
+    we've developed earlier.
   - we resize the image and scale it down to the same width
-of the images that are trained using the image captioning model we've chosen
-(to yield better results and to save memory bandwith).
-We use `Vix.Operations.thumbnail/3` to resize the image.
-  - finally, we convert the resized image to a tensor using 
-`pre_process_image/1` so it can be consumed by our image captioning model.
+    of the images that are trained using the image captioning model we've chosen
+    (to yield better results and to save memory bandwith).
+    We use `Vix.Operations.thumbnail/3` to resize the image.
+  - finally, we convert the resized image to a tensor using
+    `pre_process_image/1` so it can be consumed by our image captioning model.
 
 - after these series of validations,
-we use the image info we've obtained earlier to
-**create an "early-save" of the image**.
-With this, we are saving the image and associating it with
-the `sha1` that was retrieved from the image contents.
-We are doing this "partial image saving" 
-in case two same images are being uploaded at the same time.
-Because we are enforcing `sha1` to be unique at database level,
-this race condition is solved by the database to us optimistically.
+  we use the image info we've obtained earlier to
+  **create an "early-save" of the image**.
+  With this, we are saving the image and associating it with
+  the `sha1` that was retrieved from the image contents.
+  We are doing this "partial image saving"
+  in case two same images are being uploaded at the same time.
+  Because we are enforcing `sha1` to be unique at database level,
+  this race condition is solved by the database to us optimistically.
 
 - afterwards, we call `handle_upload/0`.
-This function will upload the image to the `S3` bucket.
-We are going to implement this function in just a second 😉.
+  This function will upload the image to the `S3` bucket.
+  We are going to implement this function in just a second 😉.
 
 - if the upload is successful,
-using the tensor and the image information from the previous steps,
-we spawn the async task to run the model.
-This step should be familiar to you,
-since we've already implemented this.
-Finally, we update the socket assigns accordingly.
+  using the tensor and the image information from the previous steps,
+  we spawn the async task to run the model.
+  This step should be familiar to you,
+  since we've already implemented this.
+  Finally, we update the socket assigns accordingly.
 
 - we handle all possible errors in the `else` statement of the
-`with` flow control statement before the image is uploaded.
+  `with` flow control statement before the image is uploaded.
 
 Hopefully this demystifies some of the code we've just implemented!
 
-Because we are using `handle_upload/0` in this function 
+Because we are using `handle_upload/0` in this function
 to upload the image to our `S3` bucket,
 let's do it right now!
 
@@ -5448,7 +5424,7 @@ we add the returning URL to the image struct.
 Otherwise, we handle the error and return it.
 
 After this small detour,
-let's implement the `handle_progress/3` 
+let's implement the `handle_progress/3`
 for the **`:speech` uploads**,
 that is, the audio the person records.
 
@@ -5486,30 +5462,29 @@ that is, the audio the person records.
 ```
 
 As we know, this function is called after the upload is completed.
-In the case of audio uploads, 
+In the case of audio uploads,
 the hook is called by the person recording their voice
 in `assets/js/app.js`.
 Similarly to the `handle_progress/3` function of the `:image_list` uploads,
 we also use `consume_uploaded_entry/3` to consume the audio file.
 
-- we consume the audio file and save it in our filesystem 
-as an `.wav` file.
+- we consume the audio file and save it in our filesystem
+  as an `.wav` file.
 - we spawn the async task and use the `whisper` audio transcription model
-with the audio file we've just saved.
+  with the audio file we've just saved.
 - we update the socket assigns accordingly.
 
 Pretty simple, right?
 
-
 ###### 4.1.2.3 Using the embeddings to semantically search images
 
-In this section, we'll finally use 
+In this section, we'll finally use
 our embedding model and semantically search for our images!
 
 As you've seen in the previous section,
 we've spawn the task to transcribe the audio into the `whipser` model.
 Now we need a handler!
-For this scenario, 
+For this scenario,
 add the following function.
 
 ```elixir
@@ -5570,31 +5545,30 @@ add the following function.
 Let's break down this function:
 
 - given the **recording text transcription**:
-  - we check if the Index file holding is *not empty*.
-  - we use the text transcription and run it 
-**through the embedding model** and get its result.
+  - we check if the Index file holding is _not empty_.
+  - we use the text transcription and run it
+    **through the embedding model** and get its result.
   - with the embedding we've received from the model,
-we **normalize it**.
+    we **normalize it**.
   - with the normalized embedding,
-we **run it through a `knn search`.
-For this, we call the `App.KnnIndex.knn_search/1` function
-we've defined in the `App.KnnIndex` GenServer
-we've implemented earlier on.
-  - the `knn search` returns the closest semantical image 
-(through the image caption)
-from the audio transcription. 
+    we \*\*run it through a `knn search`.
+    For this, we call the `App.KnnIndex.knn_search/1` function
+    we've defined in the `App.KnnIndex` GenServer
+    we've implemented earlier on.
+  - the `knn search` returns the closest semantical image
+    (through the image caption)
+    from the audio transcription.
   - upon success of this process, we update the socket assigns.
   - otherwise, we handle each error case accordingly
-and update the socket assigns.
+    and update the socket assigns.
 
 And that's it!
 We just add to sequentially call the functions
 that we've implemented prior!
 
-
 ###### 4.1.2.4 Creating embeddings when uploading images
 
-Now that we have *used* the embeddings,
+Now that we have _used_ the embeddings,
 there's one thing we forgot:
 **we forgot to keep track of the embeddings of each image that is uploaded**.
 These embeddings are saved in the Index file.
@@ -5732,28 +5706,27 @@ and change it to the following piece of code:
 Let's go over the flow of this function:
 
 - we extract the captioning label from the result of the image captioning model.
-This code is the same as it was before.
+  This code is the same as it was before.
 - afterwards we get the label
-and **feed it into the embedding model**.
+  and **feed it into the embedding model**.
 - the embedding model yields the embedding,
-*we normalize it* and **check if the `sha1` code of the image is already being used**.
-- if these three processes occur successfuly, 
-we **save the updated image to the database**,
-**update the Index file count (we increment it)**
-and **save the index file to the database**.
+  _we normalize it_ and **check if the `sha1` code of the image is already being used**.
+- if these three processes occur successfuly,
+  we **save the updated image to the database**,
+  **update the Index file count (we increment it)**
+  and **save the index file to the database**.
 - we update the socket assigns accordingly.
 - if any of the previous calls fail,
-we handle these error scenarios 
-and update the socket assigns.
+  we handle these error scenarios
+  and update the socket assigns.
 
 And that's it!
 Our app is fully loaded with semantic search capabilities! 🔋
 
-
 ###### 4.1.2.5 Update the LiveView view
 
 All that's left is updating our view.
-We are going to add basic elements 
+We are going to add basic elements
 to make this transition as smooth as possible.
 
 Head over to `lib/app_web/live/page_live.html.heex`
@@ -5761,13 +5734,17 @@ and update it as so:
 
 ```html
 <div class="hidden" id="tracker_el" phx-hook="ActivityTracker" />
-<div class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-24 lg:px-8 xl:px-28 xl:py-32">
+<div
+  class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-24 lg:px-8 xl:px-28 xl:py-32"
+>
   <div class="flex flex-col justify-start">
     <div class="flex justify-center items-center w-full">
       <div class="2xl:space-y-12">
         <div class="mx-auto max-w-2xl lg:text-center">
           <p>
-            <span class="rounded-full w-fit bg-brand/5 px-2 py-1 text-[0.8125rem] font-medium text-center leading-6 text-brand">
+            <span
+              class="rounded-full w-fit bg-brand/5 px-2 py-1 text-[0.8125rem] font-medium text-center leading-6 text-brand"
+            >
               <a
                 href="https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html"
                 target="_blank"
@@ -5785,7 +5762,9 @@ and update it as so:
               </a>
             </span>
           </p>
-          <p class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+          <p
+            class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl"
+          >
             Caption your image!
           </p>
           <h3 class="mt-6 text-lg leading-8 text-gray-600">
@@ -5810,8 +5789,8 @@ and update it as so:
             >
               HuggingFace🤗
             </a>
-            transformer models,
-            you can run this project locally and perform machine learning tasks with a handful lines of code.
+            transformer models, you can run this project locally and perform
+            machine learning tasks with a handful lines of code.
           </p>
         </div>
         <div></div>
@@ -5820,46 +5799,48 @@ and update it as so:
           <div class="col-span-full">
             <div
               class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10"
-              phx-drop-target={@uploads.image_list.ref}
+              phx-drop-target="{@uploads.image_list.ref}"
             >
               <div class="text-center">
                 <!-- Show image preview -->
                 <%= if @image_preview_base64 do %>
-                  <form id="upload-form" phx-change="noop" phx-submit="noop">
-                    <label class="cursor-pointer">
-                      <%= if not @upload_running? do %>
-                        <.live_file_input upload={@uploads.image_list} class="hidden" />
-                      <% end %>
-                      <img src={@image_preview_base64} />
-                    </label>
-                  </form>
+                <form id="upload-form" phx-change="noop" phx-submit="noop">
+                  <label class="cursor-pointer">
+                    <%= if not @upload_running? do %> <.live_file_input
+                    upload={@uploads.image_list} class="hidden" /> <% end %>
+                    <img src="{@image_preview_base64}" />
+                  </label>
+                </form>
                 <% else %>
-                  <svg
-                    class="mx-auto h-12 w-12 text-gray-300"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    aria-hidden="true"
+                <svg
+                  class="mx-auto h-12 w-12 text-gray-300"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                <div class="mt-4 flex text-sm leading-6 text-gray-600">
+                  <label
+                    for="file-upload"
+                    class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500"
                   >
-                    <path
-                      fill-rule="evenodd"
-                      d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                  <div class="mt-4 flex text-sm leading-6 text-gray-600">
-                    <label
-                      for="file-upload"
-                      class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500"
-                    >
-                      <form id="upload-form" phx-change="noop" phx-submit="noop">
-                        <label class="cursor-pointer">
-                          <.live_file_input upload={@uploads.image_list} class="hidden" /> Upload
-                        </label>
-                      </form>
-                    </label>
-                    <p class="pl-1">or drag and drop</p>
-                  </div>
-                  <p class="text-xs leading-5 text-gray-600">PNG, JPG, GIF up to 5MB</p>
+                    <form id="upload-form" phx-change="noop" phx-submit="noop">
+                      <label class="cursor-pointer">
+                        <.live_file_input upload={@uploads.image_list}
+                        class="hidden" /> Upload
+                      </label>
+                    </form>
+                  </label>
+                  <p class="pl-1">or drag and drop</p>
+                </div>
+                <p class="text-xs leading-5 text-gray-600">
+                  PNG, JPG, GIF up to 5MB
+                </p>
                 <% end %>
               </div>
             </div>
@@ -5867,43 +5848,45 @@ and update it as so:
         </div>
         <!-- Show errors -->
         <%= for entry <- @uploads.image_list.entries do %>
-          <div class="mt-2">
-            <%= for err <- upload_errors(@uploads.image_list, entry) do %>
-              <div class="rounded-md bg-red-50 p-4 mb-2">
-                <div class="flex">
-                  <div class="flex-shrink-0">
-                    <svg
-                      class="h-5 w-5 text-red-400"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path
-                        fill-rule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
-                        clip-rule="evenodd"
-                      />
-                    </svg>
-                  </div>
-                  <div class="ml-3">
-                    <h3 class="text-sm font-medium text-red-800">
-                      <%= error_to_string(err) %>
-                    </h3>
-                  </div>
-                </div>
+        <div class="mt-2">
+          <%= for err <- upload_errors(@uploads.image_list, entry) do %>
+          <div class="rounded-md bg-red-50 p-4 mb-2">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg
+                  class="h-5 w-5 text-red-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
               </div>
-            <% end %>
+              <div class="ml-3">
+                <h3 class="text-sm font-medium text-red-800">
+                  <%= error_to_string(err) %>
+                </h3>
+              </div>
+            </div>
           </div>
+          <% end %>
+        </div>
         <% end %>
         <!-- Prediction text -->
-        <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
+        <div
+          class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl"
+        >
           <span>Description: </span>
           <!-- conditional Spinner or display caption text or waiting text-->
-          <AppWeb.Spinner.spin spin={@upload_running?} />
+          <AppWeb.Spinner.spin spin="{@upload_running?}" />
           <%= if @label do %>
-            <span class="text-gray-700 font-light"><%= @label %></span>
+          <span class="text-gray-700 font-light"><%= @label %></span>
           <% else %>
-            <span class="text-gray-300 font-light">Waiting for image input.</span>
+          <span class="text-gray-300 font-light">Waiting for image input.</span>
           <% end %>
         </div>
       </div>
@@ -5911,22 +5894,31 @@ and update it as so:
     <!-- Audio -->
     <br />
     <div class="mx-auto max-w-2xl lg">
-      <h2 class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl text-center">
+      <h2
+        class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl text-center"
+      >
         Semantic search using an audio
       </h2>
       <br />
       <p>
-        Please record a phrase. You can listen to your audio. It will be transcripted automatically into a text and appear below. The semantic search for matching images will then run automatically and the found image appear below.
+        Please record a phrase. You can listen to your audio. It will be
+        transcripted automatically into a text and appear below. The semantic
+        search for matching images will then run automatically and the found
+        image appear below.
       </p>
       <br />
-      <form id="audio-upload-form" phx-change="noop" class="flex flex-col items-center">
+      <form
+        id="audio-upload-form"
+        phx-change="noop"
+        class="flex flex-col items-center"
+      >
         <.live_file_input upload={@uploads.speech} class="hidden" />
         <button
           id="record"
           class="bg-blue-500 hover:bg-blue-700 text-white font-bold px-4 rounded flex"
           type="button"
           phx-hook="Audio"
-          disabled={@mic_off?}
+          disabled="{@mic_off?}"
         >
           <Heroicons.microphone
             outline
@@ -5940,77 +5932,83 @@ and update it as so:
         <audio id="audio" controls></audio>
       </p>
       <br />
-      <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
+      <div
+        class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl"
+      >
         <span>Transcription: </span>
-        <AppWeb.Spinner.spin spin={@audio_running?} />
+        <AppWeb.Spinner.spin spin="{@audio_running?}" />
         <%= if @transcription do %>
-          <span id="output" class="text-gray-700 font-light"><%= @transcription %></span>
+        <span id="output" class="text-gray-700 font-light"
+          ><%= @transcription %></span
+        >
         <% else %>
-          <span class="text-gray-300 font-light">Waiting for audio input.</span>
+        <span class="text-gray-300 font-light">Waiting for audio input.</span>
         <% end %>
       </div>
       <br />
 
-      <div :if={@audio_search_result}>
+      <div :if="{@audio_search_result}">
         <div class="border-gray-900/10">
-          <div class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
-            <img src={@audio_search_result.url} alt="found_image" />
+          <div
+            class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10"
+          >
+            <img src="{@audio_search_result.url}" alt="found_image" />
           </div>
         </div>
       </div>
     </div>
     <!-- Examples -->
-    <%= if @display_list? do %>
-      <div class="flex flex-col">
-        <h3 class="mt-10 text-xl lg:text-center font-light tracking-tight text-gray-900 lg:text-2xl">
-          Examples
-        </h3>
-        <div class="flex flex-row justify-center my-8">
-          <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2">
-            <%= for example_img <- @example_list do %>
-              <!-- Loading skeleton if it is predicting -->
-              <%= if example_img.predicting? == true do %>
-                <div
-                  role="status"
-                  class="flex items-center justify-center w-full h-full max-w-sm bg-gray-300 rounded-lg animate-pulse"
-                >
-                  <img src={~p"/images/spinner.svg"} alt="spinner" />
-                  <span class="sr-only">Loading...</span>
-                </div>
-              <% else %>
-                <div>
-                  <img
-                    id={example_img.url}
-                    src={example_img.url}
-                    class="rounded-2xl object-cover"
-                  />
-                  <h3 class="mt-1 text-lg leading-8 text-gray-900 text-center">
-                    <%= example_img.label %>
-                  </h3>
-                </div>
-              <% end %>
-            <% end %>
+    <div :if="{@display_list?}" class="flex flex-col">
+      <h3
+        class="mt-10 text-xl lg:text-center font-light tracking-tight text-gray-900 lg:text-2xl"
+      >
+        Examples
+      </h3>
+      <div class="flex flex-row justify-center my-8">
+        <div
+          class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2"
+        >
+          <%= for example_img <- @example_list do %>
+          <!-- Loading skeleton if it is predicting -->
+          <%= if example_img.predicting? == true do %>
+          <div
+            role="status"
+            class="flex items-center justify-center w-full h-full max-w-sm bg-gray-300 rounded-lg animate-pulse"
+          >
+            <img src={~p"/images/spinner.svg"} alt="spinner" />
+            <span class="sr-only">Loading...</span>
           </div>
+          <% else %>
+          <div>
+            <img
+              id="{example_img.url}"
+              src="{example_img.url}"
+              class="rounded-2xl object-cover"
+            />
+            <h3 class="mt-1 text-lg leading-8 text-gray-900 text-center">
+              <%= example_img.label %>
+            </h3>
+          </div>
+          <% end %>
         </div>
       </div>
-    <% end %>
+    </div>
   </div>
 </div>
-
 ```
 
 As you may have noticed,
 we've made some changes to the Audio portion of the HTML.
 
 - we check if the `@transcription` assign exists.
-If so, we display the text to the person.
+  If so, we display the text to the person.
 - we check if the `@audio_search_result` assign is not `nil`.
-If that's the case, the image that is semantically closest
-to the audio transcription is shown to the person.
+  If that's the case, the image that is semantically closest
+  to the audio transcription is shown to the person.
 
 And that's it!
 We are simply showing the person
-the results. 
+the results.
 
 And with that, you've successfully added
 semantic searching into the application!
@@ -6019,7 +6017,6 @@ Give yourself a pat on the back! 👏
 You've expanded your knowledge in key areas of machine learning
 and artificial intelligence,
 that is increasingly becoming more prevalent!
-
 
 ## _Please_ star the repo! ⭐️
 

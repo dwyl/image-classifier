@@ -52,19 +52,20 @@ defmodule App.KnnIndex do
   @impl true
   def init(args) do
     # Trying to load the index file
-    :ok = File.mkdir_p!(@upload_dir)
     index_path = Keyword.fetch!(args, :index)
     space = Keyword.fetch!(args, :space)
 
     case File.exists?(index_path) do
-      # If the index file doesn't exist, we try to load from the database.
+      # If the index file doesn't exist in the FileSystem,
+      # we try to load it from the database.
       false ->
         {:ok, index, index_schema} =
           App.HnswlibIndex.maybe_load_index_from_db(space, @dim, @max_elements)
 
         {:ok, {index, index_schema, space}}
 
-      # If the index file does exist, we compare the one with teh table and check for incoherences.
+      # If the index file exists in the FileSystem,
+      # we compare it the existing DB table and check for incoherences.
       true ->
         Logger.info("ℹ️ Index file found on disk. Let's compare it with the database...")
 
@@ -82,7 +83,7 @@ defmodule App.KnnIndex do
   end
 
   defp check_integrity(path, schema, space) do
-    # We check the count of the images in the database and the one in the index.
+    # We check the count of the images in the database and the total count of the index.
     with db_count <-
            App.Repo.all(App.Image) |> length(),
          {:ok, index} <-
@@ -137,7 +138,6 @@ defmodule App.KnnIndex do
            HNSWLib.Index.get_current_count(index),
          :ok <-
            HNSWLib.Index.save_index(index, @saved_index) do
-
       {:reply, {:ok, idx}, state}
     else
       {:error, msg} ->
@@ -153,7 +153,6 @@ defmodule App.KnnIndex do
     # We search for the nearest neighbors of the input embedding.
     case HNSWLib.Index.knn_query(index, input, k: 1) do
       {:ok, labels, _distances} ->
-
         response =
           labels[0]
           |> Nx.to_flat_list()
