@@ -3181,6 +3181,11 @@ inside the
 > under a certain theme.
 > One way to solve this problem is to perform a **_full-text_ search query** on specific words among these image captions.
 
+
+<p align="center">
+  <img src="https://github.com/dwyl/image-classifier/assets/17494745/b3568de8-2b0c-4413-8528-a3aee4135ea0">
+</p>
+
 </div>
 
 > [!NOTE]
