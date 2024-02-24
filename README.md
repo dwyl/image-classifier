@@ -3200,9 +3200,6 @@ These techniques are widely used in search engines,
 including in widespread tools like
 [Elastic Search](https://www.elastic.co/).
 
-Wew will use the following tool chain:
-
-![tool-chain drawio](https://github.com/ndrean/image-classifier/assets/6793008/f5aad51b-2d49-4184-b5a4-07236449c821)
 
 ### 0. Overview of the process
 
@@ -3220,6 +3217,10 @@ Here's an overview of how semantic search usually works
 </p>
 
 > Source: https://www.elastic.co/what-is/semantic-search
+
+We will use the following tool chain:
+
+![tool-chain drawio](https://github.com/ndrean/image-classifier/assets/6793008/f5aad51b-2d49-4184-b5a4-07236449c821)
 
 #### 0.1 Audio transcription
 
