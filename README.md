@@ -3221,7 +3221,7 @@ Here's an overview of how semantic search usually works
 We will use the following tool chain:
 
 <p align="center">
-  ![tool-chain drawio](https://github.com/ndrean/image-classifier/assets/6793008/f5aad51b-2d49-4184-b5a4-07236449c821)
+  <img width="800" src="https://github.com/ndrean/image-classifier/assets/6793008/f5aad51b-2d49-4184-b5a4-07236449c821" />
 </p>
 #### 0.1 Audio transcription
 
