@@ -51,7 +51,6 @@ defmodule App.MixProject do
       {:telemetry_metrics, "~> 0.6"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.4"},
-      {:bandit, "~> 1.0"},
       {:plug_cowboy, "~> 2.7.0"},
 
       # HTTP Request
@@ -69,10 +68,8 @@ defmodule App.MixProject do
       # Bumblebee imports
       {:bumblebee, "~> 0.4.2"},
       {:exla, "~> 0.6.4"},
-      # {:xla, "~> 0.6.0"},
       {:nx, "~> 0.6.4 "},
       {:hnswlib, "~> 0.1.4"},
-      # {:hnswlib, git: "https://github.com/elixir-nx/hnswlib", override: true},
 
       # Image
       {:vix, "~> 0.26.0"},
