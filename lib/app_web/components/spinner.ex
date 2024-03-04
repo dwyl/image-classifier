@@ -1,6 +1,10 @@
 defmodule AppWeb.Spinner do
   use Phoenix.Component
-  # use AppWeb, :html
+
+  @moduledoc """
+  Stateless component to display a spinner.
+  Takes a boolean `spin` as assign
+  """
 
   attr :spin, :boolean, default: false
 

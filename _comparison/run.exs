@@ -80,7 +80,7 @@ defmodule Benchmark do
     coco_dataset_images_path = File.cwd!() |> Path.join("coco_dataset") |> Path.join("*.jpg")
     files = Path.wildcard(coco_dataset_images_path)
 
-    #coco_dataset_captions =
+    # coco_dataset_captions =
     #  File.stream!(File.cwd!() |> Path.join("coco_dataset") |> Path.join("captions.csv"))
     #  |> CSV.decode!()
     #  |> Enum.map(& &1)
@@ -120,7 +120,7 @@ defmodule Benchmark do
 
     # Go over each image and make prediction
     Enum.each(vips_images_with_captions, fn image ->
-      Logger.info("Benchmarking image #{image.id}...")
+      Logger.info("📊 Benchmarking image #{image.id}...")
 
       # Run the prediction
       {time_in_microseconds, prediction} =

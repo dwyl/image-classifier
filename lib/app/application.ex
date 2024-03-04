@@ -5,10 +5,28 @@ defmodule App.Application do
   require Logger
   use Application
 
+  @upload_dir Application.app_dir(:app, ["priv", "static", "uploads"])
+
+  @saved_index if Application.compile_env(:app, :knnindex_indices_test, false),
+                 do: Path.join(@upload_dir, "indexes_test.bin"),
+                 else: Path.join(@upload_dir, "indexes.bin")
+
+  def check_models_on_startup do
+    App.Models.verify_and_download_models()
+    |> case do
+      {:error, msg} ->
+        Logger.error("⚠️ #{msg}")
+        System.stop(0)
+
+      :ok ->
+        Logger.info("ℹ️ Models: ✅")
+        :ok
+    end
+  end
+
   @impl true
   def start(_type, _args) do
-
-    App.Models.verify_and_download_models()
+    :ok = check_models_on_startup()
 
     children = [
       # Start the Telemetry supervisor
@@ -18,17 +36,16 @@ defmodule App.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: App.PubSub},
       # Nx serving for the embedding
-      # App.TextEmbedding,
-
+      {Nx.Serving, serving: App.Models.embedding(), name: Embedding, batch_size: 1},
       # Nx serving for Speech-to-Text
       {Nx.Serving,
-      serving:
-        if Application.get_env(:app, :use_test_models) == true do
-          App.Models.audio_serving_test()
-        else
-          App.Models.audio_serving()
-        end,
-      name: Whisper},
+       serving:
+         if Application.get_env(:app, :use_test_models) == true do
+           App.Models.audio_serving_test()
+         else
+           App.Models.audio_serving()
+         end,
+       name: Whisper},
       # Nx serving for image classifier
       {Nx.Serving,
        serving:
@@ -39,7 +56,7 @@ defmodule App.Application do
          end,
        name: ImageClassifier},
       {GenMagic.Server, name: :gen_magic},
-      
+
       # Adding a supervisor
       {Task.Supervisor, name: App.TaskSupervisor},
       # Start the Endpoint (http/https)
@@ -47,6 +64,17 @@ defmodule App.Application do
       # Start a worker by calling: App.Worker.start_link(arg)
       # {App.Worker, arg}
     ]
+
+    # We are starting the HNSWLib Index GenServer only during testing.
+    # Because this GenServer needs the database to be seeded first,
+    # we only add it when we're not testing.
+    # When testing, you need to spawn this process manually (it is done in the test_helper.exs file).
+    children =
+      if Application.get_env(:app, :start_genserver, true) == true do
+        Enum.concat(children, [{App.KnnIndex, [space: :cosine, index: @saved_index]}])
+      else
+        children
+      end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

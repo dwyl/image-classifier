@@ -1,6 +1,11 @@
 defmodule App.Image do
   use Ecto.Schema
-  alias App.{Image, Repo}
+  require Logger
+
+  @moduledoc """
+  Ecto schema for the table Images and
+  utility functions.
+  """
 
   @primary_key {:id, :id, autogenerate: true}
   schema "images" do
@@ -8,24 +13,50 @@ defmodule App.Image do
     field(:width, :integer)
     field(:url, :string)
     field(:height, :integer)
+    field(:idx, :integer)
+    field(:sha1, :string)
 
     timestamps(type: :utc_datetime)
   end
 
   def changeset(image, params \\ %{}) do
     image
-    |> Ecto.Changeset.cast(params, [:url, :description, :width, :height])
-    |> Ecto.Changeset.validate_required([:url, :description, :width, :height])
+    |> Ecto.Changeset.cast(params, [:url, :description, :width, :height, :idx, :sha1])
+    |> Ecto.Changeset.validate_required([:width, :height])
+    |> Ecto.Changeset.unique_constraint(:sha1, name: :images_sha1_index)
+    |> Ecto.Changeset.unique_constraint(:idx, name: :images_idx_index)
   end
 
   @doc """
-  Uploads the given image to S3
-  and adds the image information to the database.
+  Inserts a new image into the database.
+  Returns `{:ok, image}` if the image was inserted correctly.
+  Returns `{:error, reason}` if the image was not inserted correctly.
   """
-  def insert(image) do
-    %Image{}
-    |> changeset(image)
-    |> Repo.insert!()
+  def insert(params) do
+    App.Image.changeset(%App.Image{}, params)
+    |> App.Repo.insert()
+  end
+
+  @doc """
+  Calculates the SHA1 of a given binary
+  """
+  def calc_sha1(file_binary) do
+    :crypto.hash(:sha, file_binary)
+    |> Base.encode16()
+  end
+
+  @doc """
+  Returns `{:ok, image}` or `nil` if the given sha1 is saved into the database Image table.
+  """
+  def check_sha1(sha1) when is_binary(sha1) do
+    App.Repo.get_by(App.Image, %{sha1: sha1})
+    |> case do
+      nil ->
+        nil
+
+      %App.Image{} = image ->
+        {:ok, image}
+    end
   end
 
   @doc """
@@ -76,11 +107,14 @@ defmodule App.Image do
   Otherwise, {:error, reason}.
   """
   def gen_magic_eval(path, accepted_mime) do
+    # Perform the magic evaluation.
     GenMagic.Server.perform(:gen_magic, path)
     |> case do
+      # In case it fails, return reason.
       {:error, reason} ->
         {:error, reason}
 
+      # If it succeeds, we check if it's an accepted mime type.
       {:ok,
        %GenMagic.Result{
          mime_type: mime,
@@ -91,9 +125,9 @@ defmodule App.Image do
           do: {:ok, %{mime_type: mime}},
           else: {:error, "Not accepted mime type."}
 
+      # In case the evaluation fails and it's not acceptable.
       {:ok, %GenMagic.Result{} = res} ->
-        require Logger
-        Logger.warning(%{gen_magic_response: res})
+        Logger.warning("⚠️ MIME type error: #{inspect(res)}")
         {:error, "Not acceptable."}
     end
   end

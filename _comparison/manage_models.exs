@@ -12,13 +12,16 @@ defmodule Comparison.Models do
   def verify_and_download_model(model, force_download? \\ false) do
     case force_download? do
       true ->
-        File.rm_rf!(model.cache_path) # Delete any cached pre-existing model
-        download_model(model)         # Download model
+        # Delete any cached pre-existing model
+        File.rm_rf!(model.cache_path)
+        # Download model
+        download_model(model)
 
       false ->
         # Check if the model cache directory exists or if it's not empty.
         # If so, we download the model.
         model_location = Path.join(model.cache_path, "huggingface")
+
         if not File.exists?(model_location) or File.ls!(model_location) == [] do
           download_model(model)
         end
@@ -50,7 +53,7 @@ defmodule Comparison.Models do
   # It will load the model and the respective the featurizer, tokenizer and generation config if needed,
   # and return a map with all of these at the end.
   defp load_offline_model_params(model) do
-    Logger.info("Loading #{model.name}...")
+    Logger.info("ℹ️ Loading #{model.name}...")
 
     # Loading model
     loading_settings = {:hf, model.name, cache_dir: model.cache_path, offline: true}
@@ -92,7 +95,7 @@ defmodule Comparison.Models do
   # Downloads the models according to a given %ModelInfo struct.
   # It will load the model and the respective the featurizer, tokenizer and generation config if needed.
   defp download_model(model) do
-    Logger.info("Downloading #{model.name}...")
+    Logger.info("ℹ️ Downloading #{model.name}...")
 
     # Download model
     downloading_settings = {:hf, model.name, cache_dir: model.cache_path}

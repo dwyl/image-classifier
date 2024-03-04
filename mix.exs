@@ -43,7 +43,7 @@ defmodule App.MixProject do
       {:phoenix, "~> 1.7.10"},
       {:phoenix_html, "~> 4.0.0"},
       {:phoenix_live_reload, "~> 1.5.0", only: :dev},
-      {:phoenix_live_view, "~> 0.20.1"},
+      {:phoenix_live_view, "~> 0.20.7"},
       {:heroicons, "~> 0.5.3"},
       {:floki, ">= 0.35.2", only: :test},
       {:esbuild, "~> 0.8.1", runtime: Mix.env() == :dev},
@@ -76,7 +76,9 @@ defmodule App.MixProject do
 
       # Testing
       {:excoveralls, "~> 0.15", only: [:test, :dev]},
-      {:mock, "~> 0.3.0", only: :test}
+      {:mock, "~> 0.3.0", only: :test},
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -92,7 +94,7 @@ defmodule App.MixProject do
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind default", "esbuild default"],
       "assets.deploy": ["tailwind default --minify", "esbuild default --minify", "phx.digest"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test --seed 0"],
       t: ["test"],
       c: ["coveralls.html"],
       s: ["phx.server"]

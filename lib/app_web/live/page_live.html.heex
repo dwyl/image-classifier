@@ -52,6 +52,7 @@
             you can run this project locally and perform machine learning tasks with a handful lines of code.
           </p>
         </div>
+        <div></div>
         <div class="border-gray-900/10">
           <!-- File upload section -->
           <div class="col-span-full">
@@ -64,7 +65,7 @@
                 <%= if @image_preview_base64 do %>
                   <form id="upload-form" phx-change="noop" phx-submit="noop">
                     <label class="cursor-pointer">
-                      <%= if not @running? do %>
+                      <%= if not @upload_running? do %>
                         <.live_file_input upload={@uploads.image_list} class="hidden" />
                       <% end %>
                       <img src={@image_preview_base64} />
@@ -135,22 +136,13 @@
         <!-- Prediction text -->
         <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
           <span>Description: </span>
-          <!-- Spinner -->
-          <AppWeb.Spinner.spin spin={@running?} />
-          <%!-- <%= if @running? do %>
-            <div role="status">
-              <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
-                <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
-                </div>
-              </div>
-            </div>
-          <% else %> --%>
+          <!-- conditional Spinner or display caption text or waiting text-->
+          <AppWeb.Spinner.spin spin={@upload_running?} />
           <%= if @label do %>
             <span class="text-gray-700 font-light"><%= @label %></span>
           <% else %>
             <span class="text-gray-300 font-light">Waiting for image input.</span>
           <% end %>
-          <%!-- <% end %> --%>
         </div>
       </div>
     </div>
@@ -160,18 +152,19 @@
       <h2 class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl text-center">
         Semantic search using an audio
       </h2>
+      <br />
       <p>
-        Please record a phrase. You can listen to your audio. It will automatically be transcripted into a text and appear below. The search for matching images will run automatically and the found image appear below
+        Please record a phrase. You can listen to your audio. It will be transcripted automatically into a text and appear below. The semantic search for matching images will then run automatically and the found image appear below.
       </p>
       <br />
       <form id="audio-upload-form" phx-change="noop" class="flex flex-col items-center">
         <.live_file_input upload={@uploads.speech} class="hidden" />
         <button
           id="record"
-          class="bg-blue-500 hover:bg-blue-700 text-white font-bold px-4 rounded flex"
+          class="bg-blue-500 hover:bg-blue-700 text-white font-bold p-4 rounded flex"
           type="button"
           phx-hook="Audio"
-          disabled={@micro_off}
+          disabled={@mic_off?}
         >
           <Heroicons.microphone
             outline
@@ -180,58 +173,60 @@
           <span id="text">Record</span>
         </button>
       </form>
+      <br />
       <p class="flex flex-col items-center">
         <audio id="audio" controls></audio>
-        <AppWeb.Spinner.spin spin={@speech_spin} />
-        <%!-- <%= if @speech_spin do %>
-          <div role="status">
-            <div class="relative w-6 h-6 animate-spin rounded-full bg-gradient-to-r from-purple-400 via-blue-500 to-red-400 ">
-              <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-gray-200 rounded-full border-2 border-white">
-              </div>
-            </div>
-          </div>
-        <% end %> --%>
-        <span id="output"><%= @transcription %></span>
       </p>
+      <br />
+      <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
+        <span>Transcription: </span>
+        <AppWeb.Spinner.spin spin={@audio_running?} />
+        <%= if @transcription do %>
+          <span id="output" class="text-gray-700 font-light"><%= @transcription %></span>
+        <% else %>
+          <span class="text-gray-300 font-light">Waiting for audio input.</span>
+        <% end %>
+      </div>
+      <br />
 
-      <%!-- <div :if={@search_result}>
-        <img src={@search_result.url} alt="found_image" />
-      </div> --%>
-    </div>
-    <!-- Examples -->
-    <%= if @display_list? do %>
-      <div class="flex flex-col">
-        <h3 class="mt-10 text-xl lg:text-center font-light tracking-tight text-gray-900 lg:text-2xl">
-          Examples
-        </h3>
-        <div class="flex flex-row justify-center my-8">
-          <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2">
-            <%= for example_img <- @example_list do %>
-              <!-- Loading skeleton if it is predicting -->
-              <%= if example_img.predicting? == true do %>
-                <div
-                  role="status"
-                  class="flex items-center justify-center w-full h-full max-w-sm bg-gray-300 rounded-lg animate-pulse"
-                >
-                  <img src={~p"/images/spinner.svg"} alt="spinner" />
-                  <span class="sr-only">Loading...</span>
-                </div>
-              <% else %>
-                <div>
-                  <img
-                    id={example_img.url}
-                    src={example_img.url}
-                    class="rounded-2xl object-cover"
-                  />
-                  <h3 class="mt-1 text-lg leading-8 text-gray-900 text-center">
-                    <%= example_img.label %>
-                  </h3>
-                </div>
-              <% end %>
-            <% end %>
+      <div :if={@audio_search_result}>
+        <div class="border-gray-900/10">
+          <div class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
+            <img src={@audio_search_result.url} alt="found_image" />
           </div>
         </div>
       </div>
-    <% end %>
+    </div>
+    <!-- Examples -->
+    <%!-- <%= if @display_list? do %> --%>
+    <div :if={@display_list?} class="flex flex-col">
+      <h3 class="mt-10 text-xl lg:text-center font-light tracking-tight text-gray-900 lg:text-2xl">
+        Examples
+      </h3>
+      <div class="flex flex-row justify-center my-8">
+        <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2">
+          <%= for example_img <- @example_list do %>
+            <!-- Loading skeleton if it is predicting -->
+            <%= if example_img.predicting? == true do %>
+              <div
+                role="status"
+                class="flex items-center justify-center w-full h-full max-w-sm bg-gray-300 rounded-lg animate-pulse"
+              >
+                <img src={~p"/images/spinner.svg"} alt="spinner" />
+                <span class="sr-only">Loading...</span>
+              </div>
+            <% else %>
+              <div>
+                <img id={example_img.url} src={example_img.url} class="rounded-2xl object-cover" />
+                <h3 class="mt-1 text-lg leading-8 text-gray-900 text-center">
+                  <%= example_img.label %>
+                </h3>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+    <%!-- <% end %> --%>
   </div>
 </div>

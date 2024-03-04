@@ -26,7 +26,8 @@ config :logger, level: :warning
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
 
-
 # App configuration
 config :app,
+  start_genserver: false,
+  knnindex_indices_test: true,
   use_test_models: true

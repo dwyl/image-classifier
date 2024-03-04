@@ -19,6 +19,9 @@ erl_crash.dump
 # Also ignore archive artifacts (built via "mix archive.build").
 *.ez
 
+# Ignore DB dumps
+*.db
+
 # Temporary files, for example, from tests.
 /tmp/
 
@@ -38,3 +41,7 @@ npm-debug.log
 # Bumblebee model directory
 .bumblebee/*
 .elixir_ls
+
+# KNN index direcotry
+priv/static/uploads/indexes.bin
+
