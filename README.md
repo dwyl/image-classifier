@@ -207,10 +207,10 @@ Head over to `mix.exs`and add the following dependencies
 to the `deps` section.
 
 ```elixir
-{:bumblebee, "~> 0.4.2"},
-{:exla, "~> 0.6.1"},
-{:nx, "~> 0.6.2"},
-{:vix, "~> 0.23.1"}
+{:bumblebee, "~> 0.5.0"},
+{:exla, "~> 0.7.0"},
+{:nx, "~> 0.7.0 "},
+{:hnswlib, "~> 0.1.5"},
 ```
 
 - [**`bumblebee`**](https://github.com/elixir-nx/bumblebee) is a framework that will allows us to integrate
@@ -4687,10 +4687,10 @@ We then use it with `Nx.Serving` to run the model.
 
 ```elixir
 Mix.install([
-{:bumblebee, "~> 0.4.2"},
-{:exla, "~> 0.6.4"},
-{:nx, "~> 0.6.4 "},
-{:hnswlib, "~> 0.1.4"}
+{:bumblebee, "~> 0.5.0"},
+{:exla, "~> 0.7.0"},
+{:nx, "~> 0.7.0 "},
+{:hnswlib, "~> 0.1.5"},
 ])
 
 Nx.global_default_backend(EXLA.Backend)

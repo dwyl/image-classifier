@@ -66,10 +66,10 @@ defmodule App.MixProject do
       {:postgrex, ">= 0.0.0"},
 
       # Bumblebee imports
-      {:bumblebee, "~> 0.4.2"},
-      {:exla, "~> 0.6.4"},
-      {:nx, "~> 0.6.4 "},
-      {:hnswlib, "~> 0.1.4"},
+      {:bumblebee, "~> 0.5.0"},
+      {:exla, "~> 0.7.0"},
+      {:nx, "~> 0.7.0 "},
+      {:hnswlib, "~> 0.1.5"},
 
       # Image
       {:vix, "~> 0.26.0"},
