@@ -89,6 +89,26 @@ let liveSocket = new LiveSocket("/live", Socket, {
   params: { _csrf_token: csrfToken },
 });
 
+// Toggles to show upload or semantic search containers
+// JavaScript to toggle visibility and styles
+document.getElementById('upload_option').addEventListener('click', function() {
+  document.getElementById('upload_container').style.display = 'block'; // Show Element 1
+  document.getElementById('search_container').style.display = 'none';  // Hide Element 2
+  document.getElementById('upload_option').classList.replace('bg-gray-200', 'bg-blue-500');
+  document.getElementById('upload_option').classList.replace('text-black', 'text-white');
+  document.getElementById('search_option').classList.replace('bg-blue-500', 'bg-gray-200');
+  document.getElementById('search_option').classList.replace('text-white', 'text-black');
+});
+
+document.getElementById('search_option').addEventListener('click', function() {
+  document.getElementById('upload_container').style.display = 'none';  // Hide Element 1
+  document.getElementById('search_container').style.display = 'block'; // Show Element 2
+  document.getElementById('upload_option').classList.replace('bg-blue-500', 'bg-gray-200');
+  document.getElementById('upload_option').classList.replace('text-white', 'text-black');
+  document.getElementById('search_option').classList.replace('bg-gray-200', 'bg-blue-500');
+  document.getElementById('search_option').classList.replace('text-black', 'text-white');
+});
+
 // Show progress bar on live navigation and form submits
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });
 window.addEventListener("phx:page-loading-start", (_info) => topbar.show(300));

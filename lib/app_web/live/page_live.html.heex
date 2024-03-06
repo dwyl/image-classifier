@@ -4,109 +4,136 @@
     <div class="flex justify-center items-center w-full">
       <div class="2xl:space-y-12">
         <div class="mx-auto max-w-2xl lg:text-center">
-          <p>
+
+          <!-- Title pill -->
+          <p class="text-center">
             <span class="rounded-full w-fit bg-brand/5 px-2 py-1 text-[0.8125rem] font-medium text-center leading-6 text-brand">
-              <a
-                href="https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html"
-                target="_blank"
-                rel="noopener noreferrer"
+            <a
+              href="https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html"
+              target="_blank"
+              rel="noopener noreferrer"
               >
-                🔥 LiveView
-              </a>
-              +
-              <a
-                href="https://github.com/elixir-nx/bumblebee"
-                target="_blank"
-                rel="noopener noreferrer"
+            🔥 LiveView
+            </a>
+            +
+            <a
+              href="https://github.com/elixir-nx/bumblebee"
+              target="_blank"
+              rel="noopener noreferrer"
               >
-                🐝 Bumblebee
-              </a>
+            🐝 Bumblebee
+            </a>
             </span>
           </p>
-          <p class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-            Caption your image!
-          </p>
-          <h3 class="mt-6 text-lg leading-8 text-gray-600">
-            Upload your own image (up to 5MB) and perform image captioning with
-            <a
-              href="https://elixir-lang.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="font-mono font-medium text-sky-500"
-            >
+
+          <!-- Toggle Buttons -->
+          <div class="flex justify-center">
+            <span class="isolate inline-flex rounded-md shadow-sm mt-2">
+              <button id="upload_option" type="button" class="relative inline-flex items-center gap-x-1.5 rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="-ml-0.5 h-5 w-5 text-gray-400">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                </svg>
+                Upload
+              </button>
+              <button id="search_option" type="button" class="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10">
+                <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="-ml-0.5 h-5 w-5 text-gray-400">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                </svg>
+                Search
+              </button>
+            </span>
+          </div>
+
+          <!-- Elements to Show/Hide -->
+          <div id="upload_container" class="p-4 my-2 border border-gray-200 rounded">Element 1 Content</div>
+          <div id="search_container" class="p-4 my-2 border border-gray-200 rounded" style="display: none;">Element 2 Content</div>
+
+          <!-- UPLOAD CONTAINER -->
+          <div>
+            <p class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              Caption your image!
+            </p>
+            <h3 class="mt-6 text-lg leading-8 text-gray-600">
+              Upload your own image (up to 5MB) and perform image captioning with
+              <a
+                href="https://elixir-lang.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-mono font-medium text-sky-500"
+                >
               Elixir
-            </a>
-            !
-          </h3>
-          <p class="text-lg leading-8 text-gray-400">
-            Powered with
-            <a
-              href="https://elixir-lang.org/"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="font-mono font-medium text-sky-500"
-            >
+              </a>
+              !
+            </h3>
+            <p class="text-lg leading-8 text-gray-400">
+              Powered with
+              <a
+                href="https://elixir-lang.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-mono font-medium text-sky-500"
+                >
               HuggingFace🤗
-            </a>
-            transformer models,
-            you can run this project locally and perform machine learning tasks with a handful lines of code.
-          </p>
-        </div>
-        <div></div>
-        <div class="border-gray-900/10">
-          <!-- File upload section -->
-          <div class="col-span-full">
-            <div
-              class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10"
-              phx-drop-target={@uploads.image_list.ref}
-            >
-              <div class="text-center">
-                <!-- Show image preview -->
-                <%= if @image_preview_base64 do %>
-                  <form id="upload-form" phx-change="noop" phx-submit="noop">
-                    <label class="cursor-pointer">
+              </a>
+              transformer models,
+              you can run this project locally and perform machine learning tasks with a handful lines of code.
+            </p>
+
+            <!-- File upload section -->
+            <div class="border-gray-900/10">
+              <div class="col-span-full">
+                <div
+                  class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10"
+                  phx-drop-target={@uploads.image_list.ref}
+                  >
+                  <div class="text-center">
+                    <!-- Show image preview -->
+                    <%= if @image_preview_base64 do %>
+                    <form id="upload-form" phx-change="noop" phx-submit="noop">
+                      <label class="cursor-pointer">
                       <%= if not @upload_running? do %>
-                        <.live_file_input upload={@uploads.image_list} class="hidden" />
+                      <.live_file_input upload={@uploads.image_list} class="hidden" />
                       <% end %>
                       <img src={@image_preview_base64} />
-                    </label>
-                  </form>
-                <% else %>
-                  <svg
-                    class="mx-auto h-12 w-12 text-gray-300"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path
-                      fill-rule="evenodd"
-                      d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z"
-                      clip-rule="evenodd"
-                    />
-                  </svg>
-                  <div class="mt-4 flex text-sm leading-6 text-gray-600">
-                    <label
-                      for="file-upload"
-                      class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500"
-                    >
-                      <form id="upload-form" phx-change="noop" phx-submit="noop">
-                        <label class="cursor-pointer">
-                          <.live_file_input upload={@uploads.image_list} class="hidden" /> Upload
-                        </label>
+                      </label>
+                    </form>
+                    <% else %>
+                    <svg
+                      class="mx-auto h-12 w-12 text-gray-300"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      aria-hidden="true"
+                      >
+                      <path
+                        fill-rule="evenodd"
+                        d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z"
+                        clip-rule="evenodd"
+                        />
+                    </svg>
+                    <div class="mt-4 flex text-sm leading-6 text-gray-600">
+                      <label
+                        for="file-upload"
+                        class="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500"
+                        >
+                        <form id="upload-form" phx-change="noop" phx-submit="noop">
+                      <label class="cursor-pointer">
+                      <.live_file_input upload={@uploads.image_list} class="hidden" /> Upload
+                      </label>
                       </form>
-                    </label>
-                    <p class="pl-1">or drag and drop</p>
+                      </label>
+                      <p class="pl-1">or drag and drop</p>
+                    </div>
+                    <p class="text-xs leading-5 text-gray-600">PNG, JPG, GIF up to 5MB</p>
+                    <% end %>
                   </div>
-                  <p class="text-xs leading-5 text-gray-600">PNG, JPG, GIF up to 5MB</p>
-                <% end %>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-        <!-- Show errors -->
-        <%= for entry <- @uploads.image_list.entries do %>
-          <div class="mt-2">
-            <%= for err <- upload_errors(@uploads.image_list, entry) do %>
+
+            <!-- Show errors -->
+            <%= for entry <- @uploads.image_list.entries do %>
+            <div class="mt-2">
+              <%= for err <- upload_errors(@uploads.image_list, entry) do %>
               <div class="rounded-md bg-red-50 p-4 mb-2">
                 <div class="flex">
                   <div class="flex-shrink-0">
@@ -115,12 +142,12 @@
                       viewBox="0 0 20 20"
                       fill="currentColor"
                       aria-hidden="true"
-                    >
+                      >
                       <path
                         fill-rule="evenodd"
                         d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
                         clip-rule="evenodd"
-                      />
+                        />
                     </svg>
                   </div>
                   <div class="ml-3">
@@ -130,103 +157,107 @@
                   </div>
                 </div>
               </div>
+              <% end %>
+            </div>
             <% end %>
-          </div>
-        <% end %>
-        <!-- Prediction text -->
-        <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
-          <span>Description: </span>
-          <!-- conditional Spinner or display caption text or waiting text-->
-          <AppWeb.Spinner.spin spin={@upload_running?} />
-          <%= if @label do %>
-            <span class="text-gray-700 font-light"><%= @label %></span>
-          <% else %>
-            <span class="text-gray-300 font-light">Waiting for image input.</span>
-          <% end %>
-        </div>
-      </div>
-    </div>
-    <!-- Audio -->
-    <br />
-    <div class="mx-auto max-w-2xl lg">
-      <h2 class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl text-center">
-        Semantic search using an audio
-      </h2>
-      <br />
-      <p>
-        Please record a phrase. You can listen to your audio. It will be transcripted automatically into a text and appear below. The semantic search for matching images will then run automatically and the found image appear below.
-      </p>
-      <br />
-      <form id="audio-upload-form" phx-change="noop" class="flex flex-col items-center">
-        <.live_file_input upload={@uploads.speech} class="hidden" />
-        <button
-          id="record"
-          class="bg-blue-500 hover:bg-blue-700 text-white font-bold p-4 rounded flex"
-          type="button"
-          phx-hook="Audio"
-          disabled={@mic_off?}
-        >
-          <Heroicons.microphone
-            outline
-            class="w-6 h-6 text-white font-bold group-active:animate-pulse"
-          />
-          <span id="text">Record</span>
-        </button>
-      </form>
-      <br />
-      <p class="flex flex-col items-center">
-        <audio id="audio" controls></audio>
-      </p>
-      <br />
-      <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
-        <span>Transcription: </span>
-        <AppWeb.Spinner.spin spin={@audio_running?} />
-        <%= if @transcription do %>
-          <span id="output" class="text-gray-700 font-light"><%= @transcription %></span>
-        <% else %>
-          <span class="text-gray-300 font-light">Waiting for audio input.</span>
-        <% end %>
-      </div>
-      <br />
 
-      <div :if={@audio_search_result}>
-        <div class="border-gray-900/10">
-          <div class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
-            <img src={@audio_search_result.url} alt="found_image" />
+            <!-- Prediction text -->
+            <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
+              <span>Description: </span>
+              <!-- conditional Spinner or display caption text or waiting text-->
+              <AppWeb.Spinner.spin spin={@upload_running?} />
+              <%= if @label do %>
+              <span class="text-gray-700 font-light"><%= @label %></span>
+              <% else %>
+              <span class="text-gray-300 font-light">Waiting for image input.</span>
+              <% end %>
+            </div>
+
+            <!-- Examples -->
+            <%!-- <%= if @display_list? do %> --%>
+              <div :if={@display_list?} class="flex flex-col">
+                <h3 class="mt-10 text-xl lg:text-center font-light tracking-tight text-gray-900 lg:text-2xl">
+                  Examples
+                </h3>
+                <div class="flex flex-row justify-center my-8">
+                  <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2">
+                    <%= for example_img <- @example_list do %>
+                    <!-- Loading skeleton if it is predicting -->
+                    <%= if example_img.predicting? == true do %>
+                    <div
+                      role="status"
+                      class="flex items-center justify-center w-full h-full max-w-sm bg-gray-300 rounded-lg animate-pulse"
+                      >
+                      <img src={~p"/images/spinner.svg"} alt="spinner" />
+                      <span class="sr-only">Loading...</span>
+                    </div>
+                    <% else %>
+                    <div>
+                      <img id={example_img.url} src={example_img.url} class="rounded-2xl object-cover" />
+                      <h3 class="mt-1 text-lg leading-8 text-gray-900 text-center">
+                        <%= example_img.label %>
+                      </h3>
+                    </div>
+                    <% end %>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            <%!-- <% end %> --%>
+          </div>
+
+          <!-- AUDIO SEMANTIC SEARCH CONTAINER -->
+          <div class="mx-auto max-w-2xl lg">
+            <h2 class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl text-center">
+              Semantic search using an audio
+            </h2>
+            <br />
+            <p>
+              Please record a phrase. You can listen to your audio. It will be transcripted automatically into a text and appear below. The semantic search for matching images will then run automatically and the found image appear below.
+            </p>
+            <br />
+            <form id="audio-upload-form" phx-change="noop" class="flex flex-col items-center">
+              <.live_file_input upload={@uploads.speech} class="hidden" />
+              <button
+                id="record"
+                class="bg-blue-500 hover:bg-blue-700 text-white font-bold p-4 rounded flex"
+                type="button"
+                phx-hook="Audio"
+                disabled={@mic_off?}
+                >
+                <Heroicons.microphone
+                  outline
+                  class="w-6 h-6 text-white font-bold group-active:animate-pulse"
+                  />
+                <span id="text">Record</span>
+              </button>
+            </form>
+
+            <p class="flex flex-col items-center">
+              <audio id="audio" controls></audio>
+            </p>
+
+            <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
+              <span>Transcription: </span>
+              <AppWeb.Spinner.spin spin={@audio_running?} />
+              <%= if @transcription do %>
+              <span id="output" class="text-gray-700 font-light"><%= @transcription %></span>
+              <% else %>
+              <span class="text-gray-300 font-light">Waiting for audio input.</span>
+              <% end %>
+            </div>
+
+            <div :if={@audio_search_result}>
+              <div class="border-gray-900/10">
+                <div class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
+                  <img src={@audio_search_result.url} alt="found_image" />
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
     </div>
-    <!-- Examples -->
-    <%!-- <%= if @display_list? do %> --%>
-    <div :if={@display_list?} class="flex flex-col">
-      <h3 class="mt-10 text-xl lg:text-center font-light tracking-tight text-gray-900 lg:text-2xl">
-        Examples
-      </h3>
-      <div class="flex flex-row justify-center my-8">
-        <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-6 gap-y-20 sm:grid-cols-2">
-          <%= for example_img <- @example_list do %>
-            <!-- Loading skeleton if it is predicting -->
-            <%= if example_img.predicting? == true do %>
-              <div
-                role="status"
-                class="flex items-center justify-center w-full h-full max-w-sm bg-gray-300 rounded-lg animate-pulse"
-              >
-                <img src={~p"/images/spinner.svg"} alt="spinner" />
-                <span class="sr-only">Loading...</span>
-              </div>
-            <% else %>
-              <div>
-                <img id={example_img.url} src={example_img.url} class="rounded-2xl object-cover" />
-                <h3 class="mt-1 text-lg leading-8 text-gray-900 text-center">
-                  <%= example_img.label %>
-                </h3>
-              </div>
-            <% end %>
-          <% end %>
-        </div>
-      </div>
-    </div>
-    <%!-- <% end %> --%>
   </div>
 </div>
