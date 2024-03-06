@@ -5949,13 +5949,14 @@ and update it as so:
         class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl"
       >
         <span>Transcription: </span>
-        <AppWeb.Spinner.spin spin="{@audio_running?}" />
-        <%= if @transcription do %>
-        <span id="output" class="text-gray-700 font-light"
-          ><%= @transcription %></span
-        >
+        <%= if @audio_running? do %>
+          <AppWeb.Spinner.spin spin={@audio_running?} />
         <% else %>
-        <span class="text-gray-300 font-light">Waiting for audio input.</span>
+          <%= if @transcription do %>
+          <span class="text-gray-700 font-light"><%= @transcription %></span>
+          <% else %>
+          <span class="text-gray-300 font-light text-justify">Waiting for audio input.</span>
+          <% end %>
         <% end %>
       </div>
       <br />

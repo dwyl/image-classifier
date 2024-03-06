@@ -244,7 +244,7 @@ defmodule AppWeb.PageLive do
   def handle_progress(_, _, socket), do: {:noreply, socket}
 
   @doc """
-  Called in `handle_progress` to Handle the upload to the bucket and returns the format `{:ok, map}` or {:postpone, message}`
+  Called in `handle_progress` to handle the upload to the bucket and returns the format `{:ok, map}` or {:postpone, message}`
   as demanded by the signature of callback function used `consume_uploaded_entry`
   """
   def handle_upload({:ok, %{path: path, tensor: tensor, image_info: image_info} = map})
@@ -275,10 +275,8 @@ defmodule AppWeb.PageLive do
   end
 
   @doc """
-  Every time an `async task` is created, this function is called.
-  We destructure the output of the task and update the socket assigns.
-
-  This function handles both the image that is uploaded by the user and the example images.
+  This function is invoked after the async task for embedding model is completed.
+  It retrieves the embedding, normalizes it and knn-searches the embedding in our database.
   """
   @impl true
   def handle_info({ref, %{chunks: [%{text: text}]} = _result}, %{assigns: assigns} = socket)
