@@ -66,7 +66,7 @@ with your voice! 🎙️
     - [0. Overview of the process](#0-overview-of-the-process)
       - [0.1 Audio transcription](#01-audio-transcription)
       - [0.2 Creating embeddings](#02-creating-embeddings)
-      - [0.3 Semantically searching](#03-semantically-searching)
+      - [0.3 Semantical search](#03-semantical-search)
     - [1. Pre-requisites](#1-pre-requisites)
     - [2. Transcribe an audio recording](#2-transcribe-an-audio-recording)
       - [1.1 Adding a loading spinner](#11-adding-a-loading-spinner)
@@ -230,7 +230,7 @@ to the `deps` section.
   a compiler that provides faster linear algebra calculations
   with `TensorFlow` models.
   This backend compiler is needed for `Nx`.
-  We are installing `EXLA` because allows us to compile models _just-in-time_ and run them on CPU and/or GPU.
+  We are installing `EXLA` because it allows us to compile models _just-in-time_ and run them on CPU and/or GPU.
 
 - [**`Vix`**](https://hexdocs.pm/vix/readme.html) is an Elixir extension for [libvips](https://www.libvips.org/), an image processing library.
 
@@ -386,7 +386,6 @@ and changed our view!
 ### 3. Receiving image files
 
 Now, let's start by receiving some image files.
-In order to classify them, we need to have access to begin with, right? NOTE: NOT CLEAR.
 
 With `LiveView`,
 we can easily do this by using
@@ -403,7 +402,6 @@ let's make some changes to
 `lib/app_web/live/page_live.html.heex`.
 
 ```html
-<.flash_group flash={@flash} />
 <div
   class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-28 lg:px-8 xl:px-28 xl:py-32"
 >
@@ -3181,7 +3179,6 @@ inside the
 > under a certain theme.
 > One way to solve this problem is to perform a **_full-text_ search query** on specific words among these image captions.
 
-
 <p align="center">
   <img src="https://github.com/dwyl/image-classifier/assets/17494745/b3568de8-2b0c-4413-8528-a3aee4135ea0">
 </p>
@@ -3191,7 +3188,7 @@ inside the
 > [!NOTE]
 >
 > This section was kindly implemented and documented by
-> [@nrdean](https://github.com/ndrean). It is based on artciles written by Sean Moriarty's published in the Dockyard's blog.
+> [@ndrean](https://github.com/ndrean). It is based on artciles written by Sean Moriarty's published in the Dockyard's blog.
 > Do check him out! 🎉
 
 We can leverage machine learning to greatly improve this search process:
@@ -3204,7 +3201,6 @@ with machine learning.
 These techniques are widely used in search engines,
 including in widespread tools like
 [Elastic Search](https://www.elastic.co/).
-
 
 ### 0. Overview of the process
 
@@ -3228,7 +3224,12 @@ We will use the following tool chain:
 <p align="center">
   <img width="800" src="https://github.com/ndrean/image-classifier/assets/6793008/f5aad51b-2d49-4184-b5a4-07236449c821" />
 </p>
+
 #### 0.1 Audio transcription
+
+We simply let the user start and stop the recording
+by using a submit button in a form.
+This can of course by greatly refined by using Voice Detection. You may find an example [here](https://github.com/ricky0123/vad).
 
 Firstly, we will:
 
@@ -3236,7 +3237,7 @@ Firstly, we will:
 - run a **Speech-To-Text** process to produce a text transcription
   from the audio.
 
-We will use - thus loading - the _pre-trained_ model [openai/whisper-small](https://huggingface.co/openai/whisper-small)
+We will use the _pre-trained_ model [openai/whisper-small](https://huggingface.co/openai/whisper-small)
 from <https://huggingface.co>
 and use it with the help of the [Bumblebee.Audio.speech_to_text_whisper](https://hexdocs.pm/bumblebee/Bumblebee.Audio.html#speech_to_text_whisper/5) function.
 We get an `Nx.Serving` that we will use to run this model with an input.
@@ -3244,46 +3245,51 @@ We get an `Nx.Serving` that we will use to run this model with an input.
 #### 0.2 Creating embeddings
 
 We then want to find images whose captions
-approximates this text in terms of meaning.
+approximate this text in terms of meaning.
 This transcription is the `"target text"`.
 This is where **embeddings** come into play:
-we encode each transcription as a _vector_ - aka embedding -
+they are **vector representations** of certain inputs,
+which in our case, are the text transcription of the audio file recorded by the user.
+We encode each transcription as an embedding
 and then use an approximation algorithm to find the closest neighbours.
-Embeddings are basically **vector representations** of certain inputs,
-which in our case, are audio files recorded by the user.
 
 Our next steps will be to prepare the
 [symmetric semantic search](https://www.sbert.net/examples/applications/semantic-search/README.html#symmetric-vs-asymmetric-semantic-search).
-We will use the
-[transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>)
-with the [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models)
-pre-trained system available in
+We will use a
+[transformer](<https://en.wikipedia.org/wiki/Transformer_(machine_learning_model)>) model,
+more specifically the pre-trained [sBert](https://www.sbert.net/docs/pretrained_models.html#sentence-embedding-models)
+system available in
 [Huggingface](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2).
-We will transform a text into a vector: we use the sentence-transformer model [`sentence-transformers/paraphrase-MiniLM-L6-v2` ](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2) because of its small size.
-We will run it with the help of the [Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function.
+
+We transform a text into a vector with the sentence-transformer model [`sentence-transformers/paraphrase-MiniLM-L6-v2` ](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2).
+
+> [!NOTE]
+> You may find models in the [MTEB English leaderboard](https://huggingface.co/spaces/mteb/leaderboard). We looked for "small" models in terms of file size and dimensions. You may want to try and use [GTE small](https://huggingface.co/thenlper/gte-small).
+
+We will run the model with the help of the
+[Bumblebee.Text.TextEmbedding.text_embedding](https://hexdocs.pm/bumblebee/Bumblebee.Text.html#text_embedding/3) function.
+
 This encoding is done for each image caption.
 
-#### 0.3 Semantically searching
+#### 0.3 Semantical search
 
 At this point, we have:
 
-- the embedding of the recording of the user
+- the embedding of the text transcription of the recording made by the user
   (e.g `"a dog"`).
 - all the embeddings of all the images in our "image bank".
-  To search for the images that are related to `"a dog"`,
-  we need to apply an algorithm that compares these two embeddings!
+
+To search for the images that are related to `"a dog"`,
+we need to apply an algorithm that compares these embeddings!
 
 For this, we will run a [**knn_neighbour**](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm) search.
-The baisc idea is to work in the embeddings vector space
-and find the image vectors that are close to the target vector.
-
 There are several ways to do this.
 
-- We can use the `pgvector`, a vector extension of Postgres. It is used to store vectors (the embeddings) and to run similarity searches.
-  With `pgvector`, we can run
+- we can use`pgvector` , a vector extension of Postgres. It is used to store vectors (the embeddings) and to run similarity searches.
+  With `pgvector`, we can run:
 
   - a full exact search with the [cosine similarity](https://github.com/pgvector/pgvector#distances) operator `<=>`,
-  - or use an Approximate Nearest Neighbour seach with the indexing algorithms. The extension proposes [`IVFFLAT`](https://github.com/pgvector/pgvector#ivfflat) or [`HNSWLIB`](https://github.com/pgvector/pgvector#hnsw) algorithms. You can find some explanations on both algorithms in https://tembo.io/blog/vector-indexes-in-pgvector and https://neon.tech/blog/understanding-vector-search-and-hnsw-index-with-pgvector.
+  - or use an Approximate Nearest Neighbour seach with indexing algorithms. The extension proposes the [`IVFFLAT`](https://github.com/pgvector/pgvector#ivfflat) and the [`HNSWLIB`](https://github.com/pgvector/pgvector#hnsw) algorithms. You can find some explanations on both algorithms in https://tembo.io/blog/vector-indexes-in-pgvector and https://neon.tech/blog/understanding-vector-search-and-hnsw-index-with-pgvector.
 
 > [!NOTE]
 > Note that [Supabase](https://supabase.com/docs/guides/database/extensions/pgvector) can use the `pgvector` extension, and you can use [Supabase with Fly.io](https://fly.io/docs/reference/supabase/).
@@ -3291,7 +3297,7 @@ There are several ways to do this.
 > [!WARNING]
 > Note that you need to save the embeddings (as vectors) into the database, so the database will be intensively used. This may lead to scaling problems and potential race conditions.
 
-- We can alternatively use the `hnswlib` library and its Elixir binding [HNSWLib](https://github.com/elixir-nx/hnswlib).
+- we can alternatively use the `hnswlib` library and its Elixir binding [HNSWLib](https://github.com/elixir-nx/hnswlib).
   This "externalises" the ANN search from the database as it uses an in-memory file.
   This file needs to be persisted on disk, thus at the expense of using the filesystem with again potential race conditions.
   It works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**: this struct will allow us to efficiently retrieve vector data.
@@ -3299,11 +3305,12 @@ There are several ways to do this.
 **We will use this last option**,
 mostly because we use Fly.io
 and `pgvector` is hard to come by on this platform.
-Additionally, you don't rely on a framework that does the heavylifting for you.
+We will use a GenServer to wrap all the calls to `hnswlib` so every writes will be run synchronously.
+Additionally, you don't rely on a framework that does the heavy lifting for you.
 We're here to learn, aren't we? 😃
 
 We will append incrementally the computed embedding from the captions into the Index.
-We will get an indice (simply is the order of this embedding in the Index).
+We will get an indice which is simply is the order of this embedding in the Index.
 We then run a "knn_search" algorithm; the input will be the embedding of the audio transcript.
 This algorithm will return the most relevant position(s) - `indices` -
 among the `Index` indices that minimize the choosen distance between this input and the existing vectors.
@@ -3325,27 +3332,11 @@ Bumblebee may have options to correctly use this metric, but we used a normalisa
 
 ### 1. Pre-requisites
 
-Before starting, let's install some dependencies that we'll need.
-Add these to the `deps` section in `mix.exs`.
+We have already installed all dependencies that we need.
 
-```elixir
-def deps do
-  [
-    {:hnswlib, git: "https://github.com/elixir-nx/hnswlib", override: true},
-
-  ]
-end
-```
-
-- **`hnswlib`** is the library we used to run the
-  [k-nearest neighbors algorithm](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
-  in `Elixir`.
-
-And run `mix deps.get`.
-
-**You will also need to install [`ffmpeg`](https://ffmpeg.org/)**.
-`Bumblebee` uses `ffmpeg` under the hood to process audio files into tensors,
-but it uses it _as an external dependency_.
+> [!WARNING] > **You will also need to install [`ffmpeg`](https://ffmpeg.org/)**.
+> Indeed, `Bumblebee` uses `ffmpeg` under the hood to process audio files into tensors,
+> but it uses it _as an external dependency_.
 
 And now we're ready to rock and roll! 🎸
 
@@ -3436,6 +3427,9 @@ so this part of your code will shrink to:
 
 #### 2.2 Defining `Javascript` hook
 
+We provide a basic user experience.
+We let the user click on a button to start and stop the recording.
+We do not try to resample the audio to say 16kHz nor provide automatic start/stop recording.
 We next define the hook in a new JS file, located in the `assets/js` folder.
 The important part is the `Phoenix.js` function `upload`,
 to which we pass an identifier `"speech"`
@@ -3526,12 +3520,13 @@ let liveSocket = new LiveSocket("/live", Socket, {
 
 We now need to add some server-side code.
 
-The uploaded audio file will be saved on disk as a temporary file
-in the `/priv/static/uploads` folder.
-We will make this file _unique_ every time a user records an audio.
-We simply use an `Ecto.UUID` string to the file name and pass it into the Liveview socket.
+The uploaded audio file will be saved on disk
+as a temporary file in the `/priv/static/uploads` folder.
+We will also make this file _unique_ every time a user records an audio.
+We use an `Ecto.UUID` string to the file name and pass it into the Liveview socket.
 
-The Liveview `mount/3` function returns a socket. Let's update it
+The Liveview `mount/3` function returns a socket.
+Let's update it
 and pass extra arguments -
 typically booleans for the UI such as the button disabling and the spinner -
 as well as another `allow_upload/3` to handle the upload process of the audio file.
@@ -3648,7 +3643,7 @@ def start(_type, _args) do
   ...
 ```
 
-As you can see, we're doing a similar serving
+As you can see, we're using a serving similar
 to the captioning model we've implemented earlier.
 For this to work, we need to make some changes to the
 `models.ex` module.
@@ -4025,12 +4020,12 @@ in the following form:
 ```elixir
 %{
   chunks:
-  [%{
+    [%{
       text: "Hi there",
               #^^^the text of our audio
       start_timestamp_seconds: nil,
       end_timestamp_seconds: nil
-  }]
+    }]
 }
 ```
 
@@ -4067,10 +4062,8 @@ We want to encode every caption and the input text
 into an embedding which is a vector of a specific vector space.
 In other words, we encode a string into a list of numbers.
 
-We use a transformer-based pre-trained model `SBERT` to compute an embedding for each caption.
 We chose the transformer `"sentence-transformers/paraphrase-MiniLM-L6-v2"` model.
 
-The encoding is done with the help of the `Bumblebee.Text.TextEmbedding.text_embedding` function that returns an `%Nx.Serving{}` struct.
 This transformer uses a **`384`** dimensional vector space.
 Since this transformer is trained with a `cosine metric`,
 we embed the vector space of embeddings with the same distance.
@@ -4078,20 +4071,20 @@ You can read more about [cosine_similarity here](https://en.wikipedia.org/wiki/C
 
 This model is loaded and served by an `Nx.Serving` started in the Application modeule like all other models.
 
-Afterwards, we instantiate the HNSWLib index with a `GenServer`.
-It is started in the Application module (`application.ex`).
-We will use an Index file that is saved locally in our file system.
-This file will be updated any time we append an embedding.
-This means the app uses this unique file,
-so this app is only meant to run **on a single node**.
-
 #### 3.1 The `HNSWLib` Index (GenServer)
 
 This library [`HNSWLib`](https://github.com/elixir-nx/hnswlib)
-works with an **[index struct](https://www.datastax.com/guides/what-is-a-vector-index)**.
-We instantiate the Index file via a file in a `GenServer` which holds the index in the state.
+works with an **[index](https://www.datastax.com/guides/what-is-a-vector-index)**.
+We instantiate the Index file in a `GenServer` which holds the index in the state.
+
+We will use an Index file that is saved locally in our file system.
+This file will be updated any time we append an embedding;
+all the client calls and writes to the HNSWLib index are handled by the GenServer.
+They will happen synchronously. We want to minimize the race conditions in case several users interact with the app.
+This app is only meant to run **on a single node**.
+
+It is started in the Application module (`application.ex`).
 When the app starts, we either read or create this file. The file is saved in the "/priv/static/uploads" folder.
-The GenServer runs also all the client calls to the index.
 
 Because we are deploying with Fly.io, we need to persist the Index file in the database because the machine - thus its attached volume - is pruned when inactive.
 
@@ -4454,7 +4447,7 @@ In this module:
   inside the table.
 
 And that's it!
-We've added additional code to conditionally create different indexex
+We've added additional code to conditionally create different indexes
 according to the environment
 (useful for testing),
 but you can safely ignore those conditional calls
@@ -4668,6 +4661,9 @@ and not necessary to for our app.
 
 #### 4.0 Working example on how to use `HNSWLib`
 
+The code below can be run in an IEX session
+or in a Livebook.
+
 > [!NOTE]
 >
 > This whole section is _entirely optional_.
@@ -4724,14 +4720,16 @@ HNSWLib.Index.get_current_count(index)
 #{:ok, 0}
 ```
 
-You compute an embedding for the word "small":
+You compute an embedding for the word "short":
 
 ```elixir
 input = "short"
-# you get an embedding
+# you compute the embedding
 %{embedding: data} =
     Nx.Serving.run(serving, input)
 ```
+
+and you get:
 
 ```elixir
 %{
@@ -4758,7 +4756,7 @@ When you append an entry one by one, you can get the final indice of the Index w
 HNSWLib.Index.get_current_count(index)
 ```
 
-This means to can persist the indice to uniquely identity an item.
+This means you can persist the indice to uniquely identity an item.
 
 You can also enter a batch of items. You will only get back the last indice.
 This means that if you may need to persist the embedding if you want to identify the input in this case.
@@ -4782,7 +4780,8 @@ HNSWLib.Index.get_current_count(index)
 
 You now run a `knn_query`from a text input - converted into an embedding - to look for the closest element present in the Index.
 
-Let's look for the closest item close the "small". We expect to get "short", the first item.
+Let's find the closest item in the Index to the input "small".
+We expect to get "short", the first item.
 
 ```elixir
 input = "small"
@@ -4918,8 +4917,12 @@ def mount(_, _, socket) do
 end
 ```
 
-Recall that every time you upload an image, you get back an URL from our bucket and you compute a caption.
-We will now compute an embedding from this string and save it into the Index. This is done in the `handle_info` callback.
+Recall that every time you upload an image,
+you get back an URL from our bucket
+and you compute a caption as a string.
+We will now compute an embedding from this string
+and save it into the Index.
+This is done in the `handle_info` callback.
 
 Update the Liveview `handle_info` callback where we handle the captioning results:
 
@@ -5159,12 +5162,12 @@ And that's all we need to deal with our images!
 
 ##### 4.1.2 Using embeddings in semantic search
 
-Now that we have:
+Now we have
 
-- all the embeddings models ready to be used.
+- all the embeddings models ready to be used,
 - our Index files correctly created and maintained through
-  filesystem and in the database in the `hnswlib_index` schema.
-- the needed `sha1` functions to check dupliated images.
+  filesystem and in the database in the `hnswlib_index` schema,
+- the needed `sha1` functions to check for duplicated images.
 
 It's time to bring everything together and use all of these tools
 to implement semantic search into our application.
@@ -5251,8 +5254,8 @@ with what the app is doing.
 
 As you can see, we are using `handle_progress/3`
 with `allow_upload/3`.
-As we know, `handle_progress/3` is called whenever an upload
-(be it an image or recording of the person's voice).
+As we know, `handle_progress/3` is called whenever an upload happens
+(whether an image or recording of the person's voice).
 We define two different declarations for how we want to
 process `:image` uploads and `:speech` uploads.
 
@@ -5277,7 +5280,7 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
            # Check mime type
            {:check_mime, :ok} <- {:check_mime, check_mime(mime, mimetype)},
            # Get SHA1 code from the image and check it
-           sha1 <- App.Image.calc_sha1(file_binary),
+           sha1 = App.Image.calc_sha1(file_binary),
            {:sha_check, nil} <- {:sha_check, App.Image.check_sha1(sha1)},
            # Get image and resize
            {:ok, thumbnail_vimage} <- Vops.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
@@ -5723,10 +5726,11 @@ Let's go over the flow of this function:
 - the embedding model yields the embedding,
   _we normalize it_ and **check if the `sha1` code of the image is already being used**.
 - if these three processes occur successfuly,
+  we perform a _database transaction_ where
   we **save the updated image to the database**,
   **update the Index file count (we increment it)**
   and **save the index file to the database**.
-- we update the socket assigns accordingly.
+- we finally update the socket assigns accordingly.
 - if any of the previous calls fail,
   we handle these error scenarios
   and update the socket assigns.
