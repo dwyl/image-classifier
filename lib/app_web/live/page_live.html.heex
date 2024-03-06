@@ -50,22 +50,31 @@
 
           <!-- UPLOAD CONTAINER -->
           <div>
-            <p class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+            <p class="mt-2 text-center text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
               Caption your image!
             </p>
-            <h3 class="mt-6 text-lg leading-8 text-gray-600">
-              Upload your own image (up to 5MB) and perform image captioning with
-              <a
-                href="https://elixir-lang.org/"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="font-mono font-medium text-sky-500"
-                >
-              Elixir
-              </a>
-              !
-            </h3>
-            <p class="text-lg leading-8 text-gray-400">
+            <div class="flex gap-x-4 rounded-xl bg-black/5 px-6 py-2 mt-2">
+              <div class="flex flex-col justify-center items-center">
+                <svg class="h-7 w-5 flex-none justify-center text-indigo-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fill-rule="evenodd" d="M2 3.5A1.5 1.5 0 013.5 2h1.148a1.5 1.5 0 011.465 1.175l.716 3.223a1.5 1.5 0 01-1.052 1.767l-.933.267c-.41.117-.643.555-.48.95a11.542 11.542 0 006.254 6.254c.395.163.833-.07.95-.48l.267-.933a1.5 1.5 0 011.767-1.052l3.223.716A1.5 1.5 0 0118 15.352V16.5a1.5 1.5 0 01-1.5 1.5H15c-1.149 0-2.263-.15-3.326-.43A13.022 13.022 0 012.43 8.326 13.019 13.019 0 012 5V3.5z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="text-sm leading-2 text-justify">
+                <p class="text-slate-700">
+                    Upload your own image (up to 5MB) and perform image captioning with
+                    <a
+                      href="https://elixir-lang.org/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="font-mono font-medium text-sky-500"
+                      >
+                    Elixir
+                    </a>
+                    !
+                </p>
+              </div>
+            </div>
+            <p class="mt-4 text-center text-sm leading-2 text-gray-400">
               Powered with
               <a
                 href="https://elixir-lang.org/"
@@ -80,7 +89,7 @@
             </p>
 
             <!-- File upload section -->
-            <div class="border-gray-900/10">
+            <div class="border-gray-900/10 mt-4">
               <div class="col-span-full">
                 <div
                   class="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10"
@@ -162,14 +171,17 @@
             <% end %>
 
             <!-- Prediction text -->
-            <div class="flex mt-2 space-x-1.5 items-center font-bold text-gray-900 text-xl">
-              <span>Description: </span>
+            <div class="flex mt-2 space-x-1.5 items-center">
+              <span class="font-bold text-gray-900">Description: </span>
               <!-- conditional Spinner or display caption text or waiting text-->
-              <AppWeb.Spinner.spin spin={@upload_running?} />
-              <%= if @label do %>
-              <span class="text-gray-700 font-light"><%= @label %></span>
+              <%= if @upload_running? do %>
+                <AppWeb.Spinner.spin spin={@upload_running?} />
               <% else %>
-              <span class="text-gray-300 font-light">Waiting for image input.</span>
+                <%= if @label do %>
+                <span class="text-gray-700 font-light"><%= @label %></span>
+                <% else %>
+                <span class="text-gray-300 font-light text-justify">Waiting for image input.</span>
+                <% end %>
               <% end %>
             </div>
 

@@ -199,10 +199,10 @@ defmodule AppWeb.PageLive do
          )}
 
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
-      %{error: errors} ->
-        Logger.warning("⚠️ Error uploading image. #{inspect(errors)}")
-        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
-    end
+      %{error: error} ->
+        Logger.warning("⚠️ Error uploading image. #{inspect(error)}")
+        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{error}"})}
+      end
   end
 
   # This function is called whenever a user records their voice.

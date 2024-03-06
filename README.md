@@ -3425,12 +3425,14 @@ so this part of your code will shrink to:
 
 ```elixir
 <!-- Spinner -->
-<AppWeb.Spinner.spin spin={@upload_running?} />
-
-<%= if @label do %>
-  <span class="text-gray-700 font-light"><%= @label %></span>
+<%= if @upload_running? do %>
+  <AppWeb.Spinner.spin spin={@upload_running?} />
 <% else %>
-  <span class="text-gray-300 font-light">Waiting for image input.</span>
+  <%= if @label do %>
+  <span class="text-gray-700 font-light"><%= @label %></span>
+  <% else %>
+  <span class="text-gray-300 font-light text-justify">Waiting for image input.</span>
+  <% end %>
 <% end %>
 ```
 
@@ -5341,9 +5343,9 @@ def handle_progress(:image_list, entry, socket) when entry.done? do
          )}
 
       # Otherwise, if there was an error uploading the image, we log the error and show it to the person.
-      %{error: errors} ->
-        Logger.warning("⚠️ Error uploading image. #{inspect(errors)}")
-        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3"})}
+      %{error: error} ->
+        Logger.warning("⚠️ Error uploading image. #{inspect(error)}")
+        {:noreply, push_event(socket, "toast", %{message: "Image couldn't be uploaded to S3.\n#{error}"})}
     end
   end
 ```
