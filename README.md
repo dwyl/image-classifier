@@ -122,7 +122,7 @@ as vectors and running `knn search` on them.
 ## Who? 👤
 
 This tutorial is aimed at `Phoenix` beginners
-that want to start exploring the machine learning capabilities
+who want to start exploring the machine-learning capabilities
 of the Elixir language within a `Phoenix` application.
 We propose to use pre-trained models from Hugging Face via `Bumblebee`
 and grasp how to:
@@ -150,7 +150,7 @@ by adding **semantic search**.
 
 ## Prerequisites
 
-This tutorial requires you have `Elixir` and `Phoenix` installed.
+This tutorial requires you to have `Elixir` and `Phoenix` installed.
 
 If you don't, please see [how to install Elixir](https://github.com/dwyl/learn-elixir#installation) and [Phoenix](https://hexdocs.pm/phoenix/installation.html#phoenix).
 
@@ -169,7 +169,7 @@ In addition to this, **_some_ knowledge of `AWS`** - what it is, what an `S3` bu
 
 ## 🌄 Image Captioning in `Elixir`
 
-In this section, we'll be start building our application
+In this section, we'll start building our application
 with `Bumblebee` that supports Transformer models.
 At the end of this section,
 you'll have a fully functional application
@@ -246,7 +246,7 @@ config :nx, default_backend: EXLA.Backend
 As it stands, our project is not using `LiveView`.
 Let's fix this.
 
-This will launch a super-powered process that establishes a websocket connection
+This will launch a super-powered process that establishes a WebSocket connection
 between the server and the browser.
 
 In `lib/app_web/router.ex`, change the `scope "/"` to the following.
@@ -555,10 +555,10 @@ end
 - the `progress` field is handled by the `handle_progress/3` function.
   It receives chunks from the client with a build-in `UploadWriter` function
   (as explained in the [docs](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.UploadWriter.html)).
-  When the chunks are all consummed, we get the boolean `entry.done? == true`.
+  When the chunks are all consumed, we get the boolean `entry.done? == true`.
   We consume the file in this function by using
   [`consume_uploaded_entry/3`](https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html#consume_uploaded_entry/3).
-  The anonymous function to return `{:ok, data}` or `{:postpone, message}`.
+  The anonymous function returns `{:ok, data}` or `{:postpone, message}`.
   Whilst consuming the entry/file,
   we can access its path and then use its content.
   _For now_, we don't need to use it.
@@ -589,7 +589,7 @@ It's time to do some image captioning! 🎉
 
 We first need to add some initial setup in the
 `lib/app/application.ex` file.
-Head over there and and change
+Head over there and change
 the `start` function like so:
 
 ```elixir
@@ -621,7 +621,7 @@ def serving do
 end
 ```
 
-We are using [`Nx.Serving`](https://hexdocs.pm/nx/Nx.Serving.html), which simply allows us to encapsulates tasks; it can be networking, machine learning, data processing or any other task.
+We are using [`Nx.Serving`](https://hexdocs.pm/nx/Nx.Serving.html), which simply allows us to encapsulate tasks; it can be networking, machine learning, data processing or any other task.
 
 In this specific case, we are using it to **batch requests**.
 This is extremely useful and important because we are using models that typically run on
@@ -922,7 +922,7 @@ as detailed earlier.
 We use [`flatten/1`](https://hexdocs.pm/vix/Vix.Vips.Operation.html#flatten/2)
 to flatten the alpha out of the image.
 
-The resulting image has its colourspaced changed
+The resulting image has its colourspace changed
 by calling [`colourspace/3`](https://hexdocs.pm/vix/Vix.Vips.Operation.html#colourspace/3),
 where we change the to `sRGB`.
 
@@ -1086,7 +1086,7 @@ Once a prediction is made, display it!
 
 You can and **should** try other models.
 `ResNet-50` is just one of the many that are supported by `Bumblebee`.
-You can see the supported models in https://github.com/elixir-nx/bumblebee#model-support.
+You can see the supported models at https://github.com/elixir-nx/bumblebee#model-support.
 
 #### 4.6 Considerations on user images
 
@@ -1108,7 +1108,7 @@ We have to understand that:
 We can avoid both of these downsides by moving this work to the client.
 We can leverage the
 [`Canvas API` ](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
-to decode and downsize this image in the client-side,
+to decode and downsize this image on the client-side,
 reducing server workload.
 
 You can see an example implementation of this technique
@@ -1118,7 +1118,7 @@ at https://github.com/elixir-nx/bumblebee/blob/main/examples/phoenix/image_class
 However, since we are not using `JavaScript` for anything,
 we can (and _should_!) properly downsize our images
 so they better fit the training dataset of the model we use.
-This will allow the model to process faster,
+This will allow the model to process faster
 since larger images carry over more data that is ultimately unnecessary
 for models to make predictions.
 
@@ -1202,7 +1202,7 @@ For this, we can leverage the
 [`upload_errors/2`](https://hexdocs.pm/phoenix_live_view/Phoenix.Component.html#upload_errors/2)
 function.
 This function will return the entry errors for an upload.
-We need to add an handler for one of these errors to show it first.
+We need to add a handler for one of these errors to show it first.
 
 Head over `lib/app_web/live/page_live.ex`
 and add the following line.
@@ -1652,14 +1652,14 @@ window.liveSocket = liveSocket;
   with a property **`ActivityTracker`**.
   This hook has the `mounted()` function
   that is executed when the component that is hooked with this hook is mounted.
-  You can find more information in https://hexdocs.pm/phoenix_live_view/js-interop.html.
+  You can find more information at https://hexdocs.pm/phoenix_live_view/js-interop.html.
 - inside the `mounted()` function,
   we create a `resetInactivityTimer()` function
   that is executed every time the
   **mouse moves** (`mousemove` event)
   and a **key is pressed**(`keydown`).
   This function resets the timer
-  that is run whilst there is lack of inactivity.
+  that is run whilst there is a lack of inactivity.
 - if the person is inactive for _8 seconds_,
   we create an event `"show_examples"`.
   We will create a handler in the LiveView
@@ -1737,7 +1737,7 @@ We've added **three new assigns**:
 Awesome! Let's continue.
 
 As we've mentioned before,
-we need to create a handler to our `"show_examples"` event.
+we need to create a handler for our `"show_examples"` event.
 
 Add the following function to the file.
 
@@ -1787,7 +1787,7 @@ Add the following function to the file.
   We are using a module constant `@image_width 640` on top of the file,
   so add that to the top of the file.
   This function is relevant because we preferably want to deal
-  with images that are in the same resolution of the dataset the model was trained in.
+  with images that are in the same resolution as the dataset the model was trained in.
 - we are creating **two async tasks** that retrieve the binary of the image
   and pass it on to a `predict_example_image/1` function
   (we will create this function next).
@@ -1849,7 +1849,7 @@ Great job! 👏
 Our example images async tasks have successfully been created
 and are on their way to the model!
 
-Now we need to handle these newly-created async tasks
+Now we need to handle these newly created async tasks
 once they are completed.
 As we know, we are handling our async tasks completion
 in the `def handle_info({ref, result}, %{assigns: %{task_ref: ref}} = socket)` function.
@@ -2175,7 +2175,7 @@ we are using additional CPU
 to base64 encode our images
 so they can be shown to the person.
 
-Initially we did this because
+Initially, we did this because
 `https://source.unsplash.com/random/`
 resolves into a different URL every time it is called.
 This means that the image that was fed into the model
@@ -2342,7 +2342,7 @@ in `handle_info/3`.
 
 And that's it!
 
-That last thing we need to do is change our view
+The last thing we need to do is change our view
 so it uses the `:url` parameter
 instead of the obsolete `:base64_encoded_url`.
 
@@ -2733,7 +2733,7 @@ and change the function to the following.
 
 Check the comment lines for more explanation on the changes that have bee nmade.
 We are using `ExImageInfo` to fetch the information from the image
-and assigning it to the `image_info` socket we've defined earlier.
+and assigning it to the `image_info` socket we defined earlier.
 
 We are also using `Image.upload_image_to_s3/2` to upload our image to `imgup`.
 Let's define this function in `lib/app/image.ex`.
@@ -2820,7 +2820,7 @@ and the result of the classifying model
 > we recommend using [`DBeaver`](https://dbeaver.io/),
 > an open-source database manager.
 >
-> You can learn more about it in https://github.com/dwyl/learn-postgresql.
+> You can learn more about it at https://github.com/dwyl/learn-postgresql.
 
 ### 10. Adding double MIME type check and showing feedback to the person in case of failure
 
@@ -2888,14 +2888,14 @@ to properly handle this new function output.
 We are also introducing a double MIME type check to ensure that only image files are uploaded and processed.
 We use [GenMagic](https://hexdocs.pm/gen_magic/readme.html). It provides supervised and customisable access to `libmagic` using a supervised external process.
 [This gist](https://gist.github.com/leommoore/f9e57ba2aa4bf197ebc5) explains that Magic numbers are the first bits of a file
-which uniquely identify the type of file.
+which uniquely identifies the type of file.
 
 We use the GenMagic server as a daemon; it is started in the Application module.
 It is referenced by its name.
 When we run `perform`, we obtain a map and compare the mime type with the one read by `ExImageInfo`.
-If they correspond with each other, we continue, else we stop the process.
+If they correspond with each other, we continue, or else we stop the process.
 
-On your computer, in order for this to work locally, you should install the package `libmagic-dev`.
+On your computer, for this to work locally, you should install the package `libmagic-dev`.
 
 > [!NOTE]
 >
@@ -3151,7 +3151,7 @@ If `imgup` is down or the image that was sent was for example, invalid, an error
 
 ### 11. Benchmarking image captioning models
 
-You may be wondering which model is best suitable for me?
+You may be wondering: which model is most suitable for me?
 Depending on the use case,
 `Bumblebee` supports different models
 for different scenarios.
@@ -3188,14 +3188,14 @@ inside the
 > [!NOTE]
 >
 > This section was kindly implemented and documented by
-> [@ndrean](https://github.com/ndrean). It is based on artciles written by Sean Moriarty's published in the Dockyard's blog.
+> [@ndrean](https://github.com/ndrean). It is based on articles written by Sean Moriarty's published in the Dockyard's blog.
 > Do check him out! 🎉
 
 We can leverage machine learning to greatly improve this search process:
 we'll look for images whose captions _are close in terms of meaning_
 to the search.
 
-In this section you'll learn how to perform
+In this section, you'll learn how to perform
 [**semantic search**](https://www.elastic.co/what-is/semantic-search)
 with machine learning.
 These techniques are widely used in search engines,
@@ -3219,7 +3219,7 @@ Here's an overview of how semantic search usually works
 
 > Source: https://www.elastic.co/what-is/semantic-search
 
-We will use the following tool chain:
+We will use the following toolchain:
 
 <p align="center">
   <img width="800" src="https://github.com/ndrean/image-classifier/assets/6793008/f5aad51b-2d49-4184-b5a4-07236449c821" />
@@ -3229,7 +3229,7 @@ We will use the following tool chain:
 
 We simply let the user start and stop the recording
 by using a submit button in a form.
-This can of course by greatly refined by using Voice Detection. You may find an example [here](https://github.com/ricky0123/vad).
+This can of course be greatly refined by using Voice Detection. You may find an example [here](https://github.com/ricky0123/vad).
 
 Firstly, we will:
 
@@ -3310,21 +3310,21 @@ Additionally, you don't rely on a framework that does the heavy lifting for you.
 We're here to learn, aren't we? 😃
 
 We will append incrementally the computed embedding from the captions into the Index.
-We will get an indice which is simply is the order of this embedding in the Index.
+We will get an indice which simply is the order of this embedding in the Index.
 We then run a "knn_search" algorithm; the input will be the embedding of the audio transcript.
 This algorithm will return the most relevant position(s) - `indices` -
-among the `Index` indices that minimize the choosen distance between this input and the existing vectors.
+among the `Index` indices that minimize the chosen distance between this input and the existing vectors.
 
 This is where we'll need to save:
 
 - whether the index,
 - or the embedding
 
-to look-up for the corresponding image(s), depending upon if you append items one by one or by batch.
+to look up for the corresponding image(s), depending upon if you append items one by one or by batch.
 
-In our case, you will append items one by one so we will use the indice to uniquely recover the nearest image whose caption is close semantically to our audio.
+In our case, you will append items one by one so we will use the index to uniquely recover the nearest image whose caption is close semantically to our audio.
 
-Do note that the measured distance is dependant on the [similarity metric](https://www.pinecone.io/learn/vector-similarity/)
+Do note that the measured distance is dependent on the [similarity metric](https://www.pinecone.io/learn/vector-similarity/)
 used by the embedding model.
 Because the "sentence-transformer" model we've chosen was trained with **_cosine_similarity_**,
 this is what we'll use.
@@ -3332,7 +3332,7 @@ Bumblebee may have options to correctly use this metric, but we used a normalisa
 
 ### 1. Pre-requisites
 
-We have already installed all dependencies that we need.
+We have already installed all the dependencies that we need.
 
 > [!WARNING] > **You will also need to install [`ffmpeg`](https://ffmpeg.org/)**.
 > Indeed, `Bumblebee` uses `ffmpeg` under the hood to process audio files into tensors,
@@ -3344,16 +3344,16 @@ And now we're ready to rock and roll! 🎸
 
 > **Source:** <https://dockyard.com/blog/2023/03/07/audio-speech-recognition-in-elixir-with-whisper-bumblebee?utm_source=elixir-merge>
 
-We firstly need to capture the audio and upload it to the server.
+We first need to capture the audio and upload it to the server.
 
 The process is quite similar to the image upload, except that we
 use a special Javascript hook to record the audio
-and upload it to the Phoenix Liveview.
+and upload it to the Phoenix LiveView.
 
-We use an `live_file_input` in a form to capture the audio and use the Javascript `MediaRecorder API`.
+We use a `live_file_input` in a form to capture the audio and use the Javascript `MediaRecorder API`.
 The Javascript code is triggered by an attached hook `Audio` declared in the HTML.
 We also let the user listen to his audio by adding an [embedded audio element](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/audio) `<audio>` in the HTML.
-Its source is the audio blob as an URL object.
+Its source is the audio blob as a URL object.
 
 #### 1.1 Adding a loading spinner
 
@@ -3558,7 +3558,7 @@ def mount(_,_,socket) do
 end
 ```
 
-We then create a specific `handle_progress` for the the `:speech` event
+We then create a specific `handle_progress` for the `:speech` event
 as we did with the `:image_list` event.
 It will launch a task to run the **Automatic Speech Recognition model**
 on this audio file.
@@ -4069,7 +4069,7 @@ Since this transformer is trained with a `cosine metric`,
 we embed the vector space of embeddings with the same distance.
 You can read more about [cosine_similarity here](https://en.wikipedia.org/wiki/Cosine_similarity).
 
-This model is loaded and served by an `Nx.Serving` started in the Application modeule like all other models.
+This model is loaded and served by an `Nx.Serving` started in the Application module like all other models.
 
 #### 3.1 The `HNSWLib` Index (GenServer)
 
@@ -4088,14 +4088,14 @@ When the app starts, we either read or create this file. The file is saved in th
 
 Because we are deploying with Fly.io, we need to persist the Index file in the database because the machine - thus its attached volume - is pruned when inactive.
 
-It is crucial to save the correspondance between the `Image` table and the Index file to retrieve the correct images.
+It is crucial to save the correspondence between the `Image` table and the Index file to retrieve the correct images.
 In simple terms, **the file in the `Index` table in the DB must correspond to the Index file in the system.**
 
-We therefore disable a user to load several times the same file as otherwise,
-we would have the several indexes for the same picture.
+We therefore disable a user from loading several times the same file as otherwise,
+we would have several indexes for the same picture.
 This is done through **SHA computation**.
 
-Since computations using models is a long run process,
+Since computations using models is a long-run process,
 and because several users may interact with the app,
 we need several steps to ensure that the information is synchronized between the database and the index file.
 
@@ -4297,18 +4297,18 @@ end
 Let's unpack a bit of what we are doing here.
 
 - we first are **defining the module constants**.
-  In here, we add the dimensions of the embedding vector space
+  Here, we add the dimensions of the embedding vector space
   (these are dependent on the model you choose).
   Check with the model you've used to tweak this settings optimally.
 
 - define the upload directory where **the index file will be saved inside the filesystem**.
 - when the GenServer is initialized (`init/1` function),
-  we perform a number of _integrity verifications_,
+  we perform several _integrity verifications_,
   checking if both the `Index` file in the filesystem
   and the file in the `Index` table
   (from now on, this table will be called `HnswlibIndex`,
   under the name of the same schema).
-  This validations essentially make sure the content
+  These validations essentially make sure the content
   of both files are the same.
 
 - the other functions provide a basic API for
@@ -4431,10 +4431,10 @@ In this module:
 - `lock_version` will be extremely useful to
   perform [**optmistic locking**](https://stackoverflow.com/questions/129329/optimistic-vs-pessimistic-locking),
   which is what we do in the `changeset/2` function.
-  This will allows us to prevent deadlocking
+  This will allow us to prevent deadlocking
   when two different people upload the same image at the same time,
   and overcome any race condition that may occur.
-  This will maintain the data consistenty in the Index file.
+  This will maintain the data consistency in the Index file.
 
 - `maybe_load_index_from_db/3` fetches the singleton row
   on this table and checks if the file exists in the row.
@@ -4647,7 +4647,7 @@ end
 
 ### 4. Using the Index and embeddings
 
-In this section we'll go over how to use the Index
+In this section, we'll go over how to use the Index
 and the embeddings and tie everything together to
 have a working application 😍.
 
@@ -4657,7 +4657,7 @@ the math behind it and see a working example
 of running an embedding model,
 you can check the next section.
 However, _it is entirely optional_
-and not necessary to for our app.
+and not necessary for our app.
 
 #### 4.0 Working example on how to use `HNSWLib`
 
@@ -4667,16 +4667,16 @@ or in a Livebook.
 > [!NOTE]
 >
 > This whole section is _entirely optional_.
-> It will just delve more deeply in embedding
+> It will just delve more deeply into embedding
 > and provide you with a one-file working example
-> where you can play around vector embeddings
+> where you can play around with vector embeddings
 > and get a feel of how everything works.
 
 You can endow the vector space with the following metrics by setting the `space` argument from the list:
 
 `[:l2, :ip, :cosine]`
 
-The first is the standard euclidean metric, the second the inner product, and the third the pseudo-metric "cosine similarity".
+The first is the standard Euclidean metric, the second the inner product, and the third the pseudo-metric "cosine similarity".
 
 We use the small model `"sentence-transformers/paraphrase-MiniLM-L6-v2"` to compute embeddings from text.
 We then use it with `Nx.Serving` to run the model.
@@ -4756,10 +4756,10 @@ When you append an entry one by one, you can get the final indice of the Index w
 HNSWLib.Index.get_current_count(index)
 ```
 
-This means you can persist the indice to uniquely identity an item.
+This means you can persist the index to uniquely identify an item.
 
 You can also enter a batch of items. You will only get back the last indice.
-This means that if you may need to persist the embedding if you want to identify the input in this case.
+This means that you may need to persist the embedding if you want to identify the input in this case.
 
 Let's enter another entry:
 
@@ -4851,11 +4851,11 @@ recover the first embedding.
 
 ##### 4.0.1 Notes on vector spaces
 
-A vector space of embeddings can be equiped with an (euclidean) _inner product_. If $u=(u_1,\dots,u_n)$ and $v=(v_1,\dots,v_n)$ are two embeddings, the (euclidean) inner product is defined as:
+A vector space of embeddings can be equipped with a (Euclidean) _inner product_. If $u=(u_1,\dots,u_n)$ and $v=(v_1,\dots,v_n)$ are two embeddings, the (euclidean) inner product is defined as:
 
 $< u,v >=u_1v_1+\cdots+u_nv_n$
 
-This inner product induces an euclidean _norm_:
+This inner product induces an Euclidean _norm_:
 
 $||u|| = \sqrt{< u,u >} = \sqrt{u_1^2+\cdots+u_n^2}$
 
@@ -4881,7 +4881,7 @@ $d(u,v) = ||u-v||$
 By definition,  
 $||u-v||^2  = < u-v,u-v >$.
 
-By developping, we obtain:
+By developing, we obtain:
 
 $||u-v||^2  = ||u||^2+||v||^2-2< u,v >$
 
@@ -4890,9 +4890,9 @@ $\frac12||u-v||^2=1-\cos\widehat{u,v} = d_c(u,v)$
 
 This is commonly known as the **cosine distance** _when the embeddings are normalised_. It ranges from 0 to 2. Note that it is not a true distance metric.
 
-Finally, note that since we are dealing with finite dimensional vector spaces, all the norms are equivalent (in some precise mathematical way). This means that the limit points are always the same. However, the values of the distances can be quite different, and a "clusterisation" processes can give significantly different results.
+Finally, note that since we are dealing with finite dimensional vector spaces, all the norms are equivalent (in some precise mathematical way). This means that the limit points are always the same. However, the values of the distances can be quite different, and a "clusterisation" process can give significantly different results.
 
-The first hint to which norm to choose is to take the norm used to train the model.
+The first hint as to which norm to choose is to take the norm used to train the model.
 
 #### 4.1 Computing the embeddings in our app
 
@@ -4918,10 +4918,10 @@ end
 ```
 
 Recall that every time you upload an image,
-you get back an URL from our bucket
+you get back a URL from our bucket
 and you compute a caption as a string.
 We will now compute an embedding from this string
-and save it into the Index.
+and save it in the Index.
 This is done in the `handle_info` callback.
 
 Update the Liveview `handle_info` callback where we handle the captioning results:
@@ -5127,7 +5127,7 @@ In our `changeset/2` function,
 we've fundamentally added two `unique_constraint/3` functions
 to check for the uniqueness of the newly added
 `idx` and `sha1` function.
-These are enforced at database level so we don't have
+These are enforced at the database level so we don't have
 duplicated images.
 
 In addition to these changes,
@@ -5164,8 +5164,8 @@ And that's all we need to deal with our images!
 
 Now we have
 
-- all the embeddings models ready to be used,
-- our Index files correctly created and maintained through
+- all the embedding models ready to be used,
+- our Index file correctly created and maintained through
   filesystem and in the database in the `hnswlib_index` schema,
 - the needed `sha1` functions to check for duplicated images.
 
@@ -5232,9 +5232,9 @@ To reiterate:
   - `transcription` will pertain to the result of the audio transcription
     that will occur after transcribing the audio from the person.
   - `mic_off?` is simply a toggle to visually show the person
-    that the microphone is recording or not.
+    whether the microphone is recording or not.
   - `audio_running?` is a boolean to show the person
-    if the audio transcription and semantic searching is occuring (loading).
+    if the audio transcription and semantic searching are occuring (loading).
   - `audio_search_result` is the result of the image
     that is closest semantically to the image's label from the
     transcribed audio.
@@ -5361,26 +5361,26 @@ but for clarification, we'll go over them again.
   the image goes through an array of validations.
 
   - we use `magic_check/1` to check the MIME type of the image validity.
-  - we use read the contents of the image using `ExImageInfo.info/1`.
+  - we read the contents of the image using `ExImageInfo.info/1`.
   - we check if the MIME type is valid using `check_mime/2`.
   - we calculate the `sha1` with the `App.Image.calc_sha1/1` function
     we've developed earlier.
   - we resize the image and scale it down to the same width
-    of the images that are trained using the image captioning model we've chosen
-    (to yield better results and to save memory bandwith).
+    as the images that are trained using the image captioning model we've chosen
+    (to yield better results and to save memory bandwidth).
     We use `Vix.Operations.thumbnail/3` to resize the image.
   - finally, we convert the resized image to a tensor using
     `pre_process_image/1` so it can be consumed by our image captioning model.
 
-- after these series of validations,
+- after this series of validations,
   we use the image info we've obtained earlier to
   **create an "early-save" of the image**.
   With this, we are saving the image and associating it with
   the `sha1` that was retrieved from the image contents.
   We are doing this "partial image saving"
-  in case two same images are being uploaded at the same time.
-  Because we are enforcing `sha1` to be unique at database level,
-  this race condition is solved by the database to us optimistically.
+  in case two identical images are being uploaded at the same time.
+  Because we are enforcing `sha1` to be unique at the database level,
+  this race condition is solved by the database optimistically.
 
 - afterwards, we call `handle_upload/0`.
   This function will upload the image to the `S3` bucket.
@@ -5389,14 +5389,14 @@ but for clarification, we'll go over them again.
 - if the upload is successful,
   using the tensor and the image information from the previous steps,
   we spawn the async task to run the model.
-  This step should be familiar to you,
+  This step should be familiar to you
   since we've already implemented this.
   Finally, we update the socket assigns accordingly.
 
 - we handle all possible errors in the `else` statement of the
   `with` flow control statement before the image is uploaded.
 
-Hopefully this demystifies some of the code we've just implemented!
+Hopefully, this demystifies some of the code we've just implemented!
 
 Because we are using `handle_upload/0` in this function
 to upload the image to our `S3` bucket,
@@ -5483,7 +5483,7 @@ Similarly to the `handle_progress/3` function of the `:image_list` uploads,
 we also use `consume_uploaded_entry/3` to consume the audio file.
 
 - we consume the audio file and save it in our filesystem
-  as an `.wav` file.
+  as a `.wav` file.
 - we spawn the async task and use the `whisper` audio transcription model
   with the audio file we've just saved.
 - we update the socket assigns accordingly.
@@ -5496,7 +5496,7 @@ In this section, we'll finally use
 our embedding model and semantically search for our images!
 
 As you've seen in the previous section,
-we've spawn the task to transcribe the audio into the `whipser` model.
+we've spawned the task to transcribe the audio into the `whipser` model.
 Now we need a handler!
 For this scenario,
 add the following function.
@@ -5572,7 +5572,7 @@ Let's break down this function:
   - the `knn search` returns the closest semantical image
     (through the image caption)
     from the audio transcription.
-  - upon success of this process, we update the socket assigns.
+  - upon the success of this process, we update the socket assigns.
   - otherwise, we handle each error case accordingly
     and update the socket assigns.
 
@@ -5721,7 +5721,7 @@ Let's go over the flow of this function:
 
 - we extract the captioning label from the result of the image captioning model.
   This code is the same as it was before.
-- afterwards we get the label
+- afterwards, we get the label
   and **feed it into the embedding model**.
 - the embedding model yields the embedding,
   _we normalize it_ and **check if the `sha1` code of the image is already being used**.
@@ -6027,7 +6027,7 @@ the results.
 
 And with that, you've successfully added
 semantic searching into the application!
-Give yourself a pat on the back! 👏
+Pat yourself on the back! 👏
 
 You've expanded your knowledge in key areas of machine learning
 and artificial intelligence,
@@ -6036,7 +6036,7 @@ that is increasingly becoming more prevalent!
 ## _Please_ star the repo! ⭐️
 
 If you find this package/repo useful,
-please star on GitHub, so that we know! ⭐
+please star it on GitHub, so that we know! ⭐
 
 Thank you! 🙏
 
