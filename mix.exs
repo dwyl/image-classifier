@@ -79,6 +79,7 @@ defmodule App.MixProject do
       {:mock, "~> 0.3.0", only: :test},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+      # {:wallaby, "~> 0.30.6", only: :test, runtime: false}
     ]
   end
 

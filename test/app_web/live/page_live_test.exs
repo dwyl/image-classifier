@@ -3,8 +3,12 @@ defmodule AppWeb.PageLiveTest do
   import Phoenix.LiveViewTest
   import AppWeb.UploadSupport
   import Mock
+  # use Wallaby.Feature
+  # import Wallaby.Query
 
   @moduledoc false
+
+  # {:ok, _} = Application.ensure_all_started(:wallaby)
 
   test "connected mount", %{conn: conn} do
     conn = get(conn, "/")
@@ -30,6 +34,22 @@ defmodule AppWeb.PageLiveTest do
     # Should show "Examples" title
     assert render(lv) =~ "Examples"
   end
+
+  # ############################################################
+  # # DISPLAY WHEN NAVIGATING-----------------------------------
+  # ############################################################
+  # feature "Display only Image component on mount", %{session: session} do
+  #   session
+  #   |> visit("/")
+  #   |> assert_has(css("#audio-component", style: "display: none;"))
+  # end
+
+  # feature "Display only Audio component when click on audio link", %{session: session} do
+  #   session
+  #   |> visit("/")
+  #   |> click(link("#aud"))
+  #   |> assert_has(css("#image-component", style: "display: none;"))
+  # end
 
   ############################################################
   # SUCCESSFUL SCENARIOS -------------------------------------
@@ -357,7 +377,8 @@ defmodule AppWeb.PageLiveTest do
 
     reset()
 
-    assert {:error, "Error comparing the index file with the one on the database. Incoherence on table."} ==
+    assert {:error,
+            "Error comparing the index file with the one on the database. Incoherence on table."} ==
              Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
              |> elem(1)
              |> elem(0)

@@ -64,6 +64,106 @@ defmodule AppWeb.PageLive do
   end
 
   @impl true
+  def handle_params(q_string, _uri, socket) do
+    # list of ids of the tabs/elements
+    nav_elts = ["#image-component", "#audio-component"]
+    base = "p-4"
+    styled = "bg-[bisque]"
+
+    view =
+      case map_size(q_string) do
+        # on mount
+        0 -> "#image-component"
+        _ -> "#" <> Map.get(q_string, "display")
+      end
+
+    active =
+      fn current ->
+        [base, current === view && styled]
+      end
+
+    display =
+      fn current ->
+        nav_elts
+        |> Enum.filter(&(&1 !== current))
+        |> Enum.reduce(%JS{}, fn elt, acc ->
+          acc |> JS.hide(to: elt)
+        end)
+        |> JS.show(to: current)
+      end
+
+    {:noreply, assign(socket, active: active, display: display)}
+  end
+
+  @impl true
+
+  def render(assigns) do
+    ~H"""
+    <div class="hidden" id="tracker_el" phx-hook="ActivityTracker" />
+    <AppWeb.Nav.render display={assigns.display} active={assigns.active} />
+    <div class="h-full w-full px-4 py-10 flex justify-center sm:px-6 sm:py-24 lg:px-8 xl:px-28 xl:py-32">
+      <div class="flex flex-col justify-start">
+        <div class="2xl:space-y-12">
+          <div class="mx-auto max-w-2xl lg:text-center">
+            <p>
+              <span class="rounded-full w-fit bg-brand/5 px-2 py-1 text-[0.8125rem] font-medium text-center leading-6 text-brand">
+                <a
+                  href="https://hexdocs.pm/phoenix_live_view/Phoenix.LiveView.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  🔥 LiveView
+                </a>
+                +
+                <a
+                  href="https://github.com/elixir-nx/bumblebee"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  🐝 Bumblebee
+                </a>
+              </span>
+            </p>
+
+            <p class="text-lg leading-8 text-gray-400">
+              Powered with
+              <a
+                href="https://elixir-lang.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-mono font-medium text-sky-500"
+              >
+                HuggingFace🤗
+              </a>
+              transformer models,
+              you can run this project locally and perform machine learning tasks with a handful lines of code.
+            </p>
+          </div>
+        </div>
+        <AppWeb.ImageComponent.render
+          uploads={assigns.uploads}
+          image_preview_base64={assigns.image_preview_base64}
+          upload_running?={assigns.upload_running?}
+          label={assigns.label}
+          example_list={assigns.example_list}
+        />
+        <AppWeb.AudioComponent.render
+          uploads={assigns.uploads}
+          mic_off?={assigns.mic_off?}
+          audio_running?={assigns.audio_running?}
+          transcription={assigns.transcription}
+          audio_search_result={assigns.audio_search_result}
+        />
+        <AppWeb.ExamplesComponent.render
+          display_list?={assigns.display_list?}
+          example_list={assigns.example_list}
+        />
+      </div>
+    </div>
+    """
+  end
+
+  @impl true
   def handle_event("noop", _params, socket) do
     {:noreply, socket}
   end

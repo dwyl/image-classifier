@@ -13,6 +13,18 @@ config :app, App.Repo,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 10
 
+# config :wallaby,
+#   base_url: "http://localhost:4002/",
+#   otp_app: :app,
+#   screenshot_on_failure: false,
+#   chromedriver: [
+#     path: "assets/node_modules//chromedriver/bin/chromedriver",
+#     # change to false if you want to see the browser in action
+#     headless: true
+#   ],
+#   driver: Wallaby.Chrome,
+#   hackney_options: [timeout: :infinity, recv_timeout: :infinity]
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :app, AppWeb.Endpoint,
