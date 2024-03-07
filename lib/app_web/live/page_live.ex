@@ -135,7 +135,7 @@ defmodule AppWeb.PageLive do
            # Check mime type
            {:check_mime, :ok} <- {:check_mime, check_mime(mime, mimetype)},
            # Get SHA1 code from the image and check it
-           sha1 <- App.Image.calc_sha1(file_binary),
+           sha1 = App.Image.calc_sha1(file_binary),
            {:sha_check, nil} <- {:sha_check, App.Image.check_sha1(sha1)},
            # Get image and resize
            {:ok, thumbnail_vimage} <- Vops.thumbnail(path, @image_width, size: :VIPS_SIZE_DOWN),
