@@ -92,22 +92,35 @@ let liveSocket = new LiveSocket("/live", Socket, {
 // Toggles to show upload or semantic search containers
 // JavaScript to toggle visibility and styles
 document.getElementById('upload_option').addEventListener('click', function() {
-  document.getElementById('upload_container').style.display = 'block'; // Show Element 1
-  document.getElementById('search_container').style.display = 'none';  // Hide Element 2
-  document.getElementById('upload_option').classList.replace('bg-gray-200', 'bg-blue-500');
-  document.getElementById('upload_option').classList.replace('text-black', 'text-white');
-  document.getElementById('search_option').classList.replace('bg-blue-500', 'bg-gray-200');
-  document.getElementById('search_option').classList.replace('text-white', 'text-black');
+  document.getElementById('upload_container').style.display = 'block';
+  document.getElementById('search_container').style.display = 'none';
+
+  document.getElementById('upload_option').classList.replace('bg-white', 'bg-blue-500');
+  document.getElementById('upload_option').classList.replace('text-gray-900', 'text-white');
+  document.getElementById('upload_option').classList.replace('hover:bg-gray-50', 'hover:bg-blue-600');
+  document.getElementById('upload_option').getElementsByTagName('svg')[0].classList.replace('text-gray-400', 'text-white');
+
+  document.getElementById('search_option').classList.replace('bg-blue-500', 'bg-white');
+  document.getElementById('search_option').classList.replace('text-white', 'text-gray-900');
+  document.getElementById('search_option').classList.replace('hover:bg-blue-600', 'hover:bg-gray-50');
+  document.getElementById('search_option').getElementsByTagName('svg')[0].classList.replace('text-white', 'text-gray-400');
 });
 
 document.getElementById('search_option').addEventListener('click', function() {
-  document.getElementById('upload_container').style.display = 'none';  // Hide Element 1
-  document.getElementById('search_container').style.display = 'block'; // Show Element 2
-  document.getElementById('upload_option').classList.replace('bg-blue-500', 'bg-gray-200');
-  document.getElementById('upload_option').classList.replace('text-white', 'text-black');
-  document.getElementById('search_option').classList.replace('bg-gray-200', 'bg-blue-500');
-  document.getElementById('search_option').classList.replace('text-black', 'text-white');
+  document.getElementById('upload_container').style.display = 'none'; 
+  document.getElementById('search_container').style.display = 'block';
+
+  document.getElementById('search_option').classList.replace('bg-white', 'bg-blue-500');
+  document.getElementById('search_option').classList.replace('text-gray-900', 'text-white');
+  document.getElementById('search_option').classList.replace('hover:bg-gray-50', 'hover:bg-blue-600');
+  document.getElementById('search_option').getElementsByTagName('svg')[0].classList.replace('text-gray-400', 'text-white');
+
+  document.getElementById('upload_option').classList.replace('bg-blue-500', 'bg-white');
+  document.getElementById('upload_option').classList.replace('text-white', 'text-gray-900');
+  document.getElementById('upload_option').classList.replace('hover:bg-blue-600', 'hover:bg-gray-50');
+  document.getElementById('upload_option').getElementsByTagName('svg')[0].classList.replace('text-white', 'text-gray-400');
 });
+
 
 // Show progress bar on live navigation and form submits
 topbar.config({ barColors: { 0: "#29d" }, shadowColor: "rgba(0, 0, 0, .3)" });

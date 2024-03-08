@@ -27,7 +27,7 @@
           </p>
 
           <!-- Toggle Buttons -->
-          <div class="flex justify-center">
+          <div class="flex justify-center lg:invisible">
             <span class="isolate inline-flex rounded-md shadow-sm mt-2">
               <button id="upload_option" type="button" class="relative inline-flex items-center gap-x-1.5 rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-10">
                 <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="-ml-0.5 h-5 w-5 text-gray-400">
@@ -44,14 +44,10 @@
             </span>
           </div>
 
-          <!-- Elements to Show/Hide -->
-          <div id="upload_container" class="p-4 my-2 border border-gray-200 rounded">Element 1 Content</div>
-          <div id="search_container" class="p-4 my-2 border border-gray-200 rounded" style="display: none;">Element 2 Content</div>
-
           <!-- Containers -->
           <div class="flex flex-col lg:flex-row lg:justify-around">
             <!-- UPLOAD CONTAINER -->
-            <div class="mb-6 lg:px-10">
+            <div id="upload_container"  class="mb-6 lg:px-10">
               <p class="mt-2 text-center text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
                 Caption your image!
               </p>
@@ -221,7 +217,7 @@
             </div>
 
             <!-- AUDIO SEMANTIC SEARCH CONTAINER -->
-            <div class="mb-6 mx-auto lg:px-10">
+            <div id="search_container" class="mb-6 mx-auto lg:px-10">
               <h2 class="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl text-center">
                 ...or search it!
               </h2>
