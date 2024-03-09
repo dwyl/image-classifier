@@ -6325,7 +6325,7 @@ Head over to `lib/app_web/live/page_live.html.heex` and change it like so:
                   <AppWeb.Spinner.spin spin={@audio_running?} />
                 <% else %>
                   <%= if @transcription do %>
-                  <span class="text-gray-700 font-light"><%= @transcription %></span>
+                  <span id="output" class="text-gray-700 font-light"><%= @transcription %></span>
                   <% else %>
                   <span class="text-gray-300 font-light text-justify">Waiting for audio input.</span>
                   <% end %>
