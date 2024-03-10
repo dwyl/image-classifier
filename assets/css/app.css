@@ -17,3 +17,10 @@ body {
   height: 100vh;
   width: 100vw;
 }
+
+/* Override the container displays to both be shown on larger screens */
+@media (min-width: 1024px) {
+  #upload_container, #search_container {
+    display: block !important; /* Override any inline styles */
+  }
+}
