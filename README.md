@@ -10,7 +10,7 @@
 Let's use `Elixir` machine learning capabilities
 to build an application
 that performs **image captioning**
-and **semantic searching**
+and **semantic search**
 to look for uploaded images
 with your voice! 🎙️
 
@@ -153,7 +153,7 @@ You'll learn how to do this _yourself_, so grab some coffee and let's get cracki
 This section will be divided into two sections.
 One will go over **image captioning**
 while the second one will expand the application
-by adding **semantic searching**.
+by adding **semantic search**.
 
 ## Prerequisites
 
@@ -5253,7 +5253,7 @@ To reiterate:
   - `mic_off?` is simply a toggle to visually show the person
     whether the microphone is recording or not.
   - `audio_running?` is a boolean to show the person
-    if the audio transcription and semantic searching are occuring (loading).
+    if the audio transcription and semantic search are occurring (loading).
   - `audio_search_result` is the result of the image
     that is closest semantically to the image's label from the
     transcribed audio.
@@ -6046,7 +6046,7 @@ We are simply showing the person
 the results.
 
 And with that, you've successfully added
-semantic searching into the application!
+semantic search into the application!
 Pat yourself on the back! 👏
 
 You've expanded your knowledge in key areas of machine learning
