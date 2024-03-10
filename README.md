@@ -10,13 +10,9 @@
 Let's use `Elixir` machine learning capabilities
 to build an application
 that performs **image captioning**
-and **semantic search**
-to search for uploaded images
+and **semantic searching**
+to look for uploaded images
 with your voice! 🎙️
-
-<p align="center">
-  <img src="https://github.com/dwyl/image-classifier/assets/17494745/05d0b510-ef9a-4a51-8425-d27902b0f7ad">
-</p>
 
 </div>
 
@@ -96,29 +92,39 @@ with your voice! 🎙️
 
 ## Why? 🤷
 
-Building our [app](https://github.com/dwyl/app),
+Whilst building our [app](https://github.com/dwyl/app),
 we consider `images` an _essential_ medium of communication.
 
-You personally may have a collection of images that you want to caption
-and semantically retrieve them fast.
+We needed a fully-offline capable (no 3rd party APIs/Services) image captioning service 
+using state-of-the-art pre-trained image and embedding models to describe images uploaded in our 
+[`App`](https://github.com/dwyl/app).
 
 By adding a way of captioning images, we make it _easy_ for people to suggest meta tags that describe images so they become **searchable**.
 
 ## What? 💭
 
-This run-through will create a simple
-`Phoenix` web application
-that will allow you to choose/drag an image
-and automatically caption the image.
+A step-by-step tutorial building a fully functional 
+`Phoenix LiveView` web application that allows anyone 
+to upload an image and have it described 
+and searchable.
 
 In addition to this,
-the app will allow the user to record an audio
+the app will allow the person to record an audio
 which describes the image they want to find.
 
 The audio will be transcribed into text
 and be semantically queryable.
 We do this by encoding the image captions
 as vectors and running `knn search` on them.
+
+We'll be using three different models:
+
+- Salesforce's BLIP model [`blip-image-captioning-large`](https://huggingface.co/Salesforce/blip-image-captioning-large)
+for image captioning.
+- OpenAI's speech recognition model 
+[`whisper-small`](https://huggingface.co/openai/whisper-small).
+- [`sentence-transformers/paraphrase-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2)
+embedding model.
 
 ## Who? 👤
 
@@ -147,7 +153,7 @@ You'll learn how to do this _yourself_, so grab some coffee and let's get cracki
 This section will be divided into two sections.
 One will go over **image captioning**
 while the second one will expand the application
-by adding **semantic search**.
+by adding **semantic searching**.
 
 ## Prerequisites
 
@@ -170,13 +176,18 @@ In addition to this, **_some_ knowledge of `AWS`** - what it is, what an `S3` bu
 
 ## 🌄 Image Captioning in `Elixir`
 
-In this section, we'll start building our application
-with `Bumblebee` that supports Transformer models.
-At the end of this section,
-you'll have a fully functional application
-that receives an image,
-processes it accordingly
-and captions it.
+> In this section, we'll start building our application
+> with `Bumblebee` that supports Transformer models.
+> At the end of this section,
+> you'll have a fully functional application
+> that receives an image,
+> processes it accordingly
+> and captions it.
+
+
+<p align="center">
+  <img src="https://github.com/dwyl/image-classifier/assets/17494745/05d0b510-ef9a-4a51-8425-d27902b0f7ad">
+</p>
 
 </div>
 
@@ -3172,13 +3183,18 @@ and all of the code
 inside the
 [`_comparison`](./_comparison/) folder.
 
+
 <div align="center">
 
 ## 🔍 Semantic search
 
-> Imagine a person wants to see an image that was uploaded
-> under a certain theme.
-> One way to solve this problem is to perform a **_full-text_ search query** on specific words among these image captions.
+> In this section, we will focus on implementing a
+> **_full-text_ search query** through the captions of the images.
+> At the end of this, 
+> you'll be able to transcribe audio,
+> create embeddings from the audio transcription
+> and search the closest related image.
+
 
 <p align="center">
   <img src="https://github.com/dwyl/image-classifier/assets/17494745/b3568de8-2b0c-4413-8528-a3aee4135ea0">
