@@ -51,8 +51,6 @@ COPY lib lib
 
 COPY assets assets
 
-RUN mkdir -p /app/.bumblebee
-
 # Install dependencies for assets folder
 RUN npm install --prefix assets
 
@@ -91,7 +89,6 @@ ENV MIX_ENV="prod"
 
 # Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app /app
-COPY --from=builder --chown=nobody:root /app/.bumblebee/ /app/.bumblebee
 
 USER nobody
 

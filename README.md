@@ -4427,7 +4427,7 @@ defmodule App.HnswlibIndex do
       HNSWLib.Index.new(space, dim, max_elements)
 
     # Builds index for testing only
-    if Mix.env() == :test do
+    if Application.get_env(:app, :use_test_models, false) do
       empty_index =
         Application.app_dir(:app, ["priv", "static", "uploads"])
         |> Path.join("indexes_empty.bin")
