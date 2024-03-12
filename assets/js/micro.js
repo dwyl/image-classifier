@@ -32,10 +32,12 @@ export default {
           mediaRecorder = new MediaRecorder(stream);
           mediaRecorder.start();
 
+          /*
           const { channelCount, sampleRate } = stream
             .getAudioTracks()[0]
             .getSettings();
           console.log(channelCount, sampleRate);
+          */
 
           // And update the elements
           recordButton.classList.remove(...blue);
