@@ -1,5 +1,6 @@
 {
 	"dependencies": {
+		"audiobuffer-to-wav": "^1.0.0",
 		"toastify-js": "^1.12.0"
 	}
 }
