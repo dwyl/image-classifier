@@ -95,17 +95,17 @@ with your voice! 🎙️
 Whilst building our [app](https://github.com/dwyl/app),
 we consider `images` an _essential_ medium of communication.
 
-We needed a fully-offline capable (no 3rd party APIs/Services) image captioning service 
-using state-of-the-art pre-trained image and embedding models to describe images uploaded in our 
+We needed a fully-offline capable (no 3rd party APIs/Services) image captioning service
+using state-of-the-art pre-trained image and embedding models to describe images uploaded in our
 [`App`](https://github.com/dwyl/app).
 
 By adding a way of captioning images, we make it _easy_ for people to suggest meta tags that describe images so they become **searchable**.
 
 ## What? 💭
 
-A step-by-step tutorial building a fully functional 
-`Phoenix LiveView` web application that allows anyone 
-to upload an image and have it described 
+A step-by-step tutorial building a fully functional
+`Phoenix LiveView` web application that allows anyone
+to upload an image and have it described
 and searchable.
 
 In addition to this,
@@ -120,11 +120,11 @@ as vectors and running `knn search` on them.
 We'll be using three different models:
 
 - Salesforce's BLIP model [`blip-image-captioning-large`](https://huggingface.co/Salesforce/blip-image-captioning-large)
-for image captioning.
-- OpenAI's speech recognition model 
-[`whisper-small`](https://huggingface.co/openai/whisper-small).
+  for image captioning.
+- OpenAI's speech recognition model
+  [`whisper-small`](https://huggingface.co/openai/whisper-small).
 - [`sentence-transformers/paraphrase-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/paraphrase-MiniLM-L6-v2)
-embedding model.
+  embedding model.
 
 ## Who? 👤
 
@@ -183,7 +183,6 @@ In addition to this, **_some_ knowledge of `AWS`** - what it is, what an `S3` bu
 > that receives an image,
 > processes it accordingly
 > and captions it.
-
 
 <p align="center">
   <img src="https://github.com/dwyl/image-classifier/assets/17494745/05d0b510-ef9a-4a51-8425-d27902b0f7ad">
@@ -3183,18 +3182,16 @@ and all of the code
 inside the
 [`_comparison`](./_comparison/) folder.
 
-
 <div align="center">
 
 ## 🔍 Semantic search
 
 > In this section, we will focus on implementing a
 > **_full-text_ search query** through the captions of the images.
-> At the end of this, 
+> At the end of this,
 > you'll be able to transcribe audio,
 > create embeddings from the audio transcription
 > and search the closest related image.
-
 
 <p align="center">
   <img src="https://github.com/dwyl/image-classifier/assets/17494745/b3568de8-2b0c-4413-8528-a3aee4135ea0">
@@ -3246,7 +3243,7 @@ We will use the following toolchain:
 
 We simply let the user start and stop the recording
 by using a submit button in a form.
-This can of course be greatly refined by using Voice Detection. You may find an example [here](https://github.com/ricky0123/vad).
+This can of course be greatly refined by using **Voice Detection**. You may find an example [here](https://github.com/ricky0123/vad).
 
 Firstly, we will:
 
@@ -3446,22 +3443,60 @@ so this part of your code will shrink to:
 
 #### 2.2 Defining `Javascript` hook
 
-We provide a basic user experience.
-We let the user click on a button to start and stop the recording.
-We do not try to resample the audio to say 16kHz nor provide automatic start/stop recording.
-We next define the hook in a new JS file, located in the `assets/js` folder.
+Currently, we provide a basic user experience:
+we let the user click on a button to start and stop the recording.
+
+When doing image captioning,
+we carefully worked on the size of the image file
+used for the captioning model
+to optimize the app's latency.
+
+In the same spirit,
+we can downsize the original audio file
+so it's easier on the model to process it.
+This will have the benefit of less overhead in our application.
+
+The main parameters we're dealing with are:
+
+- **lower sampling rate** (the higher the more accurate is the sound),
+- **use mono** instead of stereo,
+- and **the file type** (WAV, MP3)
+
+Since most microphones on PC have a single channel (mono) and sample at `48kHz`, 
+we will focus on resampling to `16kHz`.
+We will *not* make the conversion to mp3 here.
+
+Next, we define the hook in a new JS file, located in the `assets/js` folder.
+
+To resample to `16kHz`, we use an [AudioContext](https://developer.mozilla.org/en-US/docs/Web/API/AudioContext),
+and pass the desired `sampleRate`.
+We then use the method [decodeAudioData](https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/decodeAudioData)
+which receives an [AudioBuffer](https://developer.mozilla.org/en-US/docs/Web/API/AudioBuffer).
+We get one from the `Blob` method [arrayBuffer()](https://developer.mozilla.org/en-US/docs/Web/API/Blob/arrayBuffer).
+
 The important part is the `Phoenix.js` function `upload`,
-to which we pass an identifier `"speech"`
-and a list that contains the audio as a `Blob`.
+to which we pass an identifier `"speech"`:
+this sends the data as `Blob` via a channel to the server.
+
 We use an action button in the HTML,
 and attach Javascript listeners to it on the `"click"`, `"dataavailable"` and `"stop"` events.
 We also play with the CSS classes to modify the appearance of the action button when recording or not.
+
+Navigate to the `assets` folder and run the following command.
+We will use this to lower the sampling rate
+and conver the recorded audio file.
+
+```bash
+npm add "audiobuffer-to-wav"
+```
 
 Create a file called `assets/js/micro.js`
 and use the code below.
 
 ```js
 // /assets/js/micro.js
+import toWav from "audiobuffer-to-wav";
+
 export default {
   mounted() {
     let mediaRecorder,
@@ -3506,10 +3541,25 @@ export default {
           // Add "stop" event handler for when the recording stops.
           mediaRecorder.addEventListener("stop", () => {
             const audioBlob = new Blob(audioChunks);
-            // the source of the audio element
+            // update the source of the Audio tag for the user to listen to his audio
             audioElement.src = URL.createObjectURL(audioBlob);
 
-            _this.upload("speech", [audioBlob]);
+            // create an AudioContext with a sampleRate of 16000
+            const audioContext = new AudioContext({ sampleRate: 16000 });
+
+            // async read the Blob as ArrayBuffer to feed the "decodeAudioData"
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            // decodes the ArrayBuffer into the AudioContext format
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            // converts the AudioBuffer into a WAV format
+            const wavBuffer = toWav(audioBuffer);
+            // builds a Blob to pass to the Phoenix.JS.upload
+            const wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
+            // upload to the server via a chanel with the built-in Phoenix.JS.upload
+            _this.upload("speech", [wavBlob]);
+            //  close the MediaRecorder instance
+            mediaRecorder.stop();
+            // cleanups
             audioChunks = [];
             recordButton.classList.remove(...pulseGreen);
             recordButton.classList.add(...blue);
@@ -5840,8 +5890,9 @@ and update it as so:
                 <%= if @image_preview_base64 do %>
                 <form id="upload-form" phx-change="noop" phx-submit="noop">
                   <label class="cursor-pointer">
-                    <%= if not @upload_running? do %> <.live_file_input
-                    upload={@uploads.image_list} class="hidden" /> <% end %>
+                    <%= if not @upload_running? do %> 
+                      <.live_file_input upload={@uploads.image_list} class="hidden" /> 
+                    <% end %>
                     <img src="{@image_preview_base64}" />
                   </label>
                 </form>
@@ -6053,12 +6104,11 @@ You've expanded your knowledge in key areas of machine learning
 and artificial intelligence,
 that is increasingly becoming more prevalent!
 
-
 ### 5. Tweaking our UI
 
 Now that we have all the features we want in our application,
 let's make it prettier!
-As it stands, it's responsive enough. 
+As it stands, it's responsive enough.
 But we can always make it better!
 
 We're going to show you the changes you're going to need to make
@@ -6371,65 +6421,101 @@ Head over to `lib/app_web/live/page_live.html.heex` and change it like so:
 That may look like a lot, but we've done just a handful of changes!
 
 - we've reestructured our HTML so it's easier to read.
-You just have a few key elements: the pill on top of the page,
-a toggle that we've added (to show the **upload section**
-and the **search section**) and two containers
-with the upload and search section, respectively.
-The code is practically intact for each section.
+  You just have a few key elements: the pill on top of the page,
+  a toggle that we've added (to show the **upload section**
+  and the **search section**) and two containers
+  with the upload and search section, respectively.
+  The code is practically intact for each section.
 
 - we've made minor styling changes to each section.
-On the *upload section*,
-we added a small callout section.
-In the *search section*,
-we added a small calout section as well,
-and added the description of the image
-that is found after the audio transcription occurs.
+  On the _upload section_,
+  we added a small callout section.
+  In the _search section_,
+  we added a small calout section as well,
+  and added the description of the image
+  that is found after the audio transcription occurs.
 
 And that's it!
-What's important 
+What's important
 **is that only one second is shown at a time on mobile devices**
 and **both sections are shown on desktop devices**
 (over `1024` pixels - [pertaining to the `lg` breakpoint of `TailwindCSS`](https://tailwindcss.com/docs/responsive-design)).
 On desktop devices, the toggle button should disappear.
 
 To accomplish these, we need to add a bit of `Javascript` and `CSS` magic. 🪄
-Head over to `assets/js/app.js` 
+Head over to `assets/js/app.js`
 and add the following code.
 
 ```js
-document.getElementById('upload_option').addEventListener('click', function() {
-  document.getElementById('upload_container').style.display = 'block';
-  document.getElementById('search_container').style.display = 'none';
+document.getElementById("upload_option").addEventListener("click", function () {
+  document.getElementById("upload_container").style.display = "block";
+  document.getElementById("search_container").style.display = "none";
 
-  document.getElementById('upload_option').classList.replace('bg-white', 'bg-blue-500');
-  document.getElementById('upload_option').classList.replace('text-gray-900', 'text-white');
-  document.getElementById('upload_option').classList.replace('hover:bg-gray-50', 'hover:bg-blue-600');
-  document.getElementById('upload_option').getElementsByTagName('svg')[0].classList.replace('text-gray-400', 'text-white');
+  document
+    .getElementById("upload_option")
+    .classList.replace("bg-white", "bg-blue-500");
+  document
+    .getElementById("upload_option")
+    .classList.replace("text-gray-900", "text-white");
+  document
+    .getElementById("upload_option")
+    .classList.replace("hover:bg-gray-50", "hover:bg-blue-600");
+  document
+    .getElementById("upload_option")
+    .getElementsByTagName("svg")[0]
+    .classList.replace("text-gray-400", "text-white");
 
-  document.getElementById('search_option').classList.replace('bg-blue-500', 'bg-white');
-  document.getElementById('search_option').classList.replace('text-white', 'text-gray-900');
-  document.getElementById('search_option').classList.replace('hover:bg-blue-600', 'hover:bg-gray-50');
-  document.getElementById('search_option').getElementsByTagName('svg')[0].classList.replace('text-white', 'text-gray-400');
+  document
+    .getElementById("search_option")
+    .classList.replace("bg-blue-500", "bg-white");
+  document
+    .getElementById("search_option")
+    .classList.replace("text-white", "text-gray-900");
+  document
+    .getElementById("search_option")
+    .classList.replace("hover:bg-blue-600", "hover:bg-gray-50");
+  document
+    .getElementById("search_option")
+    .getElementsByTagName("svg")[0]
+    .classList.replace("text-white", "text-gray-400");
 });
 
-document.getElementById('search_option').addEventListener('click', function() {
-  document.getElementById('upload_container').style.display = 'none'; 
-  document.getElementById('search_container').style.display = 'block';
+document.getElementById("search_option").addEventListener("click", function () {
+  document.getElementById("upload_container").style.display = "none";
+  document.getElementById("search_container").style.display = "block";
 
-  document.getElementById('search_option').classList.replace('bg-white', 'bg-blue-500');
-  document.getElementById('search_option').classList.replace('text-gray-900', 'text-white');
-  document.getElementById('search_option').classList.replace('hover:bg-gray-50', 'hover:bg-blue-600');
-  document.getElementById('search_option').getElementsByTagName('svg')[0].classList.replace('text-gray-400', 'text-white');
+  document
+    .getElementById("search_option")
+    .classList.replace("bg-white", "bg-blue-500");
+  document
+    .getElementById("search_option")
+    .classList.replace("text-gray-900", "text-white");
+  document
+    .getElementById("search_option")
+    .classList.replace("hover:bg-gray-50", "hover:bg-blue-600");
+  document
+    .getElementById("search_option")
+    .getElementsByTagName("svg")[0]
+    .classList.replace("text-gray-400", "text-white");
 
-  document.getElementById('upload_option').classList.replace('bg-blue-500', 'bg-white');
-  document.getElementById('upload_option').classList.replace('text-white', 'text-gray-900');
-  document.getElementById('upload_option').classList.replace('hover:bg-blue-600', 'hover:bg-gray-50');
-  document.getElementById('upload_option').getElementsByTagName('svg')[0].classList.replace('text-white', 'text-gray-400');
+  document
+    .getElementById("upload_option")
+    .classList.replace("bg-blue-500", "bg-white");
+  document
+    .getElementById("upload_option")
+    .classList.replace("text-white", "text-gray-900");
+  document
+    .getElementById("upload_option")
+    .classList.replace("hover:bg-blue-600", "hover:bg-gray-50");
+  document
+    .getElementById("upload_option")
+    .getElementsByTagName("svg")[0]
+    .classList.replace("text-white", "text-gray-400");
 });
 ```
 
 The code is self-explanatory.
-We are changing the styles of the toggle buttons 
+We are changing the styles of the toggle buttons
 according to the button that is clicked.
 
 The other thing we need to make sure is that
@@ -6440,7 +6526,8 @@ to `assets/css/app.css`.
 
 ```css
 @media (min-width: 1024px) {
-  #upload_container, #search_container {
+  #upload_container,
+  #search_container {
     display: block !important; /* Override any inline styles */
   }
 }
@@ -6454,7 +6541,6 @@ by running `mix phx.server`!
   <img src="https://github.com/dwyl/ping/assets/17494745/bc69395a-e793-4b94-b214-27d5528d868b">
 </p>
 
-
 ## _Please_ star the repo! ⭐️
 
 If you find this package/repo useful,
@@ -6462,6 +6548,3 @@ please star it on GitHub, so that we know! ⭐
 
 Thank you! 🙏
 
-```
-
-```

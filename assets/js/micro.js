@@ -1,3 +1,5 @@
+import toWav from "audiobuffer-to-wav";
+
 export default {
   mounted() {
     let mediaRecorder,
@@ -28,7 +30,7 @@ export default {
         navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
           // Instantiate MediaRecorder
           mediaRecorder = new MediaRecorder(stream);
-          mediaRecorder.start();
+          mediaRecorder.start()
 
           // And update the elements
           recordButton.classList.remove(...blue);
@@ -41,12 +43,32 @@ export default {
           });
 
           // Add "stop" event handler for when the recording stops.
-          mediaRecorder.addEventListener("stop", () => {
+          mediaRecorder.addEventListener("stop", async () => {
             const audioBlob = new Blob(audioChunks);
-            // the source of the audio element
+
+            // update the source of the Audio tag for the user to listen to his audio
             audioElement.src = URL.createObjectURL(audioBlob);
 
-            _this.upload("speech", [audioBlob]);
+            // create an AudioContext with a sampleRate of 16000
+            const audioContext = new AudioContext({ sampleRate: 16000 });
+
+            // We optimize the audio to reduce the size of the file whilst maintaining the necessary information for the model -----------
+            // async read the Blob as ArrayBuffer to feed the "decodeAudioData"
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            // decodes the ArrayBuffer into the AudioContext format
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            // converts the AudioBuffer into a WAV format
+            const wavBuffer = toWav(audioBuffer);
+            // builds a Blob to pass to the Phoenix.JS.upload
+            const wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
+
+            
+            // upload to the server via a chanel with the built-in Phoenix.JS.upload
+            _this.upload("speech", [wavBlob]);
+            //  close the MediaRecorder instance
+            mediaRecorder.stop();
+            
+            // cleanups
             audioChunks = [];
             recordButton.classList.remove(...pulseGreen);
             recordButton.classList.add(...blue);
@@ -56,3 +78,4 @@ export default {
     });
   },
 };
+
