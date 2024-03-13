@@ -307,8 +307,6 @@ RUN mix local.hex --force && \
 
 # set build ENV
 ENV MIX_ENV="prod"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
-
 
 # install mix dependencies
 COPY mix.exs mix.lock ./
@@ -326,8 +324,6 @@ COPY priv priv
 COPY lib lib
 
 COPY assets assets
-
-RUN mkdir -p /app/.bumblebee
 
 # compile assets
 RUN mix assets.deploy
@@ -364,7 +360,6 @@ ENV MIX_ENV="prod"
 
 # Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app /app
-COPY --from=builder --chown=nobody:root /app/.bumblebee/ /app/.bumblebee
 
 USER nobody
 
@@ -376,17 +371,9 @@ USER nobody
 # Set the runtime ENV
 ENV ECTO_IPV6="true"
 ENV ERL_AFLAGS="-proto_dist inet6_tcp"
-ENV BUMBLEBEE_CACHE_DIR="/app/.bumblebee/"
-
 
 CMD ["/app/bin/server"]
 ```
-
-
-As you can see,
-this `Dockerfile` focuses on bundling the application
-and creating the `/app/.bumblebee` directory
-wherein the models will be downloaded into.
 
 In order to download the models
 so they can later be reused
@@ -582,9 +569,10 @@ Give yourself a pat on the back! 👏
 
 ## 4. Adding volumes to our machine instances
 
-We're now downloading the models on the first bootup
-into the path that we've defined in `BUMBLEBEE_CACHE_DIR`
-(we've personally set this to `/app/.bumblebee`).
+We're now downloading the models on the first bootup.
+In the `config/config.exs` file, 
+we've set this path to `.bumblebee`.
+**This means the folder will be in `app/bin/.bumblebee` in `fly.io`.**
 
 Because we want to persist these models in-between sessions
 (and because [according to `fly.io`](https://fly.io/docs/reference/volumes/), 
@@ -595,7 +583,7 @@ so we can place our models there to be persisted.
 
 Now we have two options:
 
-- if we have machines runnings,
+- if we have machines running,
 we probably have *two instances*,
 as this is the default of `fly.io`.
 If you wish to keep the same instances,
@@ -655,7 +643,7 @@ and add the following text to it.
 ```toml
 [mounts]
   source="models"
-  destination="/app/.bumblebee"
+  destination="/app/bin/.bumblebee"
 ```
 
 - **`source`** pertains to the *name of the volume*.
@@ -748,10 +736,10 @@ devtmpfs           98380       0     98380   0% /dev
 /dev/vda         8154588 1130176   6588600  15% /
 shm               111340       0    111340   0% /dev/shm
 tmpfs             111340       0    111340   0% /sys/fs/cgroup
-/dev/vdb         3061336  100284   2809836   4% /app/.bumblebee
+/dev/vdb         3061336  100284   2809836   4% /app/bin/.bumblebee
 ```
 
-As you can see, our `/app/.bumblebee` storage volume
+As you can see, our `/app/bin/.bumblebee` storage volume
 has roughly `3GB` available.
 `1GB` is being used by the models that have been downloaded
 when we initiated our machine instance.
@@ -1236,8 +1224,6 @@ COPY lib lib
 
 COPY assets assets
 
-RUN mkdir -p /app/.bumblebee
-
 # compile assets
 RUN mix assets.deploy
 
@@ -1273,7 +1259,6 @@ ENV MIX_ENV="prod"
 
 # Only copy the final release from the build stage
 COPY --from=builder --chown=nobody:root /app/_build/${MIX_ENV}/rel/app /app
-COPY --from=builder --chown=nobody:root /app/.bumblebee/ /app/.bumblebee
 
 USER nobody
 

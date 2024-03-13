@@ -1,22 +1,25 @@
-# fly.toml app configuration file generated for imgai on 2023-11-14T20:41:26Z
+# fly.toml app configuration file generated for imgai on 2024-03-11T18:20:28Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = "imgai"
-primary_region = "mad"
-kill_signal = "SIGTERM"
+app = 'imgai'
+primary_region = 'mad'
+kill_signal = 'SIGTERM'
 swap_size_mb = 512
 
 [build]
 
-[mounts]
-  source="models"
-  destination="/app/.bumblebee"
+[deploy]
+  release_command = '/app/bin/migrate'
 
 [env]
-  PHX_HOST = "imgai.fly.dev"
-  PORT = "8080"
+  PHX_HOST = 'imgai.fly.dev'
+  PORT = '8080'
+
+[[mounts]]
+  source = 'models'
+  destination = '/app/bin/.bumblebee'
 
 [http_service]
   internal_port = 8080
@@ -24,8 +27,12 @@ swap_size_mb = 512
   auto_stop_machines = true
   auto_start_machines = true
   min_machines_running = 0
-  processes = ["app"]
+  processes = ['app']
+
   [http_service.concurrency]
-    type = "connections"
+    type = 'connections'
     hard_limit = 1000
     soft_limit = 1000
+
+[[vm]]
+  size = 'performance-4x'
