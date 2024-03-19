@@ -48,7 +48,7 @@ defmodule App.MixProject do
       {:floki, ">= 0.35.2", only: :test},
       {:esbuild, "~> 0.8.1", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.2.2", runtime: Mix.env() == :dev},
-      {:telemetry_metrics, "~> 0.6"},
+      {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.4"},
       {:plug_cowboy, "~> 2.7.0"},
