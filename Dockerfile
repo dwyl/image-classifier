@@ -11,9 +11,9 @@
 #   - https://pkgs.org/ - resource for finding needed packages
 #   - Ex: hexpm/elixir:1.15.7-erlang-26.0.2-debian-bullseye-20231009-slim
 #
-ARG ELIXIR_VERSION=1.15.7
-ARG OTP_VERSION=26.0.2
-ARG DEBIAN_VERSION=bullseye-20231009-slim
+ARG ELIXIR_VERSION=1.16.2
+ARG OTP_VERSION=25.3.2.10
+ARG DEBIAN_VERSION=bullseye-20240130
 
 ARG BUILDER_IMAGE="hexpm/elixir:${ELIXIR_VERSION}-erlang-${OTP_VERSION}-debian-${DEBIAN_VERSION}"
 ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
@@ -21,8 +21,14 @@ ARG RUNNER_IMAGE="debian:${DEBIAN_VERSION}"
 FROM ${BUILDER_IMAGE} as builder
 
 # install build dependencies (and curl for EXLA)
-RUN apt-get update -y && apt-get install -y build-essential git curl libmagic-dev nodejs npm\
-  && apt-get clean && rm -f /var/lib/apt/lists/*_*
+RUN apt-get update -y && apt-get install -y build-essential git curl -y libmagic-dev && \
+  curl -sL https://deb.nodesource.com/setup_18.x | bash - && \
+  apt-get install -y nodejs && \
+  apt-get clean && rm -f /var/lib/apt/lists/*_* && \
+  node --version && \
+  npm --version
+
+RUN npm install -g pnpm
 
 # prepare build dir
 WORKDIR /app
@@ -52,7 +58,8 @@ COPY lib lib
 COPY assets assets
 
 # Install dependencies for assets folder
-RUN npm install --prefix assets
+# RUN cd assets && pnpm install
+RUN pnpm install --prefix assets
 
 # compile assets
 RUN mix assets.deploy
