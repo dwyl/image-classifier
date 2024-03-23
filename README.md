@@ -3453,8 +3453,11 @@ to optimize the app's latency.
 
 In the same spirit,
 we can downsize the original audio file
-so it's easier on the model to process it.
+so it's easier for the model to process it.
 This will have the benefit of less overhead in our application.
+[Even though the `whisper` model does downsize the audio's sampling rate](https://github.com/openai/whisper/discussions/870),
+we can do this on our client side to skip this step
+and marginally reduce the overhead of running the model in our application.
 
 The main parameters we're dealing with are:
 
