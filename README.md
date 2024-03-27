@@ -5662,8 +5662,9 @@ and update it as so:
                 <%= if @image_preview_base64 do %>
                 <form id="upload-form" phx-change="noop" phx-submit="noop">
                   <label class="cursor-pointer">
-                    <%= if not @upload_running? do %> <.live_file_input
-                    upload={@uploads.image_list} class="hidden" /> <% end %>
+                    <%= if not @upload_running? do %> 
+                      <.live_file_input upload={@uploads.image_list} class="hidden" /> 
+                    <% end %>
                     <img src="{@image_preview_base64}" />
                   </label>
                 </form>
@@ -5793,14 +5794,14 @@ and update it as so:
       >
         <span>Transcription: </span>
         <%= if @audio_running? do %>
-        <AppWeb.Spinner.spin spin="{@audio_running?}" />
-        <% else %> <%= if @transcription do %>
-        <span class="text-gray-700 font-light"><%= @transcription %></span>
-        <% else %>
-        <span class="text-gray-300 font-light text-justify"
-          >Waiting for audio input.</span
-        >
-        <% end %> <% end %>
+          <AppWeb.Spinner.spin spin="{@audio_running?}" />
+        <% else %> 
+          <%= if @transcription do %>
+            <span class="text-gray-700 font-light"><%= @transcription %></span>
+          <% else %>
+            <span class="text-gray-300 font-light text-justify">Waiting for audio input.</span>
+          <% end %> 
+        <% end %>
       </div>
       <br />
 
@@ -6187,7 +6188,7 @@ Head over to `lib/app_web/live/page_live.html.heex` and change it like so:
     </div>
   </div>
 </div>
-````
+```
 
 That may look like a lot, but we've done just a handful of changes!
 
