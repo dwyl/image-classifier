@@ -75,8 +75,7 @@ with your voice! 🎙️
       - [3.2 Saving the `HNSWLib` Index in the database](#32-saving-the-hnswlib-index-in-the-database)
       - [3.2 The embeding model](#32-the-embeding-model)
     - [4. Using the Index and embeddings](#4-using-the-index-and-embeddings)
-      - [4.0 Working example on how to use `HNSWLib`](#40-working-example-on-how-to-use-hnswlib)
-        - [4.0.1 Notes on vector spaces](#401-notes-on-vector-spaces)
+      - [4.0 Check the folder "hnswlib"](#40-check-the-folder-hnswlib)
       - [4.1 Computing the embeddings in our app](#41-computing-the-embeddings-in-our-app)
         - [4.1.1 Changing the `Image` schema so it's embeddable](#411-changing-the-image-schema-so-its-embeddable)
         - [4.1.2 Using embeddings in semantic search](#412-using-embeddings-in-semantic-search)
@@ -3465,7 +3464,7 @@ The main parameters we're dealing with are:
 - **use mono** instead of stereo,
 - and **the file type** (WAV, MP3)
 
-Since most microphones on PC have a single channel (mono) and sample at `48kHz`, 
+Since most microphones on PC have a single channel (mono) and sample at `48kHz`,
 we will focus on resampling to `16kHz`.
 We will *not* make the conversion to mp3 here.
 
@@ -4731,240 +4730,10 @@ you can check the next section.
 However, _it is entirely optional_
 and not necessary for our app.
 
-#### 4.0 Working example on how to use `HNSWLib`
+#### 4.0 Check the folder "hnswlib"
 
-The code below can be run in an IEX session
-or in a Livebook.
-
-> [!NOTE]
->
-> This whole section is _entirely optional_.
-> It will just delve more deeply into embedding
-> and provide you with a one-file working example
-> where you can play around with vector embeddings
-> and get a feel of how everything works.
-
-You can endow the vector space with the following metrics by setting the `space` argument from the list:
-
-`[:l2, :ip, :cosine]`
-
-The first is the standard Euclidean metric, the second the inner product, and the third the pseudo-metric "cosine similarity".
-
-We use the small model `"sentence-transformers/paraphrase-MiniLM-L6-v2"` to compute embeddings from text.
-We then use it with `Nx.Serving` to run the model.
-
-```elixir
-Mix.install([
-{:bumblebee, "~> 0.5.0"},
-{:exla, "~> 0.7.0"},
-{:nx, "~> 0.7.0 "},
-{:hnswlib, "~> 0.1.5"},
-])
-
-Nx.global_default_backend(EXLA.Backend)
-
-{:ok, index} =
-  HNSWLib.Index.new(
-    _space = :cosine,
-    _dim = 384,
-    _max_elements = 200
-  )
-
-transformer = "sentence-transformers/paraphrase-MiniLM-L6-v2"
-
-{:ok, %{model: _, params: _} = model_info} =
-      Bumblebee.load_model({:hf, transformer})
-
-{:ok, tokenizer} =
-  Bumblebee.load_tokenizer({:hf, transformer})
-
-serving =
-  Bumblebee.Text.TextEmbedding.text_embedding(
-    model_info,
-    tokenizer,
-    defn_options: [compiler: EXLA],
-    output_pool: :mean_pooling,
-    output_attribute: :hidden_state,
-    embedding_processor: :l2_norm
-  )
-
-HNSWLib.Index.get_current_count(index)
-#{:ok, 0}
-```
-
-You compute an embedding for the word "short":
-
-```elixir
-input = "short"
-# you compute the embedding
-%{embedding: data} =
-    Nx.Serving.run(serving, input)
-```
-
-and you get:
-
-```elixir
-%{
-  embedding: #Nx.Tensor<
-    f32[384]
-    [-0.03144503012299538, 0.12630629539489746, 0.018703147768974304,...]
-}
-```
-
-You then append the embedding to your Index:
-
-```elixir
-:ok = HNSWLib.Index.add_items(index, data)
-
-HNSWLib.Index.save_index(index, "my_index.bin")
-#{:ok, 1}
-```
-
-You should see a file `"my_index.bin"` is your current directory.
-
-When you append an entry one by one, you can get the final indice of the Index with:
-
-```elixir
-HNSWLib.Index.get_current_count(index)
-```
-
-This means you can persist the index to uniquely identify an item.
-
-You can also enter a batch of items. You will only get back the last indice.
-This means that you may need to persist the embedding if you want to identify the input in this case.
-
-Let's enter another entry:
-
-```elixir
-input = "tall"
-# you get an embedding
-%{embedding: data} =
-    Nx.Serving.run(serving, input)
-
-# you build your Index struct
-:ok = HNSWLib.Index.add_items(index, data)
-
-HNSWLib.Index.save_index(index, "my_index.bin")
-
-HNSWLib.Index.get_current_count(index)
-#{:ok, 2}
-```
-
-You now run a `knn_query`from a text input - converted into an embedding - to look for the closest element present in the Index.
-
-Let's find the closest item in the Index to the input "small".
-We expect to get "short", the first item.
-
-```elixir
-input = "small"
-# you normalise your query data
-%{embedding: query_data} =
-  Nx.Serving.run(serving, input)
-
-{:ok, labels, _d} =
-    HNSWLib.Index.knn_query(
-      index,
-      query_data,
-      k: 1
-    )
-```
-
-You should get:
-
-```elixir
-{:ok,
- #Nx.Tensor<
-   u64[1][1]
-   EXLA.Backend<host:0, 0.968243412.4269146128.215737>
-   [
-     [0]
-   ]
- >,
- #Nx.Tensor<
-   f32[1][1]
-   EXLA.Backend<host:0, 0.968243412.4269146128.215739>
-   [
-     [0.3143616318702698]
-   ]
- >}
-```
-
-This means that the nearest neighbour of the given input has the indice "0" in the Index.
-This corresponds to the entry "short".
-
-We can recover the embedding to compare:
-
-```elixir
-{:ok, data} =
-  HNSWLib.Index.get_items(
-    index,
-    Nx.to_flat_list(labels[0])
-  )
-
-Enum.map(data, fn
-  d -> Nx.from_binary(d, :f32)
-end)
-|> Nx.stack()
-```
-
-The result is:
-
-```elixir
-##Nx.Tensor<
-  f32[1][384]
-  EXLA.Backend<host:0, 0.968243412.4269146128.215745>
-  [
-     [-0.031445033848285675, 0.12630631029605865, 0.018703149631619453,...]
-  ]
-```
-
-You should now be able to
-recover the first embedding.
-
-##### 4.0.1 Notes on vector spaces
-
-A vector space of embeddings can be equipped with a (Euclidean) _inner product_. If $u=(u_1,\dots,u_n)$ and $v=(v_1,\dots,v_n)$ are two embeddings, the (euclidean) inner product is defined as:
-
-$< u,v >=u_1v_1+\cdots+u_nv_n$
-
-This inner product induces an Euclidean _norm_:
-
-$||u|| = \sqrt{< u,u >} = \sqrt{u_1^2+\cdots+u_n^2}$
-
-Let $u_v$ be the perpendicular projection of $u$ on $v$. Then:
-
-$< u, v > = < u_v,v > = ||u||\cdot ||v|| \cos\widehat{u,v}$
-
-The value below is known as the _cosine similarity_.
-
-$<\frac{u}{||u||}\frac{v}{\||v||}> = \cos\widehat{u,v}$.
-
-You will remark that the norm of any embedding $\frac1{||u||}u$ is 1. We say that the embedding is $L_2$-normalised.
-
-The previous formula shows that the inner product of normalised (aka unit) embeddings is the `cosine` of the angle between these "normalised" embeddings.
-
-> Source: <https://en.wikipedia.org/wiki/Cosine_similarity>
-
-_Note that this is not a distance._
-
-The norm in turn induces a _distance_:
-$d(u,v) = ||u-v||$
-
-By definition,  
-$||u-v||^2  = < u-v,u-v >$.
-
-By developing, we obtain:
-
-$||u-v||^2  = ||u||^2+||v||^2-2< u,v >$
-
-Consider now two normalised vectors. We have:
-$\frac12||u-v||^2=1-\cos\widehat{u,v} = d_c(u,v)$
-
-This is commonly known as the **cosine distance** _when the embeddings are normalised_. It ranges from 0 to 2. Note that it is not a true distance metric.
-
-Finally, note that since we are dealing with finite dimensional vector spaces, all the norms are equivalent (in some precise mathematical way). This means that the limit points are always the same. However, the values of the distances can be quite different, and a "clusterisation" process can give significantly different results.
-
-The first hint as to which norm to choose is to take the norm used to train the model.
+For a working example on how to use the index in `hnswlib`,
+you can run the ".exs" file there.
 
 #### 4.1 Computing the embeddings in our app
 
@@ -6025,13 +5794,13 @@ and update it as so:
       >
         <span>Transcription: </span>
         <%= if @audio_running? do %>
-          <AppWeb.Spinner.spin spin={@audio_running?} />
-        <% else %>
+          <AppWeb.Spinner.spin spin="{@audio_running?}" />
+        <% else %> 
           <%= if @transcription do %>
-          <span class="text-gray-700 font-light"><%= @transcription %></span>
+            <span class="text-gray-700 font-light"><%= @transcription %></span>
           <% else %>
-          <span class="text-gray-300 font-light text-justify">Waiting for audio input.</span>
-          <% end %>
+            <span class="text-gray-300 font-light text-justify">Waiting for audio input.</span>
+          <% end %> 
         <% end %>
       </div>
       <br />
@@ -6550,4 +6319,3 @@ If you find this package/repo useful,
 please star it on GitHub, so that we know! ⭐
 
 Thank you! 🙏
-
