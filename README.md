@@ -1759,10 +1759,10 @@ Add the following function to the file.
 
     # Only run if the user hasn't uploaded anything
     if(is_nil(socket.assigns.task_ref)) do
-      # Retrieves a random image from Unsplash with a given `image_width` dimension
-      random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
+      # Retrieves a random image from Picsum with a given `image_width` dimension
+      random_image = "https://picsum.photos#{@image_width}/#{@image_width}"
 
-      # Spawns prediction tasks for example image from random Unsplash image
+      # Spawns prediction tasks for example image from random Picsum image
       tasks = for _ <- 1..2 do
         {:req, body} = {:req, Req.get!(random_image).body}
         predict_example_image(body)
@@ -1789,7 +1789,7 @@ Add the following function to the file.
 > to download the file binary from the URL.
 > Make sure to install it in the `mix.exs` file.
 
-- we are using the [Unsplash API](https://unsplash.com/developers),
+- we are using the [Picsum API](https://picsum.photos),
   an _awesome_ image API with lots of photos!
   They provide a `/random` URL that yields a random photo.
   In this URL we can inclusively define the dimensions we want!
@@ -1827,7 +1827,7 @@ In the same file, add:
          {:pre_process, {:ok, t_img}} <-
            {:pre_process, pre_process_image(img_thumb)} do
 
-      # Create an async task to classify the image from unsplash
+      # Create an async task to classify the image from Picsum
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)
@@ -2186,7 +2186,7 @@ to base64 encode our images
 so they can be shown to the person.
 
 Initially, we did this because
-`https://source.unsplash.com/random/`
+`https://picsum.photos`
 resolves into a different URL every time it is called.
 This means that the image that was fed into the model
 would be different from the one shown in the example list
@@ -2205,7 +2205,7 @@ To fix this,
 >
 > ```elixir
 > %{scheme: scheme, host: host, path: path} =
->     Finch.build(:get, "https://source.unsplash.com/random/")
+>     Finch.build(:get, "https://picsum.photos")
 >     |> Finch.request!(MyFinch)
 >     |> Map.get(:headers)
 >     |> Enum.filter(fn {a, _b} -> a == "location" end)
@@ -2288,7 +2288,7 @@ which we will now change.
            {:vix, Vix.Vips.Operation.thumbnail_buffer(body, @image_width)},
          {:pre_process, {:ok, t_img}} <- {:pre_process, pre_process_image(img_thumb)} do
 
-      # Create an async task to classify the image from unsplash
+      # Create an async task to classify the image from Picsum
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)
@@ -2371,7 +2371,7 @@ so it uses the `:url` parameter.
 And we're done! 🎉
 
 We are now rendering the image on the client
-through the URL the Unsplash API resolves into
+through the URL the Picsum API resolves into
 instead of having the LiveView server
 encoding the image.
 Therefore, we're saving some CPU
@@ -2384,7 +2384,7 @@ Now let's see our application in action!
 We are expecting the examples to be shown after
 **8 seconds** of inactivity.
 If the person is inactive for this time duration,
-we fetch a random image from Unsplash API
+we fetch a random image from Picsum API
 and feed it to our model!
 
 You should see different images every time you use the app.
