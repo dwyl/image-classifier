@@ -69,7 +69,7 @@ defmodule AppWeb.PageLive do
   end
 
   @doc """
-  This function retrieves a random image from Unsplash API through a URL like "https://source.unsplash.com/random/640x640"
+  This function retrieves a random image from Picsum API through a URL like "https://picsum.photos/640/640"
   and creates async tasks to classify it.
 
   Should be invoked after some seconds when LiveView is mounted.
@@ -77,10 +77,10 @@ defmodule AppWeb.PageLive do
   def handle_event("show_examples", _data, %{assigns: assigns} = socket)
       when is_nil(assigns.task_ref) do
     # Only run if the user hasn't uploaded anything
-    # Retrieves a random image from Unsplash with a given `image_width` dimension
-    random_image = "https://source.unsplash.com/random/#{@image_width}x#{@image_width}"
+    # Retrieves a random image from Picsum with a given `image_width` dimension
+    random_image = "https://picsum.photos/#{@image_width}/#{@image_width}"
 
-    # Spawns prediction tasks for example image from random Unsplash image
+    # Spawns prediction tasks for example image from random Picsum image
     tasks =
       for _ <- 1..2 do
         %{url: url, body: body} = track_redirected(random_image)
@@ -487,7 +487,7 @@ defmodule AppWeb.PageLive do
            {:vix, Vops.thumbnail_buffer(body, @image_width)},
          {:pre_process, {:ok, t_img}} <-
            {:pre_process, pre_process_image(img_thumb)} do
-      # Create an async task to classify the image from unsplash
+      # Create an async task to classify the image from Picsum
       Task.Supervisor.async(App.TaskSupervisor, fn ->
         Nx.Serving.batched_run(ImageClassifier, t_img)
       end)
@@ -571,7 +571,7 @@ defmodule AppWeb.PageLive do
     {:error, msg}
   end
 
-  # Helper function to track the redirected URI from random Unsplash images.
+  # Helper function to track the redirected URI from random Picsum images.
   defp track_redirected(url) do
     # Create request
     req = Req.new(url: url)
