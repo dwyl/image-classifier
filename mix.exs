@@ -41,7 +41,7 @@ defmodule App.MixProject do
   defp deps do
     [
       {:phoenix, "~> 1.7.10"},
-      {:phoenix_html, "~> 4.1.1"},
+      {:phoenix_html, "~> 4.2.0"},
       {:phoenix_live_reload, "~> 1.5.0", only: :dev},
       {:phoenix_live_view, "~> 0.20.7"},
       {:heroicons, "~> 0.5.3"},
