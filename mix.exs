@@ -72,7 +72,7 @@ defmodule App.MixProject do
       {:hnswlib, "~> 0.1.5"},
 
       # Image
-      {:vix, "~> 0.31.1"},
+      {:vix, "~> 0.33.0"},
 
       # Testing
       {:excoveralls, "~> 0.15", only: [:test, :dev]},
