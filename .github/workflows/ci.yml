@@ -27,11 +27,23 @@ jobs:
     - name: Set up Elixir
       uses: erlef/setup-beam@v1
       with:
-        elixir-version: '1.17.3' # Define the elixir version [required]
-        otp-version: '27.1.2' # Define the OTP version [required]
+        elixir-version: '1.16.0' # Define the elixir version [required]
+        otp-version: '26.2.1' # Define the OTP version [required]
 
     - name: Installing ffmpeg
       uses: FedericoCarboni/setup-ffmpeg@v3
+
+    # Needed because of `ubuntu-latest` migration removed `libmagic-dev`.
+    # https://www.yellowduck.be/posts/github-actions-will-update-ubuntu-latest-to-ubuntu-24-04?t
+    - name: Install libmagic-dev
+      run: sudo apt-get update && sudo apt-get install -y libmagic-dev
+
+    - name: Restore dependencies cache
+      uses: actions/cache@v2
+      with:
+        path: deps
+        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-mix-
 
     - name: Install dependencies
       run: mix deps.get
