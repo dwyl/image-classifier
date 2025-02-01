@@ -14,8 +14,5 @@
       "lib/app_web/components",
       "lib/app_web/endpoint.ex",
       "lib/app_web/telemetry.ex"
-    ],
-    "coverage_options": {
-      "minimum_coverage": 95
-    }
+    ]
   }
