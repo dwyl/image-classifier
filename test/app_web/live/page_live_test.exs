@@ -179,7 +179,7 @@ defmodule AppWeb.PageLiveTest do
       # Wait for the prediction to end
       AppWeb.SupervisorSupport.wait_for_completion()
 
-      # No prediction occured.
+      # No prediction occurred.
       assert render(lv) =~ "Waiting for image input."
     end
   end
@@ -205,7 +205,7 @@ defmodule AppWeb.PageLiveTest do
       # Wait for the prediction to end
       AppWeb.SupervisorSupport.wait_for_completion()
 
-      # No prediction occured because API is down.
+      # No prediction occurred because API is down.
       assert render(lv) =~ "Waiting for image input."
     end
   end
@@ -233,7 +233,7 @@ defmodule AppWeb.PageLiveTest do
     # Wait for the audio prediction to end
     AppWeb.SupervisorSupport.wait_for_completion()
 
-    # No prediction occured because there was an error with transaction.
+    # No prediction occurred because there was an error with transaction.
     assert render(lv) =~ "Waiting for image input."
   end
 
@@ -260,7 +260,7 @@ defmodule AppWeb.PageLiveTest do
     # Wait for the audio prediction to end
     AppWeb.SupervisorSupport.wait_for_completion()
 
-    # No prediction occured because there was an error with transaction.
+    # No prediction occurred because there was an error with transaction.
     assert render(lv) =~ "Waiting for image input."
   end
 
@@ -287,35 +287,72 @@ defmodule AppWeb.PageLiveTest do
     # Wait for the audio prediction to end
     AppWeb.SupervisorSupport.wait_for_completion()
 
-    # No prediction occured because there was an error with transaction.
+    # No prediction occurred because there was an error with transaction.
     assert render(lv) =~ "Waiting for image input."
   end
 
   test_with_mock "uploading a file with incorrect MIME type",
-    %{conn: conn},
-    App.Image,
-    [:passthrough],
-    gen_magic_eval: fn (_, _) -> {:error, "Incorret magic MIME"} end do
-  # Resetting index files so we have a fresh index file
-  {:ok, lv, html} = start_liveview_with_empty_images_and_index(conn)
-  assert html =~ "Caption your image!"
+                 %{conn: conn},
+                 App.Image,
+                 [:passthrough],
+                 gen_magic_eval: fn _, _ -> {:error, "Incorrect magic MIME."} end do
+    # Resetting index files so we have a fresh index file
+    {:ok, lv, html} = start_liveview_with_empty_images_and_index(conn)
+    assert html =~ "Caption your image!"
 
-  # Get file and add it to the form
-  file =
-  [:code.priv_dir(:app), "static", "images", "phoenix.png"]
-  |> Path.join()
-  |> build_upload("image/png")
+    # Get file and add it to the form
+    file =
+      [:code.priv_dir(:app), "static", "images", "phoenix.png"]
+      |> Path.join()
+      |> build_upload("image/png")
 
-  image = file_input(lv, "#upload-form", :image_list, [file])
+    image = file_input(lv, "#upload-form", :image_list, [file])
 
-  # Should show an uploaded local file
-  assert render_upload(image, file.name)
+    # Should show an uploaded local file
+    assert render_upload(image, file.name)
 
-  # Wait for the audio prediction to end
-  AppWeb.SupervisorSupport.wait_for_completion()
+    # Wait for the audio prediction to end
+    AppWeb.SupervisorSupport.wait_for_completion()
 
-  # No prediction occured because there was an error with transaction.
-  assert render(lv) =~ "Waiting for image input."
+    # No prediction occurred because there was an error with transaction.
+    assert render(lv) =~ "Waiting for image input."
+
+    # Assert that the event was pushed to show person a toast message
+    assert_push_event(lv, "toast", %{
+      message: "Image couldn't be uploaded to S3.\nIncorrect magic MIME."
+    })
+  end
+
+  test_with_mock "uploading a file but file couldn't be read",
+                 %{conn: conn},
+                 File,
+                 [:passthrough],
+                 read: fn _ -> {:error, "Error reading file."} end do
+    # Resetting index files so we have a fresh index file
+    {:ok, lv, html} = start_liveview_with_empty_images_and_index(conn)
+    assert html =~ "Caption your image!"
+
+    # Get file and add it to the form
+    file =
+      [:code.priv_dir(:app), "static", "images", "phoenix.png"]
+      |> Path.join()
+      |> build_upload("image/png")
+
+    image = file_input(lv, "#upload-form", :image_list, [file])
+
+    # Should show an uploaded local file
+    assert render_upload(image, file.name)
+
+    # Wait for the audio prediction to end
+    AppWeb.SupervisorSupport.wait_for_completion()
+
+    # No prediction occurred because there was an error with transaction.
+    assert render(lv) =~ "Waiting for image input."
+
+    # Assert that the event was pushed to show person a toast message
+    assert_push_event(lv, "toast", %{
+      message: "Image couldn't be uploaded to S3.\n{:error, \"Error reading file.\"}"
+    })
   end
 
   ############################################################
@@ -384,7 +421,8 @@ defmodule AppWeb.PageLiveTest do
 
     reset()
 
-    assert {:error, "Error comparing the index file with the one on the database. Incoherence on table."} ==
+    assert {:error,
+            "Error comparing the index file with the one on the database. Incoherence on table."} ==
              Supervisor.start_child(App.Supervisor, {App.KnnIndex, [space: :cosine, index: path]})
              |> elem(1)
              |> elem(0)
