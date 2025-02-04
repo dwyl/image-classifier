@@ -291,6 +291,33 @@ defmodule AppWeb.PageLiveTest do
     assert render(lv) =~ "Waiting for image input."
   end
 
+  test_with_mock "uploading a file with incorrect MIME type",
+    %{conn: conn},
+    App.Image,
+    [:passthrough],
+    gen_magic_eval: fn (_, _) -> {:error, "Incorret magic MIME"} end do
+  # Resetting index files so we have a fresh index file
+  {:ok, lv, html} = start_liveview_with_empty_images_and_index(conn)
+  assert html =~ "Caption your image!"
+
+  # Get file and add it to the form
+  file =
+  [:code.priv_dir(:app), "static", "images", "phoenix.png"]
+  |> Path.join()
+  |> build_upload("image/png")
+
+  image = file_input(lv, "#upload-form", :image_list, [file])
+
+  # Should show an uploaded local file
+  assert render_upload(image, file.name)
+
+  # Wait for the audio prediction to end
+  AppWeb.SupervisorSupport.wait_for_completion()
+
+  # No prediction occured because there was an error with transaction.
+  assert render(lv) =~ "Waiting for image input."
+  end
+
   ############################################################
   # UNIT TESTS ON HANDLERS -----------------------------------
   ############################################################
