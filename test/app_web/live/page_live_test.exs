@@ -419,6 +419,38 @@ defmodule AppWeb.PageLiveTest do
     })
   end
 
+  test_with_mock "uploading a file but fail to thumbnail the image",
+                 %{conn: conn},
+                 Vix.Vips.Operation,
+                 [:passthrough],
+                 thumbnail: fn (_, _, _) -> {:error, "Could not thumbnail image."} end do
+    # Resetting index files so we have a fresh index file
+    {:ok, lv, html} = start_liveview_with_empty_images_and_index(conn)
+    assert html =~ "Caption your image!"
+
+    # Get file and add it to the form
+    file =
+      [:code.priv_dir(:app), "static", "images", "phoenix.png"]
+      |> Path.join()
+      |> build_upload("image/png")
+
+    image = file_input(lv, "#upload-form", :image_list, [file])
+
+    # Should show an uploaded local file
+    assert render_upload(image, file.name)
+
+    # Wait for the audio prediction to end
+    AppWeb.SupervisorSupport.wait_for_completion()
+
+    # No prediction occurred because there was an error with transaction.
+    assert render(lv) =~ "Waiting for image input."
+
+    # Assert that the event was pushed to show person a toast message
+    assert_push_event(lv, "toast", %{
+      message: "Image couldn't be uploaded to S3.\n\"Could not thumbnail image.\""
+    })
+  end
+
   ############################################################
   # UNIT TESTS ON HANDLERS -----------------------------------
   ############################################################
