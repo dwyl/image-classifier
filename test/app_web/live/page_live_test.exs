@@ -210,7 +210,7 @@ defmodule AppWeb.PageLiveTest do
     end
   end
 
-  test_with_mock "uploading a file and failing the transaction with invalid entry",
+  test_with_mock "uploading an image and failing the transaction with invalid entry",
                  %{conn: conn},
                  App.Repo,
                  [:passthrough],
@@ -237,7 +237,7 @@ defmodule AppWeb.PageLiveTest do
     assert render(lv) =~ "Waiting for image input."
   end
 
-  test_with_mock "uploading a file and failing the transaction with error saving index",
+  test_with_mock "uploading an image and failing the transaction with error saving index",
                  %{conn: conn},
                  App.Repo,
                  [:passthrough],
@@ -264,7 +264,7 @@ defmodule AppWeb.PageLiveTest do
     assert render(lv) =~ "Waiting for image input."
   end
 
-  test_with_mock "uploading a file and failing when creating partial image",
+  test_with_mock "uploading an image and failing when creating partial image",
                  %{conn: conn},
                  App.Image,
                  [:passthrough],
@@ -291,7 +291,7 @@ defmodule AppWeb.PageLiveTest do
     assert render(lv) =~ "Waiting for image input."
   end
 
-  test_with_mock "uploading a file with incorrect MIME type",
+  test_with_mock "uploading an image with incorrect MIME type",
                  %{conn: conn},
                  App.Image,
                  [:passthrough],
@@ -323,7 +323,7 @@ defmodule AppWeb.PageLiveTest do
     })
   end
 
-  test_with_mock "uploading a file but file couldn't be read",
+  test_with_mock "uploading an image but file couldn't be read",
                  %{conn: conn},
                  File,
                  [:passthrough],
@@ -355,7 +355,7 @@ defmodule AppWeb.PageLiveTest do
     })
   end
 
-  test_with_mock "uploading a file but image info is invalid",
+  test_with_mock "uploading an image but image info is invalid",
                  %{conn: conn},
                  ExImageInfo,
                  [:passthrough],
@@ -387,7 +387,7 @@ defmodule AppWeb.PageLiveTest do
     })
   end
 
-  test_with_mock "uploading a file but check mime type fails",
+  test_with_mock "uploading an image but check mime type fails",
                  %{conn: conn},
                  ExImageInfo,
                  [:passthrough],
@@ -419,7 +419,7 @@ defmodule AppWeb.PageLiveTest do
     })
   end
 
-  test_with_mock "uploading a file but fail to thumbnail the image",
+  test_with_mock "uploading an image but fail to thumbnail the image",
                  %{conn: conn},
                  Vix.Vips.Operation,
                  [:passthrough],
@@ -451,7 +451,7 @@ defmodule AppWeb.PageLiveTest do
     })
   end
 
-  test_with_mock "uploading a file but pre-processing fails",
+  test_with_mock "uploading an image but pre-processing fails",
                  %{conn: conn},
                  Vix.Vips.Operation,
                  [:passthrough],
@@ -480,6 +480,38 @@ defmodule AppWeb.PageLiveTest do
     # Assert that the event was pushed to show person a toast message
     assert_push_event(lv, "toast", %{
       message: "Image couldn't be uploaded to S3.\npre_processing error"
+    })
+  end
+
+  test_with_mock "uploading an image but checking sha1 fails",
+                 %{conn: conn},
+                 App.Repo,
+                 [:passthrough],
+                 get_by: fn _, _ -> nil end do
+    # Resetting index files so we have a fresh index file
+    {:ok, lv, html} = start_liveview_with_empty_images_and_index(conn)
+    assert html =~ "Caption your image!"
+
+    # Get file and add it to the form
+    file =
+      [:code.priv_dir(:app), "static", "images", "phoenix.png"]
+      |> Path.join()
+      |> build_upload("image/png")
+
+    image = file_input(lv, "#upload-form", :image_list, [file])
+
+    # Should show an uploaded local file
+    assert render_upload(image, file.name)
+
+    # Wait for the audio prediction to end
+    AppWeb.SupervisorSupport.wait_for_completion()
+
+    # No prediction occurred because there was an error with transaction.
+    assert render(lv) =~ "Waiting for image input."
+
+    # Assert that the event was pushed to show person a toast message
+    assert_push_event(lv, "toast", %{
+      message: "Race condition"
     })
   end
 

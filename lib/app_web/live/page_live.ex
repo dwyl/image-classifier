@@ -318,6 +318,7 @@ defmodule AppWeb.PageLive do
            tmp_wav: @tmp_wav
          )}
 
+      # coveralls-ignore-next-line
       nil ->
         {:noreply,
          assign(socket,
@@ -431,6 +432,7 @@ defmodule AppWeb.PageLive do
                label: nil
              )}
 
+          # coveralls-ignore-next-line
           {:error, msg} ->
             {:noreply,
              socket
