@@ -46,7 +46,7 @@ defmodule App.MixProject do
       {:phoenix_live_view, "~> 1.0.1"},
       {:heroicons, "~> 0.5.3"},
       {:floki, ">= 0.35.2", only: :test},
-      {:esbuild, "~> 0.9.0", runtime: Mix.env() == :dev},
+      {:esbuild, "~> 0.10.0", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3.1", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
