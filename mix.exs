@@ -40,12 +40,12 @@ defmodule App.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:phoenix, "~> 1.7.10"},
-      {:phoenix_html, "~> 4.2.0"},
-      {:phoenix_live_reload, "~> 1.6.0", only: :dev},
-      {:phoenix_live_view, "~> 1.1.2"},
+      {:phoenix, "1.7.21"},
+      {:phoenix_html, "4.2.1"},
+      {:phoenix_live_reload, "1.6.0", only: :dev},
+      {:phoenix_live_view, "1.0.14"},
       {:heroicons, "~> 0.5.3"},
-      {:floki, ">= 0.35.2", only: :test},
+      {:floki, "0.37.1", only: :test},
       {:esbuild, "~> 0.10.0", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.3.1", runtime: Mix.env() == :dev},
       {:telemetry_metrics, "~> 1.0"},
