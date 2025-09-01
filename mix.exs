@@ -42,7 +42,7 @@ defmodule App.MixProject do
     [
       {:phoenix, "1.7.21"},
       {:phoenix_html, "4.2.1"},
-      {:phoenix_live_reload, "1.6.0", only: :dev},
+      {:phoenix_live_reload, "1.6.1", only: :dev},
       {:phoenix_live_view, "1.0.14"},
       {:heroicons, "~> 0.5.3"},
       {:floki, "0.37.1", only: :test},
