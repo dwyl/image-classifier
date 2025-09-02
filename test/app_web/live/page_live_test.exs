@@ -111,8 +111,10 @@ defmodule AppWeb.PageLiveTest do
     AppWeb.SupervisorSupport.wait_for_completion()
 
     # A prediction should have occurred and the label should be shown with the audio transcription
-    assert render(lv) |> Floki.find("#output") |> Floki.text() =~
-             "Sometimes, the inner voice is encouraging"
+    html = render(lv)
+    parsed_html = Floki.parse_fragment!(html)
+    assert parsed_html |> Floki.find("#output") |> Floki.text() =~
+            "Sometimes, the inner voice is encouraging"
   end
 
   ############################################################
@@ -870,7 +872,9 @@ defmodule AppWeb.PageLiveTest do
     AppWeb.SupervisorSupport.wait_for_completion()
 
     # A prediction should have occurred and the label should be shown with the audio transcription
-    assert render_async(lv) |> Floki.find("#output") |> Floki.text() =~
-             "!! The image bank is empty. Please upload some !!"
+    html = render_async(lv)
+    parsed_html = Floki.parse_fragment!(html)
+    assert parsed_html |> Floki.find("#output") |> Floki.text() =~
+            "!! The image bank is empty. Please upload some !!"
   end
 end
