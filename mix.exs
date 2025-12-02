@@ -43,7 +43,7 @@ defmodule App.MixProject do
       {:phoenix, "1.8.1"},
       {:phoenix_html, "4.3.0"},
       {:phoenix_live_reload, "1.6.1", only: :dev},
-      {:phoenix_live_view, "1.0.14"},
+      {:phoenix_live_view, "1.1.18"},
       {:heroicons, "~> 0.5.3"},
       {:floki, "0.38.0", only: :test},
       {:esbuild, "~> 0.10.0", runtime: Mix.env() == :dev},
