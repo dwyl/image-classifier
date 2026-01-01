@@ -6,3 +6,5 @@ updates:
     interval: monthly
     time: "07:00"
     timezone: Europe/London
+  ignore:
+    - dependency-name: "phoenix_live_view"
