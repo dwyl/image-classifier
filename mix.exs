@@ -51,7 +51,7 @@ defmodule App.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:jason, "~> 1.4"},
-      {:plug_cowboy, "~> 2.7.0"},
+      {:plug_cowboy, "~> 2.8.1"},
 
       # HTTP Request
       {:httpoison, "~> 2.2"},
