@@ -54,7 +54,7 @@ defmodule App.MixProject do
       {:plug_cowboy, "~> 2.8.1"},
 
       # HTTP Request
-      {:httpoison, "~> 2.2"},
+      {:httpoison, "~> 3.0"},
       {:req, "0.6.2"},
       {:mime, "~> 2.0.5"},
       {:ex_image_info, "~> 1.0.0"},
