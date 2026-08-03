@@ -655,7 +655,7 @@ In the `serving/0` function, we are loading the[`ResNet-50`](https://huggingface
 >
 > It takes raw information and performs various transformations,
 > such as
-> [tokenization](https://neptune.ai/blog/tokenization-in-nlp),
+> [tokenization](https://www.bestaiweb.ai/glossary/tokenization/),
 > [padding](https://www.baeldung.com/cs/deep-neural-networks-padding),
 > and encoding to prepare the data for model training or inference.
 
